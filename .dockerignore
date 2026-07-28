@@ -10,6 +10,7 @@ __pycache__
 *.pyc
 *.pyo
 .run-logs
+.cache
 *.log
 *.sqlite3
 *.db
@@ -24,10 +25,7 @@ __pycache__
 frontend/node_modules
 frontend/dist
 frontend/dist-ssr
-backend/log
-backend/temp_files
-temp_files
-embedding/web_data_embeddings
+var
 backend/static/*
 !backend/static/default
 !backend/static/default/**

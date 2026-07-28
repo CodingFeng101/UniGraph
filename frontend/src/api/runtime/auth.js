@@ -3,6 +3,7 @@
  * 对接旧系统 JWT 认证机制
  */
 import CryptoJS from 'crypto-js';
+import { isLogin } from '@/utils/auth';
 import { AppConfig } from './config';
 
 const TOKEN_KEY = 'access_token';
@@ -11,7 +12,7 @@ const USER_KEY = 'user';
 export const Auth = window.Auth = {
   /** 是否已登录 */
   isLogin() {
-    return !!localStorage.getItem(TOKEN_KEY);
+    return isLogin();
   },
 
   /** 获取 token */
@@ -51,7 +52,7 @@ export const Auth = window.Auth = {
    */
   requireAuth(loginPath) {
     if (!this.isLogin()) {
-    window.location.href = loginPath || '/unigraph/login';
+      window.location.href = loginPath || `${import.meta.env.BASE_URL}login`;
       return false;
     }
     return true;
@@ -69,7 +70,7 @@ export const Auth = window.Auth = {
     }
     this.clearToken();
     this.clearUserInfo();
-      window.location.href = '/unigraph/login';
+    window.location.href = `${import.meta.env.BASE_URL}login`;
   },
 
   /**

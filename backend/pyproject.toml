@@ -63,14 +63,3 @@ dependencies = [
 requires-python = ">=3.11,<3.13"
 readme = "README.md"
 license = "MIT"
-
-[tool.pdm.dev-dependencies]
-lint = [
-    "ruff==0.15.20",
-]
-
-[tool.pdm]
-distribution = false
-
-[tool.pdm.scripts]
-lint = "pre-commit run --all-files"

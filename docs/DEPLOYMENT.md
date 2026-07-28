@@ -32,7 +32,7 @@ CREATE DATABASE onlineunigraph CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 导入初始化数据：
 
 ```bash
-mysql -uroot -p onlineunigraph < dockerunigraph.sql
+mysql -uroot -p onlineunigraph < deploy/mysql/init/01-schema.sql
 ```
 
 ## 3. 传统部署
@@ -147,7 +147,7 @@ window.FRONTEND_CONFIG = {
 
 可参考：
 
-- `docker/nginx/default.conf.template`
+- `deploy/nginx/default.conf.template`
 
 核心思路：
 
@@ -184,7 +184,7 @@ docker compose --env-file .env.docker up -d --build
 ### 4.3 生产部署
 
 ```bash
-docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.yml.prod up -d --build
+docker compose --env-file .env.docker -f compose.yaml -f deploy/compose.prod.yaml up -d --build
 ```
 
 ### 4.4 服务说明
@@ -233,20 +233,19 @@ docker compose --env-file .env.docker down -v
 这些目录或卷建议保留：
 
 - `backend/static`
-- `backend/temp_files`
-- `backend/log`
+- `var`
 - `mysql_data`
 - `redis_data`
 
 ## 6. 部署相关文件
 
-- `docker-compose.yml`
-- `docker-compose.yml.prod`
-- `Dockerfile.backend`
-- `Dockerfile.celery`
-- `Dockerfile.frontend`
-- `docker/nginx/default.conf.template`
-- `docker/nginx/40-runtime-config.sh`
+- `compose.yaml`
+- `deploy/compose.prod.yaml`
+- `deploy/docker/backend.Dockerfile`
+- `deploy/docker/frontend.Dockerfile`
+- `deploy/mysql/init/01-schema.sql`
+- `deploy/nginx/default.conf.template`
+- `deploy/nginx/40-runtime-config.sh`
 - `frontend/public/config.js`
 - `.env.docker.example`
 - `.dockerignore`

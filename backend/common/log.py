@@ -86,8 +86,7 @@ def setup_logging():
 
 def set_customize_logfile():
     log_path = path_conf.LOG_DIR
-    if not os.path.exists(log_path):
-        os.mkdir(log_path)
+    os.makedirs(log_path, exist_ok=True)
 
     # log files
     log_stdout_file = os.path.join(log_path, settings.LOG_STDOUT_FILENAME)

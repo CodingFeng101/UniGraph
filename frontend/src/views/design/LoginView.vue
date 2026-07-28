@@ -224,6 +224,14 @@ export default {
     resetForm: { username: '', email: '', password: '', confirmPassword: '', captcha: '' },
   }),
   computed: {
+    loginRedirect() {
+      const redirect = this.$route.query.redirect;
+      if (typeof redirect !== 'string') return { name: 'workspace' };
+
+      const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const normalized = redirect.startsWith(`${base}/`) ? redirect.slice(base.length) : redirect;
+      return normalized.startsWith('/') && !normalized.startsWith('//') ? normalized : { name: 'workspace' };
+    },
     modeInfo() {
       return {
         login: { title: '登录', subtitle: '欢迎使用 UniGraph 知识图谱平台' },
@@ -236,7 +244,7 @@ export default {
     document.title = '登录';
     document.body.className = '';
     if (Auth.isLogin()) {
-      window.location.href = '/unigraph/workspace';
+      this.$router.replace(this.loginRedirect);
       return;
     }
     const rememberedUsername = window.localStorage.getItem('unigraph-remembered-username');
@@ -297,7 +305,7 @@ export default {
         } catch {
           // 用户信息失败不阻断已经成功的登录。
         }
-        window.location.href = '/unigraph/workspace';
+        await this.$router.replace(this.loginRedirect);
       } catch (error) {
         this.feedback = { message: error.msg || error.message || '网络错误，请重试', success: false };
         this.loginForm.captcha = '';

@@ -6,10 +6,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKIPPED_DIRS = {
     '.git',
+    '.cache',
     '.run-venv.local',
     'node_modules',
     'dist',
-    'temp_files',
+    'var',
     '__pycache__',
 }
 
@@ -51,8 +52,8 @@ class OpenSourceSecurityTests(unittest.TestCase):
             'backend/.env',
             'backend/.env.dev',
             'backend/.env.prod',
-            'backend/log/fba_access.log',
-            'backend/log/fba_error.log',
+            'var/log/fba_access.log',
+            'var/log/fba_error.log',
             'frontend/Apache/privkey.key',
             'frontend/IIS/fullchain.pfx',
             'frontend/IIS/password.txt',

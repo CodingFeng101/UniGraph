@@ -11,7 +11,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-LOG_PATHS = [REPO_ROOT / 'backend/log/fba_access.log', REPO_ROOT / 'backend/log/fba_error.log']
+LOG_PATHS = [REPO_ROOT / 'var/log/fba_access.log', REPO_ROOT / 'var/log/fba_error.log']
 PREEXISTING_LOGS = {path for path in LOG_PATHS if path.exists()}
 
 
@@ -23,6 +23,7 @@ def remove_generated_logs() -> None:
 
 
 TEST_ENV = {
+    'UNIGRAPH_RUNTIME_DIR': str(REPO_ROOT / 'var'),
     'ENVIRONMENT': 'dev',
     'MYSQL_HOST': '127.0.0.1',
     'MYSQL_PORT': '3306',

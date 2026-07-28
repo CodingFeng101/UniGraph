@@ -101,7 +101,7 @@ docker compose --env-file .env.docker ps
 - Web：<http://localhost:8080>
 - OpenAPI（开发环境）：<http://localhost:8000/knowg/v1/docs>
 
-数据库首次启动时会加载 `dockerunigraph.sql` 创建表结构；系统不预置公开账号，请从登录页注册。
+数据库首次启动时会加载 `deploy/mysql/init/01-schema.sql` 创建表结构；系统不预置公开账号，请从登录页注册。
 
 查看日志或停止服务：
 
@@ -123,10 +123,13 @@ docker compose --env-file .env.docker down
 │   └── migrations/          # 增量 SQL 迁移
 ├── frontend/                # Vue 3 工作台
 │   └── src/                 # 页面、控制器、API、图渲染与组件
-├── docker/nginx/            # Nginx 模板与运行时配置脚本
+├── deploy/                  # Dockerfile、Nginx、MySQL 初始化与生产配置
+│   ├── docker/              # 前后端镜像定义（Celery 复用后端镜像）
+│   ├── mysql/init/          # MySQL 首次启动脚本
+│   └── nginx/               # Nginx 模板与运行时配置脚本
 ├── docs/                    # 部署文档
-├── docker-compose.yml       # 基础服务编排
-└── dockerunigraph.sql       # 首次启动数据库结构
+├── var/                     # 本地运行数据（日志、上传文件、临时文件）
+└── compose.yaml             # 开发与单机部署服务编排
 ```
 
 ## 🛠️ 本地开发

@@ -13,6 +13,7 @@ __pycache__/
 *.pyo
 
 .run-logs/
+.cache/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
@@ -25,19 +26,12 @@ frontend/dist/
 frontend/dist-ssr/
 frontend/.vite/
 
-backend/log/*
-backend/temp_files/*
-!backend/temp_files/.gitkeep
-temp_files/*
-!temp_files/.gitkeep
+var/*
+!var/.gitkeep
 backend/static/*
 !backend/static/.gitkeep
 !backend/static/default/
 !backend/static/default/**
-embedding/web_data_embeddings/*
-!embedding/web_data_embeddings/.gitkeep
-backend/embedding/web_data_embeddings/
-backend/common/core_layer/unigraph/web_search/web_data_embeddings/
 backend/ip2region.xdb
 *.sqlite3
 *.db

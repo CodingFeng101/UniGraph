@@ -54,4 +54,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate Compose configuration
-        run: docker compose --env-file .env.docker.example config --quiet
+        run: |
+          docker compose --env-file .env.docker.example config --quiet
+          docker compose --env-file .env.docker.example -f compose.yaml -f deploy/compose.prod.yaml config --quiet

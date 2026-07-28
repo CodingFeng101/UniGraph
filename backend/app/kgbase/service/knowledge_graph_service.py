@@ -33,12 +33,12 @@ from backend.common.core_layer.unigraph.module.sapperrag.utils import parse_json
 from backend.common.exception import errors
 from backend.common.security.jwt import superuser_verify
 from backend.core.conf import settings
-from backend.core.path_conf import STATIC_DIR, BasePath
+from backend.core.path_conf import STATIC_DIR, TEMP_DIR, BasePath
 from backend.database.db_mysql import async_db_session
 from backend.database.db_redis import redis_client
 from backend.scripts.init_data import logger
 
-PERMANENT_TEMP_DIR = 'temp_files'
+PERMANENT_TEMP_DIR = TEMP_DIR
 os.makedirs(PERMANENT_TEMP_DIR, exist_ok=True)
 
 

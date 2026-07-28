@@ -1,9 +1,11 @@
 #!/usr/bin/.env python3
 # -*- coding: utf-8 -*-
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import Depends, FastAPI
+from fastapi_limiter import FastAPILimiter
 from fastapi_pagination import add_pagination
 from starlette.middleware.authentication import AuthenticationMiddleware
 
@@ -34,6 +36,7 @@ async def register_init(app: FastAPI):
     await create_table()
     # 连接 redis
     await redis_client.open()
+    await FastAPILimiter.init(redis_client, prefix=settings.REQUEST_LIMITER_REDIS_PREFIX)
     yield
 
     # 关闭 redis 连接
@@ -92,15 +95,10 @@ def register_static_file(app: FastAPI):
     :return:
     """
     if settings.FASTAPI_STATIC_FILES:
-        import os
-
         from fastapi.staticfiles import StaticFiles
 
-        if not os.path.exists(STATIC_DIR):
-            os.mkdir(STATIC_DIR)
-
-        if not os.path.exists(FILES_DIR):
-            os.mkdir(FILES_DIR)
+        Path(STATIC_DIR).mkdir(parents=True, exist_ok=True)
+        Path(FILES_DIR).mkdir(parents=True, exist_ok=True)
         app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')
         app.mount('/files', StaticFiles(directory=FILES_DIR), name='files')
 

@@ -8,12 +8,13 @@ import XdbSearchIP
 # 获取项目根目录
 # 或使用绝对路径，指到backend目录为止，例如windows：BasePath = D:\git_project\fastapi_mysql\backend
 BasePath = Path(__file__).resolve().parent.parent
+RUNTIME_DIR = Path(os.getenv('UNIGRAPH_RUNTIME_DIR', BasePath.parent / 'var')).resolve()
 
 # alembic 迁移文件存放路径
 ALEMBIC_Versions_DIR = os.path.join(BasePath, 'alembic', 'versions')
 
 # 日志文件路径
-LOG_DIR = os.path.join(BasePath, 'log')
+LOG_DIR = str(RUNTIME_DIR / 'log')
 
 # Use the database distributed with XdbSearchIP instead of maintaining a
 # second 11 MB runtime copy in the repository.
@@ -23,7 +24,10 @@ IP2REGION_XDB = str(Path(XdbSearchIP.__file__).resolve().parent / 'data' / 'ip2r
 STATIC_DIR = os.path.join(BasePath, 'static')
 
 # 挂载文件目录
-FILES_DIR = os.path.join(BasePath, 'files')
+FILES_DIR = str(RUNTIME_DIR / 'files')
+
+# 临时文件目录
+TEMP_DIR = str(RUNTIME_DIR / 'temp')
 
 # jinja2 模版文件路径
 JINJA2_TEMPLATE_DIR = os.path.join(BasePath, 'templates')

@@ -39,10 +39,12 @@ export const API = window.API = {
       const response = await fetch(`${AppConfig.API_BASE_URL}${path}`, config);
 
       // 401 未授权，跳转登录
-      if (response.status === 401 && token && path !== '/v1/auth/login') {
+      if (response.status === 401 && path !== '/v1/auth/login') {
         Auth.clearToken();
-        window.location.href = '/unigraph/login';
-        return { code: 401, msg: '认证过期，请重新登录', data: null };
+        Auth.clearUserInfo();
+        const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.location.replace(`${import.meta.env.BASE_URL}login?redirect=${encodeURIComponent(redirect)}`);
+        return { code: 401, msg: '认证已失效，请重新登录', data: null };
       }
 
       // blob 响应（文件下载）
