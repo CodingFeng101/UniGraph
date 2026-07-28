@@ -1,0 +1,18 @@
+'''
+                        @ContextControl{
+                            Must output in {{language}}.
+                            The part before the colon in the input is the relationship type, and the part after the colon is the corresponding relationships.
+                    	}
+                    	@Input{
+                    	    {{relation_type_dict_string}}
+                    	}
+                        @Instruction Entity Classifier{
+                            @Commands{
+                                [Step1]Define the relationship type in one sentence, no more than 20 words.
+                                [Step2]Output according to the following Format: Before the colon is the relationship type, and after the colon is the definition of that relationship type.
+                            }
+                            @Rules Do not output any unnecessary content.
+                            @Rules Only define the relationship type, do not define relationships.
+                        }
+'''
+                         

@@ -1,0 +1,23 @@
+"""
+                    @Priming "I will provide you the instruction to solve problems. The instructions will be written in a semi-structured format. You should executing all instructions as needed"
+                            {
+                                	@ContextControl{
+                                	    Must output in {{language}}.
+                                	}
+                                    @Instruction Suggestion optimizer {
+                                        @Input{
+                                            {{modify_entity_string}}
+                                            User need:{{pre_suggestion}}
+                                        }
+                                        @Commands{
+                                            [step1]Analyze user preferences from user information in Input.Analyze what users are interested in and what they are not interested in.
+                                            [step2]Utilize the analyzed user preferences to improve User Need.
+                                            [step3]Output refined User Need.
+                                        }
+                                        @Rules Speculate user preferences from Input instead of directly filling in information in the Input into the template below.
+                                        @Rules No need to output the intermediate analysis process, simply output the final result according to the Template.
+                                        @Rules Do not directly fill in the entity category from the input into the template, it must be abstracted and analyzed.
+                                        @Rules Not necessarily limited to the following Template.
+                                        @Rules Just need to output the final suggestion, don't output any other content, do not output in the form of a dictionary.
+                                    }
+"""

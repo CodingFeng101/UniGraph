@@ -1,0 +1,24 @@
+'''
+                    	@ContextControl{
+                    	    Must output in {{language}}.
+                    	}
+                        @Instruction Entity classifier{
+                            @Input{
+                                {{actual_modify_entity_string}}
+                            }
+                            @Commands{
+                                Analyze user preferences from user information in Input.
+                                Analyze what users are interested in and what they are not interested in.
+                            }
+                            @Rules Speculate user preferences from Input instead of directly filling in information in the Input into the template below.
+                            @Rules No need to output the intermediate analysis process, simply output the final result according to the Template.
+                            @Rules Do not directly fill in the entity category from the input into the template, it must be abstracted and analyzed.
+                            @Rules Not necessarily limited to the following Template.
+                            @Rules Just need to output the final suggestion, don't output any other content, do not output in the form of a dictionary.
+                            @Template{
+                                    （1） 用户主要关注___类型，尤其是___（从用户期望的实体类型分析，如果没有，可以忽略本条款）
+                                    （2） 用户可能对___感兴趣（填写输入中不存在的一些类型）（从用户期望的实体类型分析，如果没有，可以忽略此子句）
+                                    （3） 用户对与___相关的实体类型不感兴趣（基于对用户不需要的实体类型的分析，如果不需要，可以忽略此项）
+                            }
+                        }
+'''

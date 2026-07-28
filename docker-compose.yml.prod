@@ -1,0 +1,19 @@
+services:
+  backend:
+    restart: always
+    environment:
+      ENVIRONMENT: pro
+
+  celery:
+    restart: always
+    environment:
+      ENVIRONMENT: pro
+
+  mysql:
+    restart: always
+
+  redis:
+    restart: always
+
+  frontend:
+    restart: always
