@@ -238,7 +238,7 @@ pydantic==2.13.4
     #   pydantic-extra-types
     #   pydantic-settings
     #   sqlalchemy-crud-plus
-pydantic-core==2.46.4
+pydantic-core==2.47.0
     # via pydantic
 pydantic-extra-types==2.11.1
     # via unigraph-backend (backend/pyproject.toml)
