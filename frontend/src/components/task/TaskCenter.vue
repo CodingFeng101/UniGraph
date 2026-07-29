@@ -18,7 +18,7 @@
     <span data-task-fab-count class="task-fab-count">0</span>
   </div>
 
-  <div v-show="panelOpen" id="task-panel" class="task-panel" :style="panelStyle">
+  <div ref="panel" v-show="panelOpen" id="task-panel" class="task-panel" :style="panelStyle">
     <section class="task-panel-surface">
       <header class="task-panel-header" @pointerdown="startDrag">
         <h2>后台任务</h2>
@@ -32,6 +32,8 @@
 </template>
 
 <script>
+import { gsap } from 'gsap';
+
 export default {
   name: 'TaskCenter',
   props: {
@@ -60,8 +62,8 @@ export default {
       };
     },
     panelStyle() {
-      const width = Math.min(380, window.innerWidth - 24);
-      const height = Math.min(468, window.innerHeight - 24);
+      const width = Math.min(420, window.innerWidth - 24);
+      const height = Math.min(824, window.innerHeight - 24);
       const dockLeft = this.position.x < window.innerWidth / 2;
       const orbLeft = dockLeft ? 10 : window.innerWidth - 62;
       const left = dockLeft
@@ -88,6 +90,7 @@ export default {
     this.$nextTick(() => window.TaskManager?.render());
   },
   beforeUnmount() {
+    gsap.killTweensOf([this.$refs.panel, this.$refs.panel?.querySelector('.task-panel-surface')].filter(Boolean));
     window.removeEventListener('resize', this.handleResize);
     document.removeEventListener('pointerdown', this.handleOutsidePointer);
     window.removeEventListener('pointermove', this.drag);
@@ -99,8 +102,44 @@ export default {
         this.moved = false;
         return;
       }
-      this.panelOpen = !this.panelOpen;
-      if (this.panelOpen) this.$nextTick(() => window.TaskManager?.render());
+      if (this.panelOpen) {
+        this.closePanel();
+        return;
+      }
+      this.panelOpen = true;
+      this.$nextTick(() => {
+        window.TaskManager?.render();
+        const surface = this.$refs.panel?.querySelector('.task-panel-surface');
+        if (!surface || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        gsap.fromTo(surface, { autoAlpha: 0, x: this.position.x < window.innerWidth / 2 ? -10 : 10, scale: 0.985 }, {
+          autoAlpha: 1,
+          x: 0,
+          scale: 1,
+          duration: 0.26,
+          ease: 'power2.out',
+          overwrite: 'auto',
+          onComplete: () => gsap.set(surface, { clearProps: 'opacity,visibility,transform' }),
+        });
+      });
+    },
+    closePanel() {
+      const surface = this.$refs.panel?.querySelector('.task-panel-surface');
+      if (!surface || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        this.panelOpen = false;
+        return;
+      }
+      gsap.to(surface, {
+        autoAlpha: 0,
+        x: this.position.x < window.innerWidth / 2 ? -8 : 8,
+        scale: 0.988,
+        duration: 0.16,
+        ease: 'power1.in',
+        overwrite: 'auto',
+        onComplete: () => {
+          this.panelOpen = false;
+          gsap.set(surface, { clearProps: 'opacity,visibility,transform' });
+        },
+      });
     },
     clampPosition(x, y) {
       return {
@@ -139,7 +178,7 @@ export default {
     handleOutsidePointer(event) {
       if (!this.panelOpen) return;
       if (event.target.closest('#task-panel') || event.target.closest('#task-fab-wrapper')) return;
-      this.panelOpen = false;
+      this.closePanel();
     },
   },
 };
@@ -232,8 +271,8 @@ export default {
 }
 
 .task-panel-header {
-  height: 60px;
-  padding: 0 20px;
+  height: 38px;
+  padding: 0 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -249,11 +288,11 @@ export default {
 }
 
 .task-running-count {
-  padding: 5px 12px;
+  padding: 5px 11px;
   border-radius: 999px;
   color: var(--claude-brand-500);
   background: color-mix(in srgb, var(--claude-brand-500) 9%, var(--claude-card));
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
   font-weight: 500;
 }
@@ -261,12 +300,13 @@ export default {
 .task-list {
   min-height: 0;
   flex: 1;
-  padding: 0 14px 16px;
+  padding: 0 8px 12px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
   scrollbar-width: thin;
+  overscroll-behavior: contain;
 }
 
 .task-empty {
@@ -278,19 +318,30 @@ export default {
 
 :deep(.task-card) {
   overflow: hidden;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--claude-secondary) 54%, var(--claude-card));
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--claude-secondary) 70%, var(--claude-card));
   border: 1px solid transparent;
 }
 
 :deep(.task-card__summary) {
   width: 100%;
-  min-height: 54px;
-  padding: 16px 16px 13px;
+  min-height: 50px;
+  padding: 12px 14px 8px;
   display: grid;
-  grid-template-columns: 13px 8px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  column-gap: 10px;
+  column-gap: 9px;
+  color: var(--claude-foreground);
+  background: transparent;
+}
+
+:deep(.task-card__toggle) {
+  min-width: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 13px 8px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
   color: var(--claude-foreground);
   background: transparent;
   border: 0;
@@ -298,11 +349,18 @@ export default {
   cursor: pointer;
 }
 
-:deep(.task-card__summary:hover) { background: color-mix(in srgb, var(--claude-foreground) 3%, transparent); }
-:deep(.task-card__summary:active) { transform: translateY(1px); }
+:deep(.task-card__toggle:active) { transform: translateY(1px); }
 
 :deep(.task-chevron) {
+  width: 13px;
+  height: 13px;
   transition: transform .2s cubic-bezier(.16, 1, .3, 1);
+}
+
+:deep(.task-status-check) {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.4;
 }
 
 :deep(.task-status-dot) {
@@ -316,7 +374,7 @@ export default {
   overflow: hidden;
   margin: 0;
   color: var(--claude-foreground);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.25;
   font-weight: 500;
   text-overflow: ellipsis;
@@ -324,14 +382,45 @@ export default {
 }
 
 :deep(.task-card__state) {
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
+:deep(.task-inline-actions) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+:deep(.task-inline-action) {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  color: var(--claude-muted-foreground);
+  background: color-mix(in srgb, var(--claude-border) 36%, transparent);
+  cursor: pointer;
+  transition: color .16s ease, background-color .16s ease, transform .16s ease;
+}
+
+:deep(.task-inline-action:hover) {
+  color: var(--claude-foreground);
+  background: color-mix(in srgb, var(--claude-border) 62%, transparent);
+}
+
+:deep(.task-inline-action:active) { transform: scale(.94); }
+:deep(.task-inline-action:disabled) { opacity: .38; cursor: not-allowed; }
+:deep(.task-delete-action) { color: var(--claude-destructive); }
+:deep(.task-inline-action svg) { width: 13px; height: 13px; stroke-width: 1.8; }
+
 :deep(.task-progress) {
-  height: 4px;
-  margin: 0 16px 14px 57px;
+  height: 3px;
+  margin: 0 14px 10px 46px;
   overflow: hidden;
   border-radius: 999px;
   background: color-mix(in srgb, var(--claude-border) 82%, transparent);
@@ -344,27 +433,27 @@ export default {
 }
 
 :deep(.task-detail) {
-  margin: 0 12px 12px;
-  padding: 12px;
-  border-radius: 14px;
+  margin: 0 15px 9px 34px;
+  padding: 14px 0 1px;
   border-top: 1px dashed color-mix(in srgb, var(--claude-border) 82%, transparent);
-  background: color-mix(in srgb, var(--claude-card) 72%, transparent);
+  background: transparent;
 }
 
 :deep(.task-detail.hidden) { display: none; }
 
 :deep(.task-timeline) {
-  height: 190px;
-  padding: 2px 10px 3px;
+  max-height: 286px;
+  padding: 1px 6px 1px 0;
   overflow-y: auto;
   scrollbar-width: thin;
+  overscroll-behavior: contain;
 }
 
 :deep(.task-step) {
   position: relative;
-  min-height: 49px;
-  padding: 0 0 10px 24px;
-  opacity: .62;
+  min-height: 48px;
+  padding: 0 0 11px 22px;
+  opacity: .74;
   transition: opacity 180ms ease;
 }
 
@@ -376,7 +465,7 @@ export default {
 :deep(.task-step:not(:last-child)::after) {
   content: '';
   position: absolute;
-  left: 4px;
+  left: 5px;
   top: 13px;
   bottom: -2px;
   width: 1px;
@@ -387,8 +476,8 @@ export default {
   position: absolute;
   left: 0;
   top: 3px;
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   border-radius: 999px;
   background: var(--step-color);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--step-color) 22%, var(--claude-card));
@@ -403,7 +492,7 @@ export default {
 :deep(.task-step__label) {
   overflow: hidden;
   color: var(--claude-foreground);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -418,9 +507,9 @@ export default {
 }
 
 :deep(.task-step__description) {
-  margin: 5px 0 0;
+  margin: 3px 0 0;
   color: var(--claude-muted-foreground);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.35;
 }
 
@@ -428,39 +517,6 @@ export default {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
-:deep(.task-actions) {
-  margin-top: 10px;
-  padding-top: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-top: 1px dashed color-mix(in srgb, var(--claude-border) 82%, transparent);
-}
-
-:deep(.task-action) {
-  min-width: 0;
-  height: 32px;
-  flex: 1;
-  padding: 0 12px;
-  justify-content: center;
-  border: 0;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--claude-foreground);
-  background: color-mix(in srgb, var(--claude-border) 38%, transparent);
-  font-size: 12px;
-  cursor: pointer;
-  transition: background .18s ease, transform .18s ease, opacity .18s ease;
-}
-
-:deep(.task-action:hover) { background: color-mix(in srgb, var(--claude-border) 64%, transparent); }
-:deep(.task-action:active) { transform: scale(.97); }
-:deep(.task-action:disabled) { opacity: .38; cursor: not-allowed; }
-:deep(.task-action--delete) { color: var(--claude-destructive); background: color-mix(in srgb, var(--claude-destructive) 8%, transparent); }
-:deep(.task-action--delete:hover) { background: color-mix(in srgb, var(--claude-destructive) 14%, transparent); }
 
 @media (max-width: 560px) {
   .task-panel { left: 12px !important; right: 12px; width: auto !important; }

@@ -55,6 +55,10 @@ class AppendMessageParam(SchemaBase):
     sources: Dict[str, Any] = Field(default_factory=dict)
 
 
+class UpdateMessageParam(SchemaBase):
+    content: str = Field(min_length=1)
+
+
 class GenerateTitleParam(SchemaBase):
     content: str
 

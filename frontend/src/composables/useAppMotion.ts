@@ -11,7 +11,6 @@ const MOTION_ITEM_SELECTOR = [
   '.settings-section',
   '.shared-chat-message',
   '.doc-nav-item',
-  '.task-card',
   '.ai-thinking-log__item',
   '#chat-container > div > .group',
 ].join(',');
@@ -21,7 +20,6 @@ const OVERLAY_SELECTOR = [
   '[id$="-dropdown"]',
   '[id*="-dropdown-"]',
   '.depth-menu',
-  '.task-panel',
   '.claude-menu',
   '.profile-menu',
 ].join(',');

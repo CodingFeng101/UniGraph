@@ -2,6 +2,7 @@
 import { copyText } from '@/utils/clipboard';
 import DOMPurify from 'dompurify';
 import MarkdownIt from 'markdown-it';
+import { gsap } from 'gsap';
 
 export function createGraphApplicationViewController() {
   const { API, Auth, KgBaseAPI } = window;
@@ -9,6 +10,47 @@ export function createGraphApplicationViewController() {
 lucide.createIcons();
 
 var currentShare = null;
+var messageSequence = 0;
+var motionContext = null;
+
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function animateElement(element, fromVars, toVars) {
+  if (!element || prefersReducedMotion()) return;
+  var tween = function() {
+    gsap.fromTo(element, fromVars, {
+      duration: 0.32,
+      ease: 'power2.out',
+      overwrite: 'auto',
+      ...toVars,
+      onComplete: function() {
+        gsap.set(element, { clearProps: 'opacity,visibility,transform,will-change' });
+      },
+    });
+  };
+  if (motionContext) motionContext.add(tween);
+  else tween();
+}
+
+function setChatMode(empty) {
+  var main = document.getElementById('app-main');
+  var composer = document.getElementById('chat-composer');
+  var outline = document.getElementById('chat-outline');
+  main?.classList.toggle('chat-is-empty', empty);
+  outline?.classList.toggle('hidden', empty);
+  animateElement(composer, { autoAlpha: 0, y: empty ? 14 : -10, scale: 0.99 }, { autoAlpha: 1, y: 0, scale: 1 });
+}
+
+function renderEmptyState() {
+  var container = document.getElementById('chat-message-list');
+  if (!container) return;
+  container.style.visibility = 'visible';
+  container.innerHTML = '<section class="chat-empty-state" aria-label="新对话">有什么可以帮你的？</section>';
+  setChatMode(true);
+  renderChatOutline();
+}
 
 function buildShareUrl(publicId) {
   return new URL('/unigraph/share/' + encodeURIComponent(publicId), window.location.origin).toString();
@@ -125,12 +167,103 @@ function syncCurrentChatQuery(chatUuid) {
 }
 
 function copyMessage(button) {
-  var message = button.closest('.group').querySelector('p') || button.closest('.max-w-[680px]').querySelector('p');
-  if (message) {
-    copyText(message.textContent).then(function(copied) {
+  var group = button.closest('.group');
+  var message = group?.querySelector('p') || button.closest('.max-w-[680px]')?.querySelector('p');
+  var content = group?.dataset.rawMessage || message?.textContent || '';
+  if (content) {
+    copyText(content).then(function(copied) {
       showToast(copied ? '已复制' : '复制失败');
     });
   }
+}
+
+function cancelUserMessageEdit(button) {
+  var group = button.closest('.chat-user-message');
+  var bubble = group?.querySelector('.chat-user-bubble');
+  if (!group || !bubble || group.__originalBubbleHtml == null) return;
+  bubble.innerHTML = group.__originalBubbleHtml;
+  group.__originalBubbleHtml = null;
+  group.classList.remove('is-editing');
+  group.querySelector('.chat-user-actions')?.classList.remove('hidden');
+  lucide.createIcons();
+}
+
+async function saveUserMessageEdit(button) {
+  var group = button.closest('.chat-user-message');
+  var bubble = group?.querySelector('.chat-user-bubble');
+  var textarea = group?.querySelector('.chat-inline-edit__input');
+  if (!group || !bubble || !textarea) return;
+  var parsed = parseMessageAttachments(group.dataset.rawMessage || '');
+  var content = composeMessageText(textarea.value.trim(), parsed.attachments);
+  if (!content) {
+    showToast('消息内容不能为空');
+    textarea.focus();
+    return;
+  }
+  if (!currentChatUuid || !group.dataset.messageUuid) {
+    showToast('消息尚未同步，请稍后再试');
+    return;
+  }
+  button.disabled = true;
+  button.textContent = '保存中…';
+  try {
+    var response = await KgBaseAPI.chatLibrary.updateMessage(
+      currentChatUuid,
+      group.dataset.messageUuid,
+      content,
+    );
+    if (response.code !== 200) throw new Error(response.msg || '保存失败');
+    group.dataset.rawMessage = content;
+    group.dataset.question = questionLabel(content);
+    group.__originalBubbleHtml = null;
+    group.classList.remove('is-editing');
+    bubble.innerHTML = renderSentAttachments(parsed.attachments) +
+      (textarea.value.trim()
+        ? '<p class="text-[15px] leading-relaxed whitespace-pre-wrap" style="color:var(--claude-foreground);">' + escapeHtml(textarea.value.trim()) + '</p>'
+        : '');
+    group.querySelector('.chat-user-actions')?.classList.remove('hidden');
+    lucide.createIcons();
+    renderChatOutline();
+    showToast('消息已更新');
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = '保存';
+    showToast(error.message || '保存失败');
+  }
+}
+
+function editUserMessage(button) {
+  var group = button.closest('.chat-user-message');
+  var bubble = group?.querySelector('.chat-user-bubble');
+  if (!group || !bubble || group.classList.contains('is-editing')) return;
+  var activeEditor = document.querySelector('.chat-user-message.is-editing .chat-inline-edit__cancel');
+  if (activeEditor) cancelUserMessageEdit(activeEditor);
+  var parsed = parseMessageAttachments(group.dataset.rawMessage || '');
+  group.__originalBubbleHtml = bubble.innerHTML;
+  group.classList.add('is-editing');
+  group.querySelector('.chat-user-actions')?.classList.add('hidden');
+  bubble.innerHTML = renderSentAttachments(parsed.attachments) +
+    '<div class="chat-inline-edit">' +
+      '<textarea rows="1" class="chat-inline-edit__input" aria-label="编辑消息"></textarea>' +
+      '<div class="chat-inline-edit__actions">' +
+        '<button type="button" onclick="cancelUserMessageEdit(this)" class="chat-inline-edit__button chat-inline-edit__cancel">取消</button>' +
+        '<button type="button" onclick="saveUserMessageEdit(this)" class="chat-inline-edit__button chat-inline-edit__save">保存</button>' +
+      '</div>' +
+    '</div>';
+  var textarea = bubble.querySelector('.chat-inline-edit__input');
+  textarea.value = parsed.body;
+  textarea.style.height = Math.min(Math.max(textarea.scrollHeight, 46), 180) + 'px';
+  textarea.addEventListener('input', function() {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(Math.max(textarea.scrollHeight, 46), 180) + 'px';
+  });
+  textarea.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') cancelUserMessageEdit(bubble.querySelector('.chat-inline-edit__cancel'));
+  });
+  window.setTimeout(function() {
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  }, prefersReducedMotion() ? 0 : 80);
 }
 
 function adjustTextareaHeight(textarea) {
@@ -152,7 +285,11 @@ async function handleChatAttachments(input) {
       if (response.code !== 200 || !response.data?.url) {
         throw new Error(response.msg || '附件上传失败');
       }
-      pendingAttachments.push({ name: file.name, url: response.data.url });
+      pendingAttachments.push({
+        name: file.name,
+        url: response.data.url,
+        extension: (file.name.split('.').pop() || 'FILE').toUpperCase(),
+      });
       renderChatAttachments();
       updateSendBtn();
     } catch (error) {
@@ -172,11 +309,16 @@ function renderChatAttachments() {
   if (!container) return;
   container.classList.toggle('hidden', pendingAttachments.length === 0);
   container.innerHTML = pendingAttachments.map(function(attachment, index) {
-    return '<span class="inline-flex items-center gap-1.5 max-w-[260px] px-2 py-1 rounded-lg text-[11px]" style="background:var(--claude-accent);color:var(--claude-foreground);">' +
-      '<span class="truncate">' + escapeHtml(attachment.name) + '</span>' +
-      '<button type="button" onclick="removeChatAttachment(' + index + ')" class="shrink-0 text-[10px] cursor-pointer" style="background:none;border:none;color:var(--claude-muted-foreground);">移除</button>' +
-      '</span>';
+    return '<article class="chat-attachment-card" title="' + escapeHtml(attachment.name) + '">' +
+      '<button type="button" onclick="removeChatAttachment(' + index + ')" class="chat-attachment-card__remove" aria-label="移除附件"><i data-lucide="x" style="width:13px;height:13px;"></i></button>' +
+      '<span class="chat-attachment-card__name">' + escapeHtml(attachment.name) + '</span>' +
+      '<span class="chat-attachment-card__type">' + escapeHtml(attachment.extension || 'FILE') + '</span>' +
+      '</article>';
   }).join('');
+  lucide.createIcons();
+  container.querySelectorAll('.chat-attachment-card').forEach(function(card, index) {
+    animateElement(card, { autoAlpha: 0, y: 8, scale: 0.97 }, { autoAlpha: 1, y: 0, scale: 1, delay: index * 0.035 });
+  });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -255,10 +397,7 @@ async function sendMessage() {
   var input = document.getElementById('message-input');
   var text = input.value.trim();
   if (!text && !pendingAttachments.length) return;
-  var attachmentText = pendingAttachments.map(function(attachment) {
-    return '- ' + attachment.name + ': ' + attachment.url;
-  }).join('\n');
-  var requestText = text + (attachmentText ? (text ? '\n\n' : '') + '附件：\n' + attachmentText : '');
+  var requestText = composeMessageText(text, pendingAttachments);
   if (isStreaming) {
     showToast('正在生成回答，请稍候...');
     return;
@@ -274,7 +413,7 @@ async function sendMessage() {
     return;
   }
 
-  appendUserMessage(requestText);
+  var userMessageElement = appendUserMessage(requestText);
   input.value = '';
   input.style.height = 'auto';
   pendingAttachments = [];
@@ -282,7 +421,10 @@ async function sendMessage() {
   updateSendBtn();
 
   try {
-    await saveConversationMessage('user', requestText);
+    var savedMessage = await saveConversationMessage('user', requestText);
+    if (userMessageElement && savedMessage?.message_uuid) {
+      userMessageElement.dataset.messageUuid = savedMessage.message_uuid;
+    }
   } catch (error) {
     showToast(error.message || 'Failed to save conversation');
     return;
@@ -458,38 +600,148 @@ function scrollToBottom() {
 
 // Clear the chat container
 function clearChatContainer() {
-  var container = document.querySelector('#chat-container > div');
-  if (container) container.innerHTML = '';
+  var container = document.getElementById('chat-message-list');
+  messageSequence = 0;
+  if (container) {
+    container.style.visibility = 'visible';
+    container.innerHTML = '';
+  }
+  renderChatOutline();
+}
+
+function showEmptyConversation() {
+  clearChatContainer();
+  renderEmptyState();
+}
+
+function questionLabel(text) {
+  var parsed = parseMessageAttachments(text);
+  return String(parsed.body || parsed.attachments[0]?.name || '')
+    .split('\n')[0]
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 52) || '附件提问';
+}
+
+function parseMessageAttachments(text) {
+  var source = String(text || '');
+  var marker = source.match(/(?:^|\n)附件[：:]\s*\n/);
+  if (!marker || marker.index == null) return { body: source.trim(), attachments: [] };
+  var body = source.slice(0, marker.index).trim();
+  var attachmentBlock = source.slice(marker.index + marker[0].length);
+  var attachments = attachmentBlock.split('\n').map(function(line) {
+    var match = line.trim().match(/^-\s+(.+?):\s+(\S+)\s*$/);
+    if (!match) return null;
+    var name = match[1].trim();
+    return {
+      name: name,
+      url: match[2].trim(),
+      extension: (name.split('.').pop() || 'FILE').toUpperCase(),
+    };
+  }).filter(Boolean);
+  return { body: body, attachments: attachments };
+}
+
+function composeMessageText(body, attachments) {
+  var attachmentText = (attachments || []).map(function(attachment) {
+    return '- ' + attachment.name + ': ' + attachment.url;
+  }).join('\n');
+  return body + (attachmentText ? (body ? '\n\n' : '') + '附件：\n' + attachmentText : '');
+}
+
+function attachmentHref(path) {
+  if (/^https?:\/\//i.test(path)) return path;
+  return (window.AppConfig?.SHOW_IMAGE_API || '') + String(path || '').replace(/^\/+/, '');
+}
+
+function renderSentAttachments(attachments) {
+  if (!attachments.length) return '';
+  return '<div class="chat-sent-attachments">' + attachments.map(function(attachment) {
+    return '<a class="chat-sent-file" href="' + escapeHtml(attachmentHref(attachment.url)) + '" target="_blank" rel="noopener" title="' + escapeHtml(attachment.name) + '">' +
+      '<i data-lucide="file-text" class="chat-sent-file__icon"></i>' +
+      '<span class="chat-sent-file__name">' + escapeHtml(attachment.name) + '</span>' +
+      '<span class="chat-sent-file__type">' + escapeHtml(attachment.extension || 'FILE') + '</span>' +
+      '</a>';
+  }).join('') + '</div>';
+}
+
+function jumpToChatQuestion(id) {
+  var target = document.getElementById(id);
+  if (!target) return;
+  target.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+  var bubble = target.querySelector('.chat-user-bubble');
+  if (bubble && !prefersReducedMotion()) {
+    gsap.fromTo(bubble, { scale: 0.985 }, { scale: 1, duration: 0.34, ease: 'power2.out', overwrite: 'auto' });
+  }
+}
+
+function renderChatOutline() {
+  var outline = document.getElementById('chat-outline');
+  if (!outline) return;
+  var questions = Array.from(document.querySelectorAll('.chat-user-message[data-question]'));
+  outline.classList.toggle('hidden', questions.length === 0 || document.getElementById('app-main')?.classList.contains('chat-is-empty'));
+  if (!questions.length) {
+    outline.innerHTML = '';
+    return;
+  }
+  var markers = questions.map(function(item) {
+    return '<button type="button" class="chat-outline__marker" aria-label="跳转到：' + escapeHtml(item.dataset.question) + '" title="' + escapeHtml(item.dataset.question) + '" data-chat-target="' + escapeHtml(item.id) + '"></button>';
+  }).join('');
+  var list = questions.map(function(item, index) {
+    return '<button type="button" class="chat-outline__item" data-chat-target="' + escapeHtml(item.id) + '"><span style="color:var(--claude-muted-foreground);margin-right:8px;">' + (index + 1) + '</span>' + escapeHtml(item.dataset.question) + '</button>';
+  }).join('');
+  outline.innerHTML = '<div class="chat-outline__rail">' + markers + '</div><div class="chat-outline__panel"><p class="chat-outline__title">本次对话的问题</p>' + list + '</div>';
+  outline.querySelectorAll('[data-chat-target]').forEach(function(button) {
+    button.addEventListener('click', function() { jumpToChatQuestion(button.dataset.chatTarget); });
+  });
 }
 
 // Append user message (right-side bubble)
-function appendUserMessage(text) {
-  var container = document.querySelector('#chat-container > div');
+function appendUserMessage(text, messageUuid) {
+  var container = document.getElementById('chat-message-list');
   if (!container) return;
+  container.querySelector('.chat-empty-state')?.remove();
+  setChatMode(false);
+  var parsedMessage = parseMessageAttachments(text);
+  var bodyHtml = parsedMessage.body
+    ? '<p class="text-[15px] leading-relaxed whitespace-pre-wrap" style="color:var(--claude-foreground);">' + escapeHtml(parsedMessage.body) + '</p>'
+    : '';
   var time = new Date().toTimeString().slice(0, 5);
   var div = document.createElement('div');
-  div.className = 'group';
+  messageSequence += 1;
+  div.id = 'chat-question-' + messageSequence;
+  div.dataset.question = questionLabel(text);
+  div.dataset.rawMessage = String(text || '');
+  if (messageUuid) div.dataset.messageUuid = messageUuid;
+  div.className = 'group chat-user-message';
   div.innerHTML =
     '<div class="flex justify-end">' +
-      '<div class="max-w-[480px]">' +
-        '<div class="px-5 py-3 rounded-2xl" style="background:var(--claude-secondary);">' +
-          '<p class="text-[15px] leading-relaxed" style="color:var(--claude-foreground);">' + escapeHtml(text) + '</p>' +
+      '<div class="chat-user-message-shell max-w-[520px]">' +
+        '<div class="chat-user-bubble px-5 py-3 rounded-2xl" style="background:var(--claude-secondary);">' +
+          renderSentAttachments(parsedMessage.attachments) + bodyHtml +
         '</div>' +
       '</div>' +
     '</div>' +
-    '<div class="flex items-center justify-end gap-1 mt-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">' +
+    '<div class="chat-user-actions flex items-center justify-end gap-1 mt-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">' +
       '<span class="text-[11px] mr-1.5" style="color:var(--claude-muted-foreground);">' + time + '</span>' +
       '<button type="button" onclick="copyMessage(this)" class="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-muted-foreground);" title="复制">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' +
       '</button>' +
+      '<button type="button" onclick="editUserMessage(this)" class="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-muted-foreground);" title="编辑">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+      '</button>' +
     '</div>';
   container.appendChild(div);
+  lucide.createIcons();
+  animateElement(div, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0 });
+  renderChatOutline();
   scrollToBottom();
+  return div;
 }
 
 // Append AI thinking bubble; returns the created element
 function appendAIThinking() {
-  var container = document.querySelector('#chat-container > div');
+  var container = document.getElementById('chat-message-list');
   if (!container) return null;
   var div = document.createElement('div');
   div.className = 'group';
@@ -512,6 +764,7 @@ function appendAIThinking() {
       '<div class="ai-answer text-[15px] leading-[1.75] space-y-3" style="font-family:var(--claude-font-serif);color:var(--claude-card-foreground);"></div>' +
     '</div>';
   container.appendChild(div);
+  animateElement(div, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0 });
   scrollToBottom();
   return div;
 }
@@ -554,16 +807,20 @@ function appendAIMessage(text, sources) {
 function setConversationTitle(title) {
   var titleEl = document.getElementById('conversation-title');
   if (!titleEl) return;
+  var normalizedTitle = String(title || '').trim();
+  var titleWrap = document.getElementById('conversation-title-wrap');
+  var shouldShow = normalizedTitle !== '' && normalizedTitle !== '新对话' && normalizedTitle !== '对话';
+  if (titleWrap) titleWrap.classList.toggle('hidden', !shouldShow);
   if (titleEl.tagName === 'INPUT') {
     var span = document.createElement('span');
     span.id = 'conversation-title';
     span.className = 'text-sm font-medium truncate';
     span.style.color = 'var(--claude-foreground)';
-    span.textContent = title || '新对话';
+    span.textContent = normalizedTitle;
     titleEl.replaceWith(span);
     return;
   }
-  titleEl.textContent = title || '新对话';
+  titleEl.textContent = normalizedTitle;
 }
 
 function renameCurrentChat() {
@@ -622,7 +879,6 @@ async function ensureCurrentChat(firstMessage) {
   }
   currentChatUuid = response.data;
   syncCurrentChatQuery(currentChatUuid);
-  setConversationTitle(currentChatName);
   return currentChatUuid;
 }
 
@@ -637,6 +893,7 @@ async function saveConversationMessage(role, content, sources) {
     sources: normalizeSources(sources),
   });
   if (response.code !== 200) throw new Error(response.msg || '保存对话失败');
+  return response.data;
 }
 
 function parseStoredMessages(messages) {
@@ -1012,6 +1269,8 @@ async function switchChat(chatUuid, name) {
   currentChatName = name || '对话';
   setConversationTitle(name || '对话');
   clearChatContainer();
+  setChatMode(false);
+  var loadedMessages = 0;
   try {
     var res = await KgBaseAPI.chatLibrary.getDetail(chatUuid);
     if (res.code === 200 && res.data) {
@@ -1019,11 +1278,12 @@ async function switchChat(chatUuid, name) {
         ? res.data.conversation
         : parseStoredMessages(res.data.messages || res.data.chats || res.data.history || []);
       if (messages.length > 0) {
+        loadedMessages = messages.length;
         messages.forEach(function(msg) {
           var role = msg.role || msg.type || (msg.is_user ? 'user' : 'assistant');
           var content = msg.content || msg.message || msg.answer || '';
           if (role === 'user' || role === 'human') {
-            appendUserMessage(content);
+            appendUserMessage(content, msg.uuid);
           } else {
             var sources = {};
             (msg.sources || []).forEach(function(source) {
@@ -1038,6 +1298,7 @@ async function switchChat(chatUuid, name) {
     console.error('Failed to load chat detail:', err);
     showToast('加载对话失败');
   }
+  if (!loadedMessages) renderEmptyState();
   loadChatHistory();
 }
 
@@ -1047,22 +1308,15 @@ async function newConversation() {
     showToast('正在生成回答，请稍候...');
     return;
   }
-  try {
-    currentChatName = '新对话';
-    var response = await KgBaseAPI.chatLibrary.create({
-      kg_base_uuid: kgBaseUuid,
-      name: '新对话-' + Date.now().toString().slice(-6)
-    });
-    if (response.code !== 200 || !response.data) throw new Error(response.msg || '创建对话失败');
-    currentChatUuid = response.data;
-    syncCurrentChatQuery(currentChatUuid);
-    clearChatContainer();
-    setConversationTitle('新对话');
-    await loadChatHistory();
-    showToast('已开始新对话');
-  } catch (error) {
-    showToast(error.message || '创建对话失败');
-  }
+  currentChatUuid = null;
+  currentChatName = '新对话';
+  pendingAttachments = [];
+  syncCurrentChatQuery(null);
+  setConversationTitle('新对话');
+  renderChatAttachments();
+  updateSendBtn();
+  showEmptyConversation();
+  renderChatHistory(chatHistoryItems);
 }
 
 // Enter to send (without Shift)
@@ -1078,7 +1332,9 @@ if (messageInput) {
 
 // Initialize page
 updateSidebarLinks(kgBaseUuid);
-clearChatContainer();
+var appMain = document.getElementById('app-main');
+if (appMain) motionContext = gsap.context(function() {}, appMain);
+showEmptyConversation();
 setConversationTitle('新对话');
 (async function initializeApp() {
   await Promise.all([loadKnowledgeGraphs(), loadChatHistory(), loadAvailableModels(), loadCurrentSidebarUser()]);
@@ -1087,6 +1343,9 @@ setConversationTitle('新对话');
 })();
 
   window.copyMessage = copyMessage;
+  window.cancelUserMessageEdit = cancelUserMessageEdit;
+  window.editUserMessage = editUserMessage;
+  window.saveUserMessageEdit = saveUserMessageEdit;
   window.deleteChat = deleteChat;
   window.favoriteChat = favoriteChat;
   window.newConversation = newConversation;
@@ -1096,11 +1355,17 @@ setConversationTitle('新对话');
   window.toggleChatSort = toggleChatSort;
   window.toggleChatMenu = toggleChatMenu;
 
+  function destroy() {
+    motionContext?.revert();
+    motionContext = null;
+  }
+
   return {
     adjustTextareaHeight,
     copyMessage,
     copyShareLink,
     createShareLink,
+    destroy,
     handleChatAttachments,
     selectEffort,
     selectKnowledgeGraph,

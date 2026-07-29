@@ -1,4 +1,5 @@
 import { getGraphExpansionDepth } from '@/services/preferences';
+import { renderGraphTooltipContent } from '@/utils/graphTooltip';
 
 /* Generated from pages/graph-design.html; keep behavior changes in the source controller during migration. */
 export function createGraphDesignViewController() {
@@ -47,18 +48,16 @@ function closeModal(id) {
 
 function showTooltip(e, title, type, bodyHtml) {
   const t = document.getElementById('canvas-tooltip');
-  document.getElementById('tooltip-title').textContent = title;
-  document.getElementById('tooltip-type').textContent = type;
-  document.getElementById('tooltip-body').innerHTML = bodyHtml.replace(/<br>/g, '<br>');
+  if (!t) return;
+  renderGraphTooltipContent(title, type, bodyHtml);
   t.classList.remove('hidden');
   const rect = t.parentElement.getBoundingClientRect();
   let x = e.clientX - rect.left + 15;
   let y = e.clientY - rect.top - 10;
-  if (x + 270 > rect.width) x = e.clientX - rect.left - 275;
-  if (y + 200 > rect.height) y = rect.height - 210;
-  if (y < 10) y = 10;
+  if (x + t.offsetWidth + 12 > rect.width) x = e.clientX - rect.left - t.offsetWidth - 15;
+  if (y + t.offsetHeight + 12 > rect.height) y = rect.height - t.offsetHeight - 12;
   t.style.left = x + 'px';
-  t.style.top = y + 'px';
+  t.style.top = Math.max(12, y) + 'px';
 }
 
 function hideTooltip() {
@@ -472,6 +471,15 @@ async function loadSchemaDetail(schemaUuid) {
   }
 }
 
+function resolveSchemaEntityName(uuid, preferredName) {
+  var explicitName = String(preferredName || '').trim();
+  if (explicitName && explicitName !== uuid) return explicitName;
+  var entity = ((currentSchemaData && currentSchemaData.entities) || []).find(function(item) {
+    return item.uuid === uuid;
+  });
+  return entity && entity.name ? entity.name : '未知实体';
+}
+
 // Render schema graph using GraphRenderer (Cytoscape.js)
 function renderSchemaGraph(detail) {
   // Schema graph: entity type's name is used as the grouping type
@@ -520,8 +528,8 @@ function renderSchemaGraph(detail) {
     onEdgeClick: function(data) {
       selectedElement = { type: 'relationship', uuid: data.id, data: data };
       var raw = data.raw || {};
-      var sourceName = raw.source_entity_name || raw.source_entity_uuid || '';
-      var targetName = raw.target_entity_name || raw.target_entity_uuid || '';
+      var sourceName = resolveSchemaEntityName(raw.source_entity_uuid, raw.source_entity_name);
+      var targetName = resolveSchemaEntityName(raw.target_entity_uuid, raw.target_entity_name);
       showTooltipByPos(data.label || '关系类型', '关系类型',
         '起始: ' + sourceName + '<br>目标: ' + targetName);
     },
@@ -536,8 +544,8 @@ function renderSchemaGraph(detail) {
       var raw = data.raw || {};
       selectedElement = { type: 'relationship', uuid: data.id, data: data };
       showTooltipByPos(data.label || '关系类型', '关系类型',
-        '起始: ' + (raw.source_entity_name || raw.source_entity_uuid || '') + '<br>目标: ' +
-        (raw.target_entity_name || raw.target_entity_uuid || ''), position);
+        '起始: ' + resolveSchemaEntityName(raw.source_entity_uuid, raw.source_entity_name) + '<br>目标: ' +
+        resolveSchemaEntityName(raw.target_entity_uuid, raw.target_entity_name), position);
     },
     onElementLeave: scheduleTooltipHide,
     onCanvasClick: function() {
@@ -551,14 +559,12 @@ function renderSchemaGraph(detail) {
 function showTooltipByPos(title, type, bodyHtml, position) {
   var t = document.getElementById('canvas-tooltip');
   if (!t) return;
-  document.getElementById('tooltip-title').textContent = title;
-  document.getElementById('tooltip-type').textContent = type;
-  document.getElementById('tooltip-body').innerHTML = bodyHtml;
+  renderGraphTooltipContent(title, type, bodyHtml);
   t.classList.remove('hidden');
   var parent = t.parentElement;
-  var x = position ? position.x + 16 : parent.clientWidth / 2 - 130;
+  var x = position ? position.x + 16 : parent.clientWidth / 2 - t.offsetWidth / 2;
   var y = position ? position.y - 18 : 20;
-  if (x + 270 > parent.clientWidth) x = Math.max(12, x - 286);
+  if (x + t.offsetWidth + 12 > parent.clientWidth) x = Math.max(12, x - t.offsetWidth - 32);
   if (y + t.offsetHeight > parent.clientHeight) y = Math.max(12, parent.clientHeight - t.offsetHeight - 12);
   t.style.left = Math.max(12, x) + 'px';
   t.style.top = Math.max(12, y) + 'px';

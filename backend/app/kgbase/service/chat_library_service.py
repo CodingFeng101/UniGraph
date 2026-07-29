@@ -407,6 +407,24 @@ class ChatLibraryService:
             return {'message_uuid': message.uuid}
 
     @staticmethod
+    async def update_message(*, uuid: str, message_uuid: str, user_uuid: str, content: str) -> dict:
+        async with async_db_session.begin() as db:
+            await ChatLibraryService._get_owned_library(db, uuid, user_uuid, for_update=True)
+            result = await db.execute(
+                select(ChatMessage).where(
+                    ChatMessage.uuid == message_uuid,
+                    ChatMessage.chat_library_uuid == uuid,
+                    ChatMessage.role == 'user',
+                )
+            )
+            message = result.scalars().first()
+            if not message:
+                raise errors.NotFoundError(msg='用户消息不存在')
+            message.content = content
+            await db.flush()
+            return {'message_uuid': message.uuid, 'content': message.content}
+
+    @staticmethod
     async def generate_title(*, uuid: str, content: str, user_token: str, user_uuid: str) -> str:
         async with async_db_session() as db:
             library = await ChatLibraryService._get_owned_library(db, uuid, user_uuid)

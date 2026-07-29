@@ -5,6 +5,7 @@
 import { Auth } from '@/api/runtime/auth';
 import { KgBaseAPI } from '@/api';
 import { getTaskNotificationPreferences } from '@/services/preferences';
+import { gsap } from 'gsap';
 
 export const TaskManager = window.TaskManager = (() => {
   const STORAGE_KEY = 'unigraph_task_queue';
@@ -110,7 +111,7 @@ export const TaskManager = window.TaskManager = (() => {
     if (state === 'SUCCESS') return 'var(--claude-success-500)';
     if (state === 'FAILURE') return 'var(--claude-destructive)';
     if (state === 'REVOKE' || state === 'REVOKED') return 'var(--claude-muted-foreground)';
-    return 'var(--claude-info-500, #3b82f6)';
+    return 'var(--claude-brand-500)';
   }
 
   function formatTaskTime(value) {
@@ -175,6 +176,7 @@ export const TaskManager = window.TaskManager = (() => {
     container.innerHTML = tasks.slice().reverse().map((task) => {
       const progress = Math.max(0, Math.min(100, Number(task.progress) || 0));
       const canCancel = ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state);
+      const canRetry = !canCancel && task.state !== 'SUCCESS';
       const isOpen = expandedTasks.has(task.uid);
       const steps = getTaskSteps(task);
       const title = [task.displayName, task.objectName].filter(Boolean).join(': ');
@@ -197,23 +199,28 @@ export const TaskManager = window.TaskManager = (() => {
       }).join('');
       return `
         <div class="task-card" data-task-id="${escapeHtml(task.uid)}">
-          <button type="button" onclick="TaskManager.toggle(this)" class="task-card__summary">
-            <svg class="task-chevron" style="transform:${isOpen ? 'rotate(90deg)' : 'rotate(0deg)'}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-            <span class="task-status-dot" style="background:${stateColor(task.state)};"></span>
-            <p class="task-card__title">${escapeHtml(title || '后台任务')}</p>
+          <div class="task-card__summary">
+            <button type="button" onclick="TaskManager.toggle(this)" class="task-card__toggle" aria-label="${isOpen ? '收起' : '展开'}任务日志">
+              <i data-lucide="chevron-right" class="task-chevron" style="transform:${isOpen ? 'rotate(90deg)' : 'rotate(0deg)'}"></i>
+              ${task.state === 'SUCCESS'
+                ? '<i data-lucide="check" class="task-status-check" style="color:' + stateColor(task.state) + ';"></i>'
+                : '<span class="task-status-dot" style="background:' + stateColor(task.state) + ';"></span>'}
+              <p class="task-card__title">${escapeHtml(title || '后台任务')}</p>
+            </button>
+            <div class="task-inline-actions">
+              ${canCancel ? `<button type="button" onclick="TaskManager.pause('${escapeHtml(task.uid)}')" class="task-inline-action" title="暂停" aria-label="暂停"><i data-lucide="pause"></i></button>` : ''}
+              ${(canCancel || canRetry) ? `<button type="button" onclick="TaskManager.retry('${escapeHtml(task.uid)}')" class="task-inline-action" title="重启" aria-label="重启"><i data-lucide="rotate-ccw"></i></button>` : ''}
+              <button type="button" onclick="TaskManager.remove('${escapeHtml(task.uid)}')" class="task-inline-action task-delete-action" title="删除" aria-label="删除"><i data-lucide="trash-2"></i></button>
+            </div>
             <span class="task-card__state" style="color:${stateColor(task.state)};">${escapeHtml(statusText)}</span>
-          </button>
+          </div>
           <div class="task-progress"><div class="task-progress__value" style="width:${progress}%;background:${stateColor(task.state)};"></div></div>
           <div class="task-detail${isOpen ? '' : ' hidden'}">
             <div class="task-timeline">${stepMarkup}</div>
-            <div class="task-actions">
-              <button type="button" onclick="TaskManager.pause('${escapeHtml(task.uid)}')" class="task-action" ${canCancel ? '' : 'disabled'}><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>暂停</button>
-              <button type="button" onclick="TaskManager.retry('${escapeHtml(task.uid)}')" class="task-action"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/></svg>重启</button>
-              <button type="button" onclick="TaskManager.remove('${escapeHtml(task.uid)}')" class="task-action task-action--delete"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4h8v2"/></svg>删除</button>
-            </div>
           </div>
         </div>`;
     }).join('');
+    window.lucide?.createIcons();
     requestAnimationFrame(() => {
       container.scrollTop = previousScrollTop;
       container.querySelectorAll('.task-detail:not(.hidden) .task-timeline').forEach((timeline) => {
@@ -227,12 +234,23 @@ export const TaskManager = window.TaskManager = (() => {
     const detail = card?.querySelector('.task-detail');
     const chevron = button.querySelector('.task-chevron');
     if (!detail) return;
-    detail.classList.toggle('hidden');
-    const isOpen = !detail.classList.contains('hidden');
+    const isOpen = detail.classList.contains('hidden');
     if (isOpen) expandedTasks.add(card.dataset.taskId);
     else expandedTasks.delete(card.dataset.taskId);
-    if (chevron) chevron.style.transform = isOpen ? 'rotate(90deg)' : 'rotate(0deg)';
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (chevron) gsap.to(chevron, { rotation: isOpen ? 90 : 0, duration: reducedMotion ? 0 : 0.2, ease: 'power2.out', overwrite: 'auto' });
     if (isOpen) {
+      detail.classList.remove('hidden');
+      if (!reducedMotion) {
+        gsap.fromTo(detail, { autoAlpha: 0, y: -6 }, {
+          autoAlpha: 1,
+          y: 0,
+          duration: 0.24,
+          ease: 'power2.out',
+          overwrite: 'auto',
+          onComplete: () => gsap.set(detail, { clearProps: 'opacity,visibility,transform' }),
+        });
+      }
       requestAnimationFrame(() => {
         const container = card.closest('[data-task-list]');
         if (!container) return;
@@ -240,6 +258,20 @@ export const TaskManager = window.TaskManager = (() => {
         if (timeline) timeline.scrollTop = timeline.scrollHeight;
         const target = card.offsetTop + card.offsetHeight - container.clientHeight;
         container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+      });
+    } else if (reducedMotion) {
+      detail.classList.add('hidden');
+    } else {
+      gsap.to(detail, {
+        autoAlpha: 0,
+        y: -5,
+        duration: 0.16,
+        ease: 'power1.in',
+        overwrite: 'auto',
+        onComplete: () => {
+          detail.classList.add('hidden');
+          gsap.set(detail, { clearProps: 'opacity,visibility,transform' });
+        },
       });
     }
   }

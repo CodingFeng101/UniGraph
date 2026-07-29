@@ -1,4 +1,5 @@
 import { getGraphExpansionDepth } from '@/services/preferences';
+import { renderGraphTooltipContent } from '@/utils/graphTooltip';
 
 /* Generated from pages/graph-build.html; keep behavior changes in the source controller during migration. */
 export function createGraphBuildViewController() {
@@ -85,18 +86,16 @@ function showToast(message) {
 
 function showTooltip(e, title, type, bodyHtml) {
   var t = document.getElementById('canvas-tooltip');
-  document.getElementById('tooltip-title').textContent = title;
-  document.getElementById('tooltip-type').textContent = type;
-  document.getElementById('tooltip-body').innerHTML = bodyHtml;
+  if (!t) return;
+  renderGraphTooltipContent(title, type, bodyHtml);
   t.classList.remove('hidden');
   var rect = t.parentElement.getBoundingClientRect();
   var x = e.clientX - rect.left + 15;
   var y = e.clientY - rect.top - 10;
-  if (x + 270 > rect.width) x = e.clientX - rect.left - 275;
-  if (y + 200 > rect.height) y = rect.height - 210;
-  if (y < 10) y = 10;
+  if (x + t.offsetWidth + 12 > rect.width) x = e.clientX - rect.left - t.offsetWidth - 15;
+  if (y + t.offsetHeight + 12 > rect.height) y = rect.height - t.offsetHeight - 12;
   t.style.left = x + 'px';
-  t.style.top = y + 'px';
+  t.style.top = Math.max(12, y) + 'px';
 }
 
 function hideTooltip() {
@@ -605,7 +604,12 @@ function mergeExplorationData(data, removeType, anchorUuid) {
   graphData.entities = Array.from(entityMap.values());
   graphData.relationships = Array.from(relationshipMap.values());
   renderGraph(viewState);
-  if (cy?._engine === 'vis-network') return;
+  if (cy?._engine === 'vis-network') {
+    window.requestAnimationFrame(function() {
+      cy?.refreshConnections?.();
+    });
+    return;
+  }
   var newNodes = cy.nodes().filter(function(node) { return !existingIds.has(node.id()); });
   if (newNodes.length) {
     var anchorPosition = viewState.anchorPosition;
@@ -674,14 +678,23 @@ function normalizeGraphAttributes(value) {
   }
 }
 
+function resolveKnowledgeEntityName(uuid, preferredName) {
+  var explicitName = String(preferredName || '').trim();
+  if (explicitName && explicitName !== uuid) return explicitName;
+  var pools = [graphData.entities, fullGraphData.entities, allEntitiesForDropdown];
+  for (var index = 0; index < pools.length; index += 1) {
+    var entity = (pools[index] || []).find(function(item) { return item.uuid === uuid; });
+    if (entity && entity.name) return entity.name;
+  }
+  return '未知实体';
+}
+
 // ===== Show element detail panel =====
 function showElementDetail(data, type, position) {
   var t = document.getElementById('canvas-tooltip');
   if (!t) return;
   var title = data.label || data.name || '';
   var typeLabel = type === 'node' ? (data.type || '实体') + ' (实体)' : (data.type || data.label || '关系') + ' (关系)';
-  document.getElementById('tooltip-title').textContent = title;
-  document.getElementById('tooltip-type').textContent = typeLabel;
   var bodyHtml = '';
   if (type === 'node' && data.raw) {
     var attrs = normalizeGraphAttributes(data.raw.attributes);
@@ -692,20 +705,19 @@ function showElementDetail(data, type, position) {
     }
     if (data.raw.source) bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">来源: ' + data.raw.source + '</p>';
   } else if (type === 'edge' && data.raw) {
-    var srcEntity = graphData.entities.find(function(e) { return e.uuid === data.raw.source_entity_uuid; });
-    var tgtEntity = graphData.entities.find(function(e) { return e.uuid === data.raw.target_entity_uuid; });
-    var srcName = srcEntity ? srcEntity.name : (data.raw.source_entity_uuid || '');
-    var tgtName = tgtEntity ? tgtEntity.name : (data.raw.target_entity_uuid || '');
-    bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">' + srcName + ' → ' + tgtName + '</p>';
+    var srcName = resolveKnowledgeEntityName(data.raw.source_entity_uuid, data.raw.source_entity_name);
+    var tgtName = resolveKnowledgeEntityName(data.raw.target_entity_uuid, data.raw.target_entity_name);
+    bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">头实体: ' + srcName + '</p>';
+    bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">尾实体: ' + tgtName + '</p>';
     if (data.raw.type) bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">类型: ' + data.raw.type + '</p>';
     if (data.raw.source) bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">来源: ' + data.raw.source + '</p>';
   }
-  document.getElementById('tooltip-body').innerHTML = bodyHtml;
+  renderGraphTooltipContent(title, typeLabel, bodyHtml);
   t.classList.remove('hidden');
   var parent = t.parentElement;
-  var x = position ? position.x + 16 : parent.clientWidth - 272;
+  var x = position ? position.x + 16 : parent.clientWidth - t.offsetWidth - 12;
   var y = position ? position.y - 18 : 12;
-  if (x + 270 > parent.clientWidth) x = Math.max(12, x - 286);
+  if (x + t.offsetWidth + 12 > parent.clientWidth) x = Math.max(12, x - t.offsetWidth - 32);
   if (y + t.offsetHeight > parent.clientHeight) y = Math.max(12, parent.clientHeight - t.offsetHeight - 12);
   t.style.right = 'auto';
   t.style.left = Math.max(12, x) + 'px';

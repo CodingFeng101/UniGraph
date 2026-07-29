@@ -293,9 +293,10 @@ export default {
         const item = items[index];
         if (!item) return;
         const disabled = !uuid && ['info', 'design', 'build'].includes(key);
+        const isActivePage = key === this.active && key !== 'app';
         item.href = links[key];
-        item.style.background = key === this.active ? 'var(--claude-accent)' : 'transparent';
-        item.style.color = key === this.active
+        item.style.background = isActivePage ? 'var(--claude-accent)' : '';
+        item.style.color = isActivePage
           ? 'var(--claude-foreground)'
           : 'var(--claude-muted-foreground)';
         item.setAttribute('aria-disabled', disabled ? 'true' : 'false');
