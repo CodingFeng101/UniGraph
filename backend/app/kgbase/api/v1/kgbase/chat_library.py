@@ -16,6 +16,7 @@ from backend.app.kgbase.schema.chat_library import (
     LibraryResponse,
     PublicChatShareResponse,
     UpdateLibraryParam,
+    UpdateMessageParam,
 )
 from backend.app.kgbase.service.chat_library_service import chat_library_service
 from backend.common.response.response_schema import ResponseModel, response_base
@@ -131,6 +132,26 @@ async def append_message(
         uuid=chat_library_uuid,
         user_uuid=request.user.uuid,
         obj=obj,
+    )
+    return response_base.success(data=data)
+
+
+@router.patch(
+    '/{chat_library_uuid}/message/{message_uuid}',
+    summary='Edit one user message',
+    dependencies=[DependsJwtAuth],
+)
+async def update_message(
+    request: Request,
+    chat_library_uuid: Annotated[str, Path(...)],
+    message_uuid: Annotated[str, Path(...)],
+    obj: UpdateMessageParam,
+) -> ResponseModel:
+    data = await chat_library_service.update_message(
+        uuid=chat_library_uuid,
+        message_uuid=message_uuid,
+        user_uuid=request.user.uuid,
+        content=obj.content,
     )
     return response_base.success(data=data)
 

@@ -131,8 +131,10 @@ class KnowledgeGraphService:
                             select(KnowledgeRelationship)
                             .where(
                                 KnowledgeRelationship.knowledge_graph_uuid == uuid,
-                                KnowledgeRelationship.source_entity_uuid.in_(ids),
-                                KnowledgeRelationship.target_entity_uuid.in_(ids),
+                                or_(
+                                    KnowledgeRelationship.source_entity_uuid.in_(ids),
+                                    KnowledgeRelationship.target_entity_uuid.in_(ids),
+                                ),
                             )
                             .limit(limit * 4)
                         )
@@ -140,6 +142,29 @@ class KnowledgeGraphService:
                     .scalars()
                     .all()
                 )
+                connected_ids = {
+                    endpoint
+                    for relationship in relationships
+                    for endpoint in (
+                        relationship.source_entity_uuid,
+                        relationship.target_entity_uuid,
+                    )
+                }
+                missing_ids = connected_ids.difference(ids)
+                if missing_ids:
+                    connected_entities = (
+                        (
+                            await db.execute(
+                                select(KnowledgeEntity).where(
+                                    KnowledgeEntity.knowledge_graph_uuid == uuid,
+                                    KnowledgeEntity.uuid.in_(missing_ids),
+                                )
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    entities.extend(connected_entities)
             return {'entities': entities, 'relationships': relationships}
 
     @staticmethod

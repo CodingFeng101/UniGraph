@@ -241,17 +241,7 @@ export function createKnowledgeBaseListViewController() {
   initDraggableTaskFAB();
 
   function showToast(msg) {
-    var existing = document.getElementById('global-toast');
-    if (existing) existing.remove();
-    var toast = document.createElement('div');
-    toast.id = 'global-toast';
-    toast.textContent = msg;
-    toast.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);background:var(--claude-foreground);color:var(--claude-background);padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;box-shadow:var(--claude-shadow-lg);transition:opacity 0.3s;max-width:80vw;';
-    document.body.appendChild(toast);
-    setTimeout(function() {
-      toast.style.opacity = '0';
-      setTimeout(function() { toast.remove(); }, 300);
-    }, 2000);
+    window.showToast(msg);
   }
 
   function escapeHtml(s) {
@@ -325,16 +315,8 @@ export function createKnowledgeBaseListViewController() {
         }
         coverHtml = '<img src="' + escapeHtml(imgSrc) + '" class="absolute inset-0 w-full h-full object-cover" alt="">';
       } else {
-        coverHtml = '<svg class="absolute inset-0 w-full h-full opacity-[0.06]" viewBox="0 0 400 160" fill="none">' +
-          '<circle cx="80" cy="60" r="40" stroke="currentColor" stroke-width="1" style="color:var(--claude-foreground);"/>' +
-          '<circle cx="200" cy="40" r="30" stroke="currentColor" stroke-width="1" style="color:var(--claude-foreground);"/>' +
-          '<circle cx="320" cy="80" r="35" stroke="currentColor" stroke-width="1" style="color:var(--claude-foreground);"/>' +
-          '<circle cx="150" cy="120" r="25" stroke="currentColor" stroke-width="1" style="color:var(--claude-foreground);"/>' +
-          '<line x1="110" y1="70" x2="175" y2="50" stroke="currentColor" stroke-width="0.8" style="color:var(--claude-foreground);"/>' +
-          '<line x1="225" y1="50" x2="290" y2="72" stroke="currentColor" stroke-width="0.8" style="color:var(--claude-foreground);"/>' +
-          '<line x1="105" y1="85" x2="130" y2="110" stroke="currentColor" stroke-width="0.8" style="color:var(--claude-foreground);"/>' +
-          '<line x1="175" y1="50" x2="165" y2="100" stroke="currentColor" stroke-width="0.8" style="color:var(--claude-foreground);"/>' +
-          '</svg>';
+        var defaultCover = (AppConfig.SHOW_IMAGE_API || '') + 'static/default/kg_base_default.png';
+        coverHtml = '<img src="' + escapeHtml(defaultCover) + '" class="absolute inset-0 w-full h-full object-cover" alt="默认知识库封面">';
       }
       var updateTime = formatTime(kb.updated_time || kb.created_time);
       html += '<article class="kb-card flex flex-col rounded-lg overflow-hidden transition-shadow hover:shadow-md" data-uuid="' + escapeHtml(uuid) + '" style="background:var(--claude-popover);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-xs);">' +

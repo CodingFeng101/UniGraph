@@ -27,16 +27,7 @@ function selectDocNav(el) {
 }
 
 function showToast(message) {
-  var container = document.getElementById('toast-container');
-  var toast = document.createElement('div');
-  toast.className = 'px-4 py-2.5 rounded-lg text-sm font-medium';
-  toast.style.background = 'var(--claude-card)';
-  toast.style.color = 'var(--claude-foreground)';
-  toast.style.border = '1px solid var(--claude-border)';
-  toast.style.boxShadow = 'var(--claude-shadow-md)';
-  toast.textContent = message;
-  container.appendChild(toast);
-  setTimeout(function() { toast.remove(); }, 2000);
+  window.showToast(message);
 }
 
 

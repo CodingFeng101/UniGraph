@@ -1,5 +1,5 @@
 const localBackendHost = window.location.hostname || '127.0.0.1';
-const localBackendOrigin = `http://${localBackendHost}:8003`;
+const localBackendOrigin = `http://${localBackendHost}:8000`;
 
 window.FRONTEND_CONFIG = window.FRONTEND_CONFIG || {
   VITE_HOST_URL: localBackendOrigin,

@@ -5,7 +5,7 @@
 <AppSearchDialog />
 
 <div id="app-main" class="h-screen min-h-0 flex flex-col transition-all duration-300" style="margin-left:260px;">
-  <header class="h-14 flex items-center justify-between px-5 shrink-0 min-w-0" style="background:var(--claude-card);border-bottom:1px solid var(--claude-border);">
+  <header class="h-14 flex items-center justify-between px-5 shrink-0 min-w-0" style="background:var(--claude-card);">
     <div class="flex items-center gap-2">
       <div class="relative" id="graph-dropdown-wrapper-top">
         <button type="button" @click="toggleElement('graph-dropdown-top')" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors w-[240px]" style="background:var(--claude-accent);border:1px solid var(--claude-brand-500);">
@@ -214,17 +214,22 @@
 
       </svg>
 
-      <div id="canvas-tooltip" class="hidden absolute z-50 rounded-xl overflow-hidden" @mouseleave="hideTooltip()" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);width:260px;">
-        <div class="px-4 py-3" style="border-bottom:1px solid var(--claude-border);">
-          <p id="tooltip-title" class="text-sm font-semibold" style="color:var(--claude-foreground);font-family:var(--claude-font-display);"></p>
-          <p id="tooltip-type" class="text-[11px] mt-0.5" style="color:var(--claude-muted-foreground);"></p>
+      <div id="canvas-tooltip" class="hidden graph-hover-card" @mouseleave="hideTooltip()">
+        <div class="graph-hover-card__header">
+          <div class="min-w-0">
+            <p id="tooltip-title" class="graph-hover-card__title"></p>
+            <p id="tooltip-type" class="graph-hover-card__type"></p>
+          </div>
+          <span id="tooltip-badge" class="graph-hover-card__badge"></span>
         </div>
-        <div id="tooltip-body" class="px-4 py-3">
-        </div>
-        <div class="px-4 py-2 flex items-center gap-2" style="border-top:1px solid var(--claude-border);">
-          <button @click="editSelected()" class="text-[11px] font-medium transition-colors hover:opacity-70 cursor-pointer" style="background:none;border:none;color:var(--claude-primary);">编辑</button>
-          <span style="color:var(--claude-border);">|</span>
-          <button @click="deleteSelected()" class="text-[11px] font-medium transition-colors hover:opacity-70 cursor-pointer" style="background:none;border:none;color:var(--claude-destructive);">删除</button>
+        <div id="tooltip-body" class="graph-hover-card__body"></div>
+        <div class="graph-hover-card__actions">
+          <button type="button" @click="hideTooltip();editSelected()" class="graph-hover-card__action">
+            <i data-lucide="pencil-line" aria-hidden="true"></i><span>编辑</span>
+          </button>
+          <button type="button" @click="hideTooltip();deleteSelected()" class="graph-hover-card__action graph-hover-card__action--delete">
+            <i data-lucide="trash-2" aria-hidden="true"></i><span>删除</span>
+          </button>
         </div>
       </div>
 
@@ -460,7 +465,6 @@
   </div>
 </div>
 
-<div id="toast-container" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-2"></div>
   </div>
 </template>
 
@@ -590,6 +594,7 @@ export default {
 </script>
 
 <style>
+@import '../../assets/styles/graph-tooltip.css';
 
 .sidebar-logo { display: flex; }
 #app-sidebar.sidebar-collapsed { width: 48px; }

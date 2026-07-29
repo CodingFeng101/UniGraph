@@ -217,7 +217,7 @@ export function createProfileViewController() {
     var apiKey = document.getElementById('llm-key-input').value.trim();
     var apiUrl = document.getElementById('llm-url-input').value.trim();
     if (!modelVal) {
-      alert('请输入模型名称');
+      showToast('请输入模型名称');
       return;
     }
     try {
@@ -293,7 +293,7 @@ export function createProfileViewController() {
     var apiKey = document.getElementById('embed-key-input').value.trim();
     var apiUrl = document.getElementById('embed-url-input').value.trim();
     if (!modelVal) {
-      alert('请输入模型名称');
+      showToast('请输入模型名称');
       return;
     }
     try {

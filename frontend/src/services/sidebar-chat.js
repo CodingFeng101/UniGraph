@@ -155,7 +155,19 @@ export const ChatSidebar = window.ChatSidebar = (() => {
   }
 
   async function remove(uuid) {
-    if (!window.confirm('确认删除该对话？')) return;
+    const item = items.find((entry) => entry.uuid === uuid);
+    if (typeof window.confirmAction !== 'function') {
+      notify('确认组件未就绪，请稍后重试');
+      return;
+    }
+    const confirmed = await window.confirmAction({
+      title: '删除对话',
+      message: item?.name
+        ? '确定要删除“' + item.name + '”吗？删除后无法恢复。'
+        : '确定要删除这段对话吗？删除后无法恢复。',
+      confirmText: '删除',
+    });
+    if (!confirmed) return;
     const response = await KgBaseAPI.chatLibrary.delete(uuid);
     if (response.code !== 200) return notify(response.msg || '删除失败');
     items = items.filter((item) => item.uuid !== uuid);

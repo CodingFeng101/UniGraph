@@ -314,6 +314,9 @@ export const KgBaseAPI = window.KgBaseAPI = {
     appendMessage(chatLibraryUuid, data) {
       return API.post(`/v1/kg/chat_library/${chatLibraryUuid}/message`, data);
     },
+    updateMessage(chatLibraryUuid, messageUuid, content) {
+      return API.patch(`/v1/kg/chat_library/${chatLibraryUuid}/message/${messageUuid}`, { content });
+    },
     generateTitle(chatLibraryUuid, content) {
       return API.post(`/v1/kg/chat_library/${chatLibraryUuid}/title`, { content });
     },

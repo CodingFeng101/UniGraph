@@ -4,7 +4,7 @@
 
 <div id="app-main" class="h-screen min-h-0 flex flex-col transition-all duration-300" style="margin-left:260px;">
   <div class="shrink-0 h-11 flex items-center px-6 justify-between">
-    <div class="flex items-center gap-1.5 cursor-pointer sidebar-collapsed-hide" style="max-width:300px;" @click="renameCurrentChat()" title="点击重命名">
+    <div id="conversation-title-wrap" class="hidden flex items-center gap-1.5 cursor-pointer sidebar-collapsed-hide" style="max-width:300px;" @click="renameCurrentChat()" title="点击重命名">
       <span id="conversation-title" class="text-sm font-medium truncate" style="color:var(--claude-foreground);">新对话</span>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--claude-muted-foreground);flex-shrink:0;"><polyline points="9 18 15 12 9 6"/></svg>
     </div>
@@ -14,7 +14,7 @@
   </div>
 
   <div class="flex-1 overflow-y-auto" id="chat-container">
-    <div class="max-w-[680px] mx-auto px-8 py-6 space-y-6">
+    <div id="chat-message-list" class="max-w-[680px] mx-auto px-8 py-6 space-y-6" style="visibility:hidden;">
       <div class="group">
         <div class="flex justify-end">
           <div class="max-w-[480px]">
@@ -283,22 +283,24 @@
     </div>
   </div>
 
-  <div class="shrink-0 pb-5 pt-2">
-    <div class="max-w-[680px] mx-auto px-8">
-      <div class="rounded-2xl border px-4 pt-3.5 pb-3" style="background:var(--claude-card);border-color:var(--claude-border);">
-        <textarea id="message-input" rows="1" class="w-full resize-none text-[15px] leading-relaxed bg-transparent outline-none" style="color:var(--claude-foreground);min-height:24px;max-height:160px;font-family:var(--claude-font-sans);" placeholder="有什么可以帮你的？" @input="adjustTextareaHeight($event.currentTarget);updateSendBtn()"></textarea>
+  <aside id="chat-outline" class="chat-outline hidden" aria-label="对话问题目录"></aside>
 
-        <div id="chat-attachment-list" class="hidden flex flex-wrap gap-1.5 pt-2"></div>
+  <div id="chat-composer-shell" class="chat-composer-shell shrink-0 pb-5 pt-2">
+    <div class="max-w-[680px] mx-auto px-8">
+      <div id="chat-composer" class="chat-composer rounded-2xl border px-4 pt-3.5 pb-3" style="background:var(--claude-card);border-color:var(--claude-border);">
+        <div id="chat-attachment-list" class="chat-attachment-list hidden pb-3"></div>
         <input id="chat-attachment-input" type="file" class="hidden" multiple accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.png,.jpg,.jpeg" @change="handleChatAttachments($event.currentTarget)">
 
+        <textarea id="message-input" rows="1" class="w-full resize-none text-[15px] leading-relaxed bg-transparent outline-none" style="color:var(--claude-foreground);min-height:24px;max-height:160px;font-family:var(--claude-font-sans);" placeholder="有什么可以帮你的？" @input="adjustTextareaHeight($event.currentTarget);updateSendBtn()"></textarea>
+
         <div class="flex items-center gap-2 pt-2">
-          <button type="button" @click="triggerChatAttachments()" class="group relative w-8 h-8 inline-flex items-center justify-center rounded-full transition-colors cursor-pointer" style="background:var(--claude-secondary);border:none;color:var(--claude-foreground);" aria-label="上传附件">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          <button type="button" @click="triggerChatAttachments()" class="group relative w-8 h-8 inline-flex items-center justify-center transition-opacity hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-foreground);" aria-label="上传附件">
+            <i data-lucide="plus" style="width:17px;height:17px;stroke-width:1.8;"></i>
             <span class="pointer-events-none absolute left-1/2 bottom-full mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100" style="background:var(--claude-foreground);color:var(--claude-background);box-shadow:var(--claude-shadow-md);">上传附件</span>
           </button>
 
           <div class="relative">
-            <button type="button" data-role="kg-trigger" @click="selectKnowledgeGraph()" class="h-8 flex items-center gap-1.5 px-2.5 rounded-full text-[12px] transition-colors hover:opacity-80 cursor-pointer" style="background:var(--claude-secondary);border:none;color:var(--claude-foreground);" title="选择知识图谱索引">
+            <button type="button" data-role="kg-trigger" @click="selectKnowledgeGraph()" class="h-8 flex items-center gap-1.5 px-2 text-[13px] transition-opacity hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-foreground);" title="选择知识图谱索引">
               <span id="kg-status-dot" class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-success-500);"></span>
               <span id="kg-selector-label">选择知识图谱</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
@@ -309,9 +311,9 @@
           <div class="flex-1"></div>
 
           <div class="relative">
-            <button type="button" data-role="model-trigger" @click="toggleModelDropdown()" class="h-8 inline-flex items-center gap-1.5 px-3 rounded-full text-[13px] cursor-pointer transition-colors" style="background:var(--claude-accent);border:none;color:var(--claude-foreground);">
+            <button type="button" data-role="model-trigger" @click="toggleModelDropdown()" class="h-8 inline-flex items-center gap-1.5 px-2 text-[13px] cursor-pointer transition-opacity hover:opacity-70" style="background:transparent;border:none;color:var(--claude-foreground);">
               <span id="model-value">UG-4o</span>
-              <span id="effort-value" class="text-[11px]" style="color:var(--claude-muted-foreground);">Low</span>
+              <span id="effort-value" class="text-[12px]" style="color:var(--claude-muted-foreground);">Low</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div id="model-dropdown" class="hidden absolute bottom-full right-0 mb-2 w-56 rounded-xl z-50 p-1" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
@@ -371,12 +373,8 @@
             </div>
           </div>
 
-          <button type="button" @click="showToast('语音输入')" class="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-muted-foreground);" aria-label="语音输入" title="语音">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-          </button>
-
-          <button id="send-btn" type="button" @click="sendMessage()" class="w-9 h-9 flex items-center justify-center rounded-[10px] transition-all cursor-pointer" style="background:var(--claude-primary);color:var(--claude-primary-foreground);border:none;" aria-label="发送" title="发送">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.7"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          <button id="send-btn" type="button" @click="sendMessage()" class="w-8 h-8 flex items-center justify-center rounded-[9px] transition-all cursor-pointer" style="background:var(--claude-primary);color:var(--claude-primary-foreground);border:none;" aria-label="发送" title="发送">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.7"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
           </button>
         </div>
       </div>
@@ -424,7 +422,6 @@
   </div>
 </div>
 
-<div id="toast-container" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-2"></div>
 
 <TaskCenter />
 
@@ -446,6 +443,9 @@ export default {
     document.title = "知识图谱应用";
     document.body.className = "h-screen overflow-hidden min-h-0";
     this.controller = createGraphApplicationViewController();
+  },
+  beforeUnmount() {
+    this.controller?.destroy?.();
   },
   methods: {
     adjustTextareaHeight(...args) {
@@ -517,6 +517,166 @@ export default {
 @keyframes trace-pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
 @keyframes dot-blink { 0%,80%,100%{opacity:0.3;} 40%{opacity:1;} }
 @keyframes thinking-log-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+#app-main { position: relative; }
+.chat-composer-shell { position: relative; z-index: 35; }
+.chat-composer { box-shadow: var(--claude-shadow-sm); will-change: transform, opacity; }
+#app-main.chat-is-empty #chat-container { pointer-events: none; }
+#app-main.chat-is-empty .chat-composer-shell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 2vh;
+  pointer-events: none;
+}
+#app-main.chat-is-empty .chat-composer-shell > div { width: min(760px, calc(100% - 48px)); max-width: none; pointer-events: auto; }
+#app-main.chat-is-empty .chat-composer { min-height: 100px; padding: 14px 20px 12px; border-radius: 20px; }
+#app-main.chat-is-empty #message-input { min-height: 34px !important; font-size: 16px; }
+.chat-empty-state {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 120px);
+  transform: translateX(-50%);
+  color: var(--claude-foreground);
+  font-family: var(--claude-font-serif);
+  font-size: clamp(28px, 2.25vw, 42px);
+  line-height: 1.12;
+  white-space: nowrap;
+}
+.chat-attachment-list { display: flex; flex-wrap: wrap; gap: 10px; }
+.chat-attachment-list.hidden { display: none; }
+.chat-attachment-card {
+  position: relative;
+  width: 150px;
+  height: 116px;
+  padding: 14px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: visible;
+  border: 1px solid var(--claude-border);
+  border-radius: 12px;
+  background: var(--claude-background);
+  box-shadow: var(--claude-shadow-sm);
+  will-change: transform, opacity;
+}
+.chat-attachment-card__name { overflow: hidden; color: var(--claude-foreground); font-size: 12px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.chat-attachment-card__type { align-self: flex-start; padding: 2px 6px; border: 1px solid var(--claude-border); border-radius: 5px; color: var(--claude-muted-foreground); font-size: 10px; line-height: 1; }
+.chat-attachment-card__remove {
+  position: absolute;
+  left: -8px;
+  top: -8px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--claude-border);
+  border-radius: 50%;
+  color: var(--claude-muted-foreground);
+  background: var(--claude-card);
+  box-shadow: var(--claude-shadow-xs);
+  cursor: pointer;
+}
+.chat-sent-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.chat-sent-attachments + p { margin-top: 10px; }
+.chat-sent-file {
+  width: 148px;
+  min-height: 82px;
+  padding: 11px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: 9px;
+  border: 1px solid var(--claude-border);
+  border-radius: 12px;
+  color: var(--claude-foreground);
+  background: var(--claude-card);
+  box-shadow: var(--claude-shadow-xs);
+  text-decoration: none;
+  transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+.chat-sent-file:hover { border-color: color-mix(in srgb, var(--claude-primary) 45%, var(--claude-border)); box-shadow: var(--claude-shadow-sm); transform: translateY(-1px); }
+.chat-sent-file__icon { grid-row: 1 / 3; align-self: start; width: 24px; height: 24px; color: var(--claude-muted-foreground); }
+.chat-sent-file__name { min-width: 0; overflow: hidden; align-self: start; font-size: 12px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.chat-sent-file__type { justify-self: start; padding: 2px 5px; border: 1px solid var(--claude-border); border-radius: 5px; color: var(--claude-muted-foreground); font-size: 9px; line-height: 1; }
+.chat-outline {
+  position: fixed;
+  z-index: 34;
+  right: 18px;
+  top: 76px;
+  bottom: 112px;
+  width: 42px;
+}
+.chat-outline__rail { height: 100%; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 7px; }
+.chat-outline__marker { width: 28px; height: 3px; padding: 0; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--claude-muted-foreground) 48%, transparent); cursor: pointer; transition: width .16s ease, background-color .16s ease; }
+.chat-outline__marker:hover, .chat-outline__marker.is-active { width: 34px; background: var(--claude-foreground); }
+.chat-outline__panel {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 360px;
+  max-height: min(540px, calc(100vh - 180px));
+  padding: 12px;
+  overflow-y: auto;
+  border: 1px solid var(--claude-border);
+  border-radius: 18px;
+  background: var(--claude-card);
+  box-shadow: var(--claude-shadow-lg);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-50%) translateX(8px);
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease, visibility .18s;
+}
+.chat-outline:hover .chat-outline__panel, .chat-outline:focus-within .chat-outline__panel { opacity: 1; visibility: visible; transform: translateY(-50%) translateX(0); pointer-events: auto; }
+.chat-outline__title { margin: 2px 6px 8px; color: var(--claude-muted-foreground); font-size: 12px; }
+.chat-outline__item { width: 100%; padding: 9px 10px; overflow: hidden; border: 0; border-radius: 10px; color: var(--claude-foreground); background: transparent; font-size: 13px; line-height: 1.35; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.chat-outline__item:hover { background: var(--claude-secondary); }
+.chat-user-message { scroll-margin-top: 72px; }
+.chat-user-message.is-editing .chat-user-message-shell { width: 100%; max-width: 100%; }
+.chat-user-message.is-editing .chat-user-bubble {
+  padding: 10px;
+  border: 1px solid var(--claude-border);
+  border-radius: 16px;
+  background: var(--claude-secondary) !important;
+  box-shadow: var(--claude-shadow-sm);
+}
+.chat-user-message.is-editing .chat-sent-attachments { justify-content: flex-start; margin-bottom: 10px; }
+.chat-inline-edit__input {
+  width: 100%;
+  min-height: 46px;
+  max-height: 180px;
+  padding: 10px 12px;
+  resize: none;
+  overflow-y: auto;
+  border: 1.5px solid var(--claude-primary);
+  border-radius: 12px;
+  outline: none;
+  background: var(--claude-card);
+  color: var(--claude-foreground);
+  font-family: var(--claude-font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--claude-primary) 10%, transparent);
+}
+.chat-inline-edit__actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 10px; }
+.chat-inline-edit__button {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--claude-border);
+  border-radius: 10px;
+  background: var(--claude-card);
+  color: var(--claude-foreground);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+.chat-inline-edit__button:hover { background: var(--claude-accent); }
+.chat-inline-edit__save { border-color: transparent; background: var(--claude-foreground); color: var(--claude-background); }
+.chat-inline-edit__save:hover { background: color-mix(in srgb, var(--claude-foreground) 88%, transparent); }
+.chat-inline-edit__save:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 900px) { .chat-outline { display: none !important; } }
 .ai-thinking-log { margin: 8px 0 0 22px; display: grid; gap: 5px; }
 .ai-thinking-log__item { display: grid; grid-template-columns: 8px auto; align-items: center; column-gap: 7px; color: var(--claude-muted-foreground); font-size: 12px; line-height: 1.35; transition: opacity .18s ease; animation: thinking-log-enter .22s ease-out both; }
 .ai-thinking-log__dot { width: 5px; height: 5px; border-radius: 50%; background: var(--claude-accent); }

@@ -1,5 +1,7 @@
 import { createApp } from 'vue';
 import {
+  Check,
+  ChevronRight,
   ContactRound,
   createIcons,
   Eye,
@@ -7,7 +9,9 @@ import {
   Lock,
   Mail,
   Pencil,
+  Pause,
   Plus,
+  RotateCcw,
   Search,
   ShieldCheck,
   Trash2,
@@ -30,12 +34,16 @@ window.lucide = {
   createIcons: () => createIcons({
     icons: {
       ContactRound,
+      Check,
+      ChevronRight,
       Eye,
       ListTodo,
       Lock,
       Mail,
       Pencil,
+      Pause,
       Plus,
+      RotateCcw,
       Search,
       ShieldCheck,
       Trash2,

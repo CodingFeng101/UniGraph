@@ -14,13 +14,19 @@ router = APIRouter()
     '/static/{unique_id}/{filename}',
     summary='获取图片',
 )
-async def get_image(unique_id: UUID, filename: str) -> FileResponse:
+async def get_image(unique_id: str, filename: str) -> FileResponse:
     """
     前端通过URL的方式，经过fastapi路由中专请求，并返回图片
     """
     try:
         if filename in {'.', '..'} or '/' in filename or '\\' in filename:
             raise HTTPException(status_code=400, detail='Invalid filename')
+
+        if unique_id != 'default':
+            try:
+                UUID(unique_id)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail='Invalid image directory') from exc
 
         file_path = Path(STATIC_DIR) / str(unique_id) / filename
         if not file_path.is_file():

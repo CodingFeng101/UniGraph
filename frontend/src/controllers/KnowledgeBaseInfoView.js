@@ -87,7 +87,8 @@ function triggerCoverUpload() {
 function applyCover(path) {
   var coverEl = document.getElementById('kb-cover');
   if (!coverEl) return;
-  coverEl.style.backgroundImage = path ? 'url(' + AppConfig.SHOW_IMAGE_API + path + ')' : '';
+  var coverPath = path || 'static/default/kg_base_default.png';
+  coverEl.style.backgroundImage = 'url(' + AppConfig.SHOW_IMAGE_API + coverPath + ')';
   coverEl.style.backgroundSize = 'cover';
   coverEl.style.backgroundPosition = 'center';
 }
@@ -119,13 +120,7 @@ function copyUUID() {
 }
 
 function showToast(message) {
-  var toast = document.createElement('div');
-  toast.textContent = message;
-  toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:8px;background:var(--claude-foreground);color:var(--claude-background);font-size:13px;z-index:9999;animation:fadeInUp 0.3s ease;';
-  document.body.appendChild(toast);
-  setTimeout(function() {
-    toast.remove();
-  }, 2000);
+  window.showToast(message);
 }
 
 function localizeKnowledgeBaseName(name) {

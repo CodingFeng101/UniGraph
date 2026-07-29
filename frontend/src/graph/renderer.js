@@ -1060,6 +1060,19 @@ export const GraphRenderer = window.GraphRenderer = {
           });
         });
         network.startSimulation();
+        this.refreshConnections();
+        stopSimulationSoon(560);
+      },
+      refreshConnections() {
+        if (this._destroyed) return;
+        const visibleEdges = edgeData.get().map((edge) => ({
+          id: edge.id,
+          hidden: false,
+          physics: true,
+        }));
+        if (visibleEdges.length) edgeData.update(visibleEdges);
+        network.redraw();
+        network.startSimulation();
         stopSimulationSoon(560);
       },
       destroy() {
