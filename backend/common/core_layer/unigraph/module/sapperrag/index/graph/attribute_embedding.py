@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 
 import numpy as np
 from tqdm.asyncio import tqdm_asyncio
@@ -16,7 +15,7 @@ class AttributeEmbedder:
         self.semaphore = asyncio.Semaphore(max_concurrent)  # 控制并发量
 
     @staticmethod
-    async def embed_attributes(text_embeder, attributes, api_key, base_url):
+    async def embed_attributes(text_embeder, attributes, api_key, base_url, model):
         """
         带指数退避重试的嵌入方法
 
@@ -31,7 +30,10 @@ class AttributeEmbedder:
             try:
                 attributes_text = ' '.join(f'{k}: {v}' for k, v in attributes.items())
                 response = await text_embeder.get_vector(
-                    query=attributes_text, api_key=os.getenv('OPENAI_API_KEY', ''), base_url='https://api.rcouyi.com/v1'
+                    query=attributes_text,
+                    api_key=api_key,
+                    base_url=base_url,
+                    model=model,
                 )
                 logger.info(f'嵌入成功: {attributes_text}')
                 return np.array(response)
@@ -42,7 +44,7 @@ class AttributeEmbedder:
                 await asyncio.sleep(backoff_factor * (2**attempt))
         return np.array([])
 
-    async def _process_single_entity(self, index, entity, embeder, api_key, base_url):
+    async def _process_single_entity(self, index, entity, embeder, api_key, base_url, model):
         """
         处理单个实体的异步任务
 
@@ -57,7 +59,7 @@ class AttributeEmbedder:
                 attributes['name'] = entity.name
 
                 # 获取嵌入向量
-                vector = await AttributeEmbedder.embed_attributes(embeder, attributes, api_key, base_url)
+                vector = await AttributeEmbedder.embed_attributes(embeder, attributes, api_key, base_url, model)
 
                 # 更新实体数据
                 entity.attributes_embedding = vector.tolist()
@@ -67,7 +69,7 @@ class AttributeEmbedder:
             finally:
                 del attributes['name']
 
-    async def add_attribute_vectors(self, entities, api_key, base_url, progress_callback=None):
+    async def add_attribute_vectors(self, entities, api_key, base_url, model, progress_callback=None):
         """
         并发处理所有实体
 
@@ -77,7 +79,8 @@ class AttributeEmbedder:
         # 创建任务列表
         embeder = GenericResponseGetter()
         tasks = [
-            self._process_single_entity(idx, entity, embeder, api_key, base_url) for idx, entity in enumerate(entities)
+            self._process_single_entity(idx, entity, embeder, api_key, base_url, model)
+            for idx, entity in enumerate(entities)
         ]
 
         # 使用带进度条的并发执行
@@ -85,12 +88,17 @@ class AttributeEmbedder:
 
         completed = 0
         total = len(tasks)
+        failures = []
         for future in progress_bar:
             index, error = await future
             completed += 1
             if error:
+                failures.append((index, error))
                 logger.error(f'处理实体 {index} 时出错: {str(error)}')
             if progress_callback:
                 progress_callback(completed, total, entities[index], error)
+
+        if failures:
+            raise RuntimeError(f'{len(failures)}/{total} 个实体向量生成失败，请检查嵌入模型配置')
 
         return entities

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import asyncio
-
 from backend.app.kgbase.crud.crud_embedding import embedding_dao
 from backend.app.kgbase.model import Embedding
 from backend.app.kgbase.schema.embedding import (
@@ -12,8 +10,6 @@ from backend.database.db_mysql import async_db_session
 
 
 class EmbeddingService:
-    _lock = asyncio.Lock()  # 创建一个类级别的异步锁
-
     @staticmethod
     async def add(*, obj: EmbeddingBase) -> str:
         async with async_db_session.begin() as db:

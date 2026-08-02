@@ -13,7 +13,7 @@
 
     <div class="mb-12 px-1 py-5 flex items-center gap-5">
       <div class="relative w-16 h-16 shrink-0">
-        <button id="profile-avatar" type="button" @click="triggerAvatarUpload()" class="group relative w-16 h-16 rounded-full flex items-center justify-center text-lg font-semibold overflow-hidden cursor-pointer" style="background:var(--claude-accent);color:var(--claude-brand-700);border:none;" title="点击更换头像">U</button>
+        <button id="profile-avatar" type="button" @click="triggerAvatarUpload()" class="group relative w-16 h-16 rounded-full flex items-center justify-center text-lg font-semibold overflow-hidden cursor-pointer" style="background:var(--claude-accent);color:var(--claude-brand-700);border:none;" title="点击更换头像（最大 5 MB）">U</button>
         <div id="avatar-upload-hint" class="hidden pointer-events-none absolute inset-0 rounded-full items-center justify-center text-[11px] font-medium" style="display:none;background:rgba(28,25,23,.62);color:#fff;">更换头像</div>
       </div>
       <input id="profile-avatar-input" type="file" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" @change="uploadAvatar($event.currentTarget)">
@@ -70,7 +70,7 @@
             <i data-lucide="x" style="width:11px;height:11px;"></i>
           </button>
         </div>
-        <button type="button" @click="openEmbedModal()" class="inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors hover:opacity-80 cursor-pointer" style="background:var(--claude-secondary);border:1px dashed var(--claude-border);color:var(--claude-muted-foreground);" title="添加嵌入模型" aria-label="添加嵌入模型">
+        <button id="add-embedding-model" type="button" @click="openEmbedModal()" class="inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors hover:opacity-80 cursor-pointer" style="background:var(--claude-secondary);border:1px dashed var(--claude-border);color:var(--claude-muted-foreground);" title="添加嵌入模型" aria-label="添加嵌入模型">
           <i data-lucide="plus" style="width:14px;height:14px;"></i>
         </button>
       </div>
@@ -96,11 +96,12 @@
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">API Key</label>
         <div class="relative">
-          <input type="password" id="llm-key-input" placeholder="sk-..." class="w-full h-9 px-3 pr-10 text-sm rounded-lg border outline-none transition-colors" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);" onfocus="this.style.borderColor='var(--claude-brand-500)'" onblur="this.style.borderColor='var(--claude-border)'">
+          <input type="password" id="llm-key-input" placeholder="编辑时留空表示不修改" class="w-full h-9 px-3 pr-10 text-sm rounded-lg border outline-none transition-colors" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);" onfocus="this.style.borderColor='var(--claude-brand-500)'" onblur="this.style.borderColor='var(--claude-border)'">
           <button @click="togglePassword('llm-key-input')" class="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 transition-opacity hover:opacity-70 cursor-pointer" style="color:var(--claude-muted-foreground);background:none;border:none;" aria-label="切换密码可见性">
             <i data-lucide="eye" style="width:16px;height:16px;"></i>
           </button>
         </div>
+        <p id="llm-key-status" class="mt-1.5 text-[11px]" style="color:var(--claude-muted-foreground);">密钥将加密保存，保存后不会回显明文。</p>
       </div>
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">Base URL</label>
@@ -109,6 +110,7 @@
     </div>
     <div class="flex items-center justify-end gap-2 px-5 py-3" style="border-top:1px solid var(--claude-border);">
       <button @click="closeLlmModal()" class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);border:none;">取消</button>
+      <button id="llm-test-button" @click="testModelConnection('llm')" class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" style="background:transparent;color:var(--claude-primary);border:1px solid var(--claude-primary);">测试连接</button>
       <button @click="saveLlmCapsule()" class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" style="background:var(--claude-primary);color:var(--claude-primary-foreground);border:none;">保存</button>
     </div>
   </div>
@@ -130,11 +132,12 @@
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">API Key</label>
         <div class="relative">
-          <input type="password" id="embed-key-input" placeholder="sk-..." class="w-full h-9 px-3 pr-10 text-sm rounded-lg border outline-none transition-colors" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);" onfocus="this.style.borderColor='var(--claude-brand-500)'" onblur="this.style.borderColor='var(--claude-border)'">
+          <input type="password" id="embed-key-input" placeholder="编辑时留空表示不修改" class="w-full h-9 px-3 pr-10 text-sm rounded-lg border outline-none transition-colors" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);" onfocus="this.style.borderColor='var(--claude-brand-500)'" onblur="this.style.borderColor='var(--claude-border)'">
           <button @click="togglePassword('embed-key-input')" class="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 transition-opacity hover:opacity-70 cursor-pointer" style="color:var(--claude-muted-foreground);background:none;border:none;" aria-label="切换密码可见性">
             <i data-lucide="eye" style="width:16px;height:16px;"></i>
           </button>
         </div>
+        <p id="embed-key-status" class="mt-1.5 text-[11px]" style="color:var(--claude-muted-foreground);">密钥将加密保存，保存后不会回显明文。</p>
       </div>
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">Base URL</label>
@@ -143,6 +146,7 @@
     </div>
     <div class="flex items-center justify-end gap-2 px-5 py-3" style="border-top:1px solid var(--claude-border);">
       <button @click="closeEmbedModal()" class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);border:none;">取消</button>
+      <button id="embed-test-button" @click="testModelConnection('embedding')" class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" style="background:transparent;color:var(--claude-primary);border:1px solid var(--claude-primary);">测试连接</button>
       <button @click="saveEmbedCapsule()" class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" style="background:var(--claude-primary);color:var(--claude-primary-foreground);border:none;">保存</button>
     </div>
   </div>
@@ -205,6 +209,9 @@ export default {
     },
     saveLlmCapsule(...args) {
       return this.controller?.saveLlmCapsule(...args);
+    },
+    testModelConnection(...args) {
+      return this.controller?.testModelConnection(...args);
     },
     toggleTaskPanel(...args) {
       return this.controller?.toggleTaskPanel(...args);

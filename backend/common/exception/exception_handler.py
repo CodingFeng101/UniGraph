@@ -9,6 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from uvicorn.protocols.http.h11_impl import STATUS_PHRASES
 
 from backend.common.exception.errors import BaseExceptionMixin
+from backend.common.log import log
 from backend.common.response.response_code import CustomResponseCode, StandardResponseCode
 from backend.common.response.response_schema import response_base
 from backend.common.schema import (
@@ -100,8 +101,11 @@ def register_exception(app: FastAPI):
                 'data': None,
             }
         else:
-            res = response_base.fail(res=CustomResponseCode.HTTP_400)
-            content = res.model_dump()
+            content = {
+                'code': exc.status_code,
+                'msg': '请求无法完成',
+                'data': None,
+            }
         request.state.__request_http_exception__ = content
         content.update(trace_id=get_request_trace_id(request))
         return MsgSpecJSONResponse(
@@ -209,15 +213,12 @@ def register_exception(app: FastAPI):
         :param exc:
         :return:
         """
-        if settings.ENVIRONMENT == 'dev':
-            content = {
-                'code': StandardResponseCode.HTTP_500,
-                'msg': str(exc),
-                'data': None,
-            }
-        else:
-            res = response_base.fail(res=CustomResponseCode.HTTP_500)
-            content = res.model_dump()
+        log.exception(f'Unhandled request exception: {request.method} {request.url.path}')
+        content = {
+            'code': StandardResponseCode.HTTP_500,
+            'msg': '服务暂时不可用，请稍后重试',
+            'data': None,
+        }
         request.state.__request_all_unknown_exception__ = content
         content.update(trace_id=get_request_trace_id(request))
         return MsgSpecJSONResponse(
@@ -246,15 +247,12 @@ def register_exception(app: FastAPI):
                     'data': exc.data,
                 }
             else:
-                if settings.ENVIRONMENT == 'dev':
-                    content = {
-                        'code': StandardResponseCode.HTTP_500,
-                        'msg': str(exc),
-                        'data': None,
-                    }
-                else:
-                    res = response_base.fail(res=CustomResponseCode.HTTP_500)
-                    content = res.model_dump()
+                log.exception(f'Unhandled CORS request exception: {request.method} {request.url.path}')
+                content = {
+                    'code': StandardResponseCode.HTTP_500,
+                    'msg': '服务暂时不可用，请稍后重试',
+                    'data': None,
+                }
             request.state.__request_cors_500_exception__ = content
             content.update(trace_id=get_request_trace_id(request))
             response = MsgSpecJSONResponse(

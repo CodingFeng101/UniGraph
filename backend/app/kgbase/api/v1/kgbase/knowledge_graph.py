@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from contextlib import suppress
 from typing import Annotated
 
 import anyio
-from fastapi import APIRouter, Depends, File, Form, Path, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
+from backend.app.file.file import MAX_UPLOAD_SIZE
 from backend.app.kgbase.schema import GetIndexDetail, GetKnowledgeGraphDetail, GetSchemaGraphDetail
 from backend.app.kgbase.schema.community import AddCommunityParam, UpdateCommunityParam
 from backend.app.kgbase.schema.embedding import EmbeddingBase
@@ -22,16 +24,23 @@ from backend.app.kgbase.schema.knowledge_graph import (
     UpdateKnowledgeGraphParam,
 )
 from backend.app.kgbase.schema.knowledge_relationship import AddKnowledgeRelationshipParam
+from backend.app.kgbase.service.chat_context_service import chat_context_service
 from backend.app.kgbase.service.community_service import community_service
 from backend.app.kgbase.service.embedding_service import embedding_service
 from backend.app.kgbase.service.knowledge_entity_service import knowledge_entity_service
 from backend.app.kgbase.service.knowledge_graph_service import knowledge_graph_service
 from backend.app.kgbase.service.knowledge_relationship_service import knowledge_relationship_service
+from backend.app.kgbase.service.ownership_service import ownership_service
 from backend.app.kgbase.service.schema_graph_service import schema_graph_service
 from backend.app.task.celery import celery_app
+from backend.common.core_layer.unigraph.module.sapperrag.retriver.structured_search.local_search.system_prompt import (
+    LOCAL_SEARCH_SYSTEM_PROMPT,
+)
+from backend.common.exception.errors import ForbiddenError
 from backend.common.pagination import DependsPagination, paging_data
+from backend.common.rate_limit import rate_limiter
 from backend.common.response.response_schema import CustomResponse, ResponseModel, response_base
-from backend.common.security.jwt import DependsJwtAuth
+from backend.common.security.jwt import DependsJwtAuth, get_token
 from backend.common.security.permission import RequestPermission
 from backend.common.task_progress import scaled_progress, should_report, task_error_result, task_progress, task_result
 from backend.core.conf import settings
@@ -46,6 +55,34 @@ HEARTBEAT_INTERVAL = 50
 router = APIRouter()
 
 
+def _safe_question_error(exc: Exception) -> tuple[int, str]:
+    """Map model-provider failures to stable messages without leaking responses."""
+    raw_message = str(exc).lower()
+    response = getattr(exc, 'response', None)
+    candidate_codes = (
+        getattr(exc, 'status_code', None),
+        getattr(response, 'status_code', None),
+    )
+    normalized_codes = {int(code) for code in candidate_codes if isinstance(code, (int, str)) and str(code).isdigit()}
+    status_code = next(
+        iter(normalized_codes),
+        500,
+    )
+
+    if 401 in normalized_codes or any(
+        marker in raw_message
+        for marker in ('error code: 401', '401 unauthorized', '无效的令牌', 'invalid token', 'invalid api key')
+    ):
+        return 401, '当前模型凭据无效，请到个人中心重新配置 API Key'
+    if 429 in normalized_codes or 'error code: 429' in raw_message:
+        return 429, '模型服务请求过于频繁，请稍后重试'
+    if status_code in {502, 503, 504}:
+        return status_code, '模型服务暂时不可用，请稍后重试'
+    if isinstance(exc, HTTPException) and isinstance(exc.detail, str):
+        return status_code, exc.detail
+    return 500, '问答处理失败，请检查模型配置或稍后重试'
+
+
 # 心跳机制，保持发起QA请求时保持链接活跃
 async def merge_async_generators(*gens):
     """
@@ -56,12 +93,11 @@ async def merge_async_generators(*gens):
     async def run_generator(gen):
         try:
             async for item in gen:
-                await queue.put(item)
-        except Exception:
-            await queue.put(None)  # 作为错误信号
+                await queue.put(('item', item))
+        except Exception as exc:
+            await queue.put(('error', exc))
         finally:
-            if not queue.empty():
-                await queue.put(None)  # 结束信号
+            await queue.put(('done', None))
 
     try:
         # 创建取消作用域
@@ -69,12 +105,15 @@ async def merge_async_generators(*gens):
             for gen in gens:
                 tg.start_soon(run_generator, gen)
 
-            while True:
-                item = await queue.get()
-                if item is None:  # 收到结束信号
-                    break
-                yield item
-                queue.task_done()
+            remaining = len(gens)
+            while remaining:
+                kind, payload = await queue.get()
+                if kind == 'done':
+                    remaining -= 1
+                elif kind == 'error':
+                    raise payload
+                else:
+                    yield payload
     except anyio.get_cancelled_exc_class():
         # 取消时不做特殊处理，让上层处理
         raise
@@ -83,31 +122,36 @@ async def merge_async_generators(*gens):
 
 
 @router.get('/all/{kg_base_uuid}', summary='获取kgbase下所有实例图谱', dependencies=[DependsJwtAuth])
-async def get_all_knowledge_graphs(kg_base_uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_all_knowledge_graphs(request: Request, kg_base_uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_kg_base(user_uuid=request.user.uuid, uuid=kg_base_uuid)
     knowledge_graphs = await knowledge_graph_service.get_all(kg_base_uuid=kg_base_uuid)
     data = [KnowledgeGraphResponse(**select_as_dict(knowledge_graph)) for knowledge_graph in knowledge_graphs]
     return response_base.success(data=data)
 
 
 @router.get('/{uuid}', summary='获取实例图谱详情', dependencies=[DependsJwtAuth])
-async def get_knowledge_graph(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_knowledge_graph(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=uuid)
     knowledge_graph = await knowledge_graph_service.get_knowledge_graph(uuid=uuid)
     data = GetKnowledgeGraphDetail(**select_as_dict(knowledge_graph))
     return response_base.success(data=data)
 
 
 @router.get('/explore/{uuid}/overview', summary='获取渐进式图谱概览', dependencies=[DependsJwtAuth])
-async def get_exploration_overview(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_exploration_overview(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=uuid)
     data = await knowledge_graph_service.get_exploration_overview(uuid=uuid)
     return response_base.success(data=data)
 
 
 @router.get('/explore/{uuid}/type', summary='按实体类型展开图谱', dependencies=[DependsJwtAuth])
 async def get_exploration_type(
+    request: Request,
     uuid: Annotated[str, Path(...)],
     entity_type: Annotated[str, Query(...)],
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
 ) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=uuid)
     result = await knowledge_graph_service.get_exploration_type(uuid=uuid, entity_type=entity_type, limit=limit)
     return response_base.success(
         data={
@@ -119,11 +163,16 @@ async def get_exploration_type(
 
 @router.get('/explore/{uuid}/neighbors/{entity_uuid}', summary='按跳数展开实体邻居', dependencies=[DependsJwtAuth])
 async def get_exploration_neighbors(
+    request: Request,
     uuid: Annotated[str, Path(...)],
     entity_uuid: Annotated[str, Path(...)],
     depth: Annotated[int, Query(ge=1, le=5)] = 1,
     limit: Annotated[int, Query(ge=1, le=500)] = 300,
 ) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=uuid)
+    await ownership_service.require_knowledge_entity_in_graph(
+        user_uuid=request.user.uuid, entity_uuid=entity_uuid, knowledge_graph_uuid=uuid
+    )
     result = await knowledge_graph_service.get_exploration_neighbors(
         uuid=uuid, entity_uuid=entity_uuid, depth=depth, limit=limit
     )
@@ -136,13 +185,15 @@ async def get_exploration_neighbors(
 
 
 @router.get('/depth/{uuid}', summary='获取最大索引深度', dependencies=[DependsJwtAuth])
-async def get_depth(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_depth(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=uuid)
     depth = await knowledge_graph_service.get_depth(uuid=uuid)
     return response_base.success(data=depth)
 
 
 @router.post('/export-index-file/{uuid}', summary='将索引导出为文件', dependencies=[DependsJwtAuth])
-async def export_knowledge_graph_index_file(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def export_knowledge_graph_index_file(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=uuid)
     knowledge_graph = await knowledge_graph_service.get_knowledge_graph(uuid=uuid)
     data = GetKnowledgeGraphDetail(**select_as_dict(knowledge_graph))
     entities = json.dumps([entity.to_dict() for entity in data.entities], ensure_ascii=False, indent=4)
@@ -156,18 +207,22 @@ async def export_knowledge_graph_index_file(uuid: Annotated[str, Path(...)]) -> 
 
 
 @router.post('/export-index-url/{uuid}', summary='将索引导出为url', dependencies=[DependsJwtAuth])
-async def export_knowledge_graph_index_url(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def export_knowledge_graph_index_url(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=uuid)
     url = f'{settings.INDEX_EXPORT_URL_ROOT}/{uuid}'
     return response_base.success(data={'url': url})
 
 
 @router.post('/import-index', summary='导入索引', dependencies=[DependsJwtAuth])
 async def import_knowledge_graph_index(
-    knowledge_graph_uuid: str = Form(...), file: UploadFile = File(...)
+    request: Request, knowledge_graph_uuid: str = Form(...), file: UploadFile = File(...)
 ) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=knowledge_graph_uuid)
     try:
         # 读取文件内容
-        file_content = await file.read()
+        file_content = await file.read(MAX_UPLOAD_SIZE + 1)
+        if len(file_content) > MAX_UPLOAD_SIZE:
+            return response_base.fail(res=CustomResponse(code=413, msg='索引文件不能超过 50 MB'))
         index_data = json.loads(file_content.decode('utf-8'))  # 将文件解析为 JSON
         entities = json.loads(index_data['entities'])
         communities = json.loads(index_data['communities'])
@@ -211,8 +266,15 @@ async def import_knowledge_graph_index(
     return response_base.success(data={'results': '索引导入成功'})
 
 
-@router.post('/ask/{uuid}', summary='基于索引进行问答', dependencies=[DependsJwtAuth])
-async def ask_knowledge_graph(uuid: Annotated[str, Path(...)], obj: AskKnowledgeGraphParam):
+@router.post(
+    '/ask/{uuid}',
+    summary='基于索引进行问答',
+    dependencies=[DependsJwtAuth, Depends(rate_limiter(times=30, seconds=60))],
+)
+async def ask_knowledge_graph(request: Request, uuid: Annotated[str, Path(...)], obj: AskKnowledgeGraphParam):
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=uuid)
+    obj.user_token = get_token(request)
+
     async def generate_stream():
         # 创建事件标志来控制心跳任务
         stop_event = asyncio.Event()
@@ -238,13 +300,21 @@ async def ask_knowledge_graph(uuid: Annotated[str, Path(...)], obj: AskKnowledge
             try:
                 yield (
                     json.dumps(
-                        {'type': 'processing', 'message': '正在解析问题', 'detail': '已接收问题，开始准备查询上下文'},
+                        {'type': 'processing', 'message': '正在解析问题', 'detail': '正在识别查询意图并准备检索上下文'},
                         ensure_ascii=False,
                     )
                     + '\n'
                 )
                 # 获取用户信息和知识图谱
-                api_key, base_url, model = await knowledge_graph_service.get_user_llm_info(user_token=obj.user_token)
+                api_key, base_url, model = await knowledge_graph_service.get_user_llm_info(
+                    user_token=obj.user_token,
+                    model_uuid=obj.llm_model_uuid,
+                )
+                (
+                    embedding_api_key,
+                    embedding_base_url,
+                    embedding_model,
+                ) = await knowledge_graph_service.get_user_embedding_info(user_token=obj.user_token)
                 yield (
                     json.dumps(
                         {'type': 'processing', 'message': '模型配置加载完成', 'detail': f'将使用 {model} 生成回答'},
@@ -281,15 +351,61 @@ async def ask_knowledge_graph(uuid: Annotated[str, Path(...)], obj: AskKnowledge
                     )
                     + '\n'
                 )
-                response = await knowledge_graph_service.query(
-                    knowledge_graph=data,
-                    query=obj.message,
-                    infer=obj.infer,
-                    depth=obj.depth,
-                    api_key=api_key,
-                    base_url=base_url,
-                    model=model,
+                context_progress: asyncio.Queue[dict[str, str]] = asyncio.Queue()
+
+                async def report_context_progress(message: str, detail: str) -> None:
+                    await context_progress.put({
+                        'type': 'processing',
+                        'message': message,
+                        'detail': detail,
+                    })
+
+                async def report_answer_delta(delta: str) -> None:
+                    await context_progress.put({'type': 'answer_delta', 'delta': delta})
+
+                async def provide_conversation_context(context_text: str):
+                    return await chat_context_service.prepare(
+                        chat_library_uuid=obj.chat_library_uuid,
+                        current_message_uuid=obj.current_message_uuid,
+                        user_uuid=request.user.uuid,
+                        current_question=obj.message,
+                        knowledge_context=context_text,
+                        system_prompt=LOCAL_SEARCH_SYSTEM_PROMPT,
+                        api_key=api_key,
+                        base_url=base_url,
+                        model=model,
+                        progress_callback=report_context_progress,
+                    )
+
+                query_task = asyncio.create_task(
+                    knowledge_graph_service.query(
+                        knowledge_graph=data,
+                        query=obj.message,
+                        infer=obj.infer,
+                        depth=obj.depth,
+                        api_key=api_key,
+                        base_url=base_url,
+                        model=model,
+                        embedding_api_key=embedding_api_key,
+                        embedding_base_url=embedding_base_url,
+                        embedding_model=embedding_model,
+                        context_provider=provide_conversation_context if obj.chat_library_uuid else None,
+                        token_callback=report_answer_delta,
+                    )
                 )
+                try:
+                    while not query_task.done() or not context_progress.empty():
+                        try:
+                            progress = await asyncio.wait_for(context_progress.get(), timeout=0.1)
+                        except asyncio.TimeoutError:
+                            continue
+                        yield json.dumps(progress, ensure_ascii=False) + '\n'
+                    response = await query_task
+                finally:
+                    if not query_task.done():
+                        query_task.cancel()
+                        with suppress(asyncio.CancelledError):
+                            await query_task
                 yield (
                     json.dumps(
                         {
@@ -305,10 +421,13 @@ async def ask_knowledge_graph(uuid: Annotated[str, Path(...)], obj: AskKnowledge
                 # 返回成功结果（保持原有 ResponseModel 格式）
                 yield json.dumps({'type': 'final_result', 'data': response, 'code': 200, 'msg': 'success'}) + '\n'
 
-            except asyncio.TimeoutError as e:
-                yield json.dumps({'type': 'error', 'code': 500, 'msg': str(e)}) + '\n'
+            except asyncio.TimeoutError:
+                payload = {'type': 'error', 'code': 504, 'msg': '模型响应超时，请稍后重试'}
+                yield json.dumps(payload, ensure_ascii=False) + '\n'
             except Exception as e:
-                yield json.dumps({'type': 'error', 'code': 500, 'msg': str(e)}) + '\n'
+                logger.exception('Knowledge graph question failed')
+                status_code, message = _safe_question_error(e)
+                yield json.dumps({'type': 'error', 'code': status_code, 'msg': message}, ensure_ascii=False) + '\n'
             finally:
                 stop_event.set()  # 停止心跳
 
@@ -338,6 +457,9 @@ async def build_index(self, uuid: str, user_token: str, depth: int = 4):
 
         # 获取用户信息和知识图谱
         api_key, base_url, model = await knowledge_graph_service.get_user_llm_info(user_token=user_token)
+        embedding_api_key, embedding_base_url, embedding_model = await knowledge_graph_service.get_user_embedding_info(
+            user_token=user_token
+        )
         knowledge_graph = await knowledge_graph_service.get_knowledge_graph(uuid=uuid)
         data = GetIndexDetail(**select_as_dict(knowledge_graph))
         entity_total = len(data.entities)
@@ -392,6 +514,9 @@ async def build_index(self, uuid: str, user_token: str, depth: int = 4):
             api_key=api_key,
             base_url=base_url,
             model=model,
+            embedding_api_key=embedding_api_key,
+            embedding_base_url=embedding_base_url,
+            embedding_model=embedding_model,
             progress_callback=report_index_progress,
         )
 
@@ -466,7 +591,7 @@ async def build_index(self, uuid: str, user_token: str, depth: int = 4):
         error_payload = {
             'error': {
                 'code': 'INTERNAL_ERROR',
-                'message': '任务失败, 请检查API账户并稍后重试!',
+                'message': str(e) or '知识图谱索引构建失败，请稍后重试',
                 'type': e.__class__.__name__,
                 'details': {'task_id': self.request.id, 'module': e.__class__.__module__},
             },
@@ -587,7 +712,7 @@ async def create_knowledge_graph(self, user_token: str, obj_data: dict):
                     try:
                         # 如果数据库没有实体，则新建
                         source_entity_uuid = await knowledge_entity_service.add(obj=source_entity)
-                    except Exception:
+                    except ForbiddenError:
                         exist_source_entity = await knowledge_entity_service.get_knowledge_entity(
                             name=source_entity.name, knowledge_graph_uuid=source_entity.knowledge_graph_uuid
                         )
@@ -605,7 +730,7 @@ async def create_knowledge_graph(self, user_token: str, obj_data: dict):
                     try:
                         # 如果数据库没有，则新建
                         target_entity_uuid = await knowledge_entity_service.add(obj=target_entity)
-                    except Exception:
+                    except ForbiddenError:
                         exist_target_entity = await knowledge_entity_service.get_knowledge_entity(
                             name=target_entity.name, knowledge_graph_uuid=target_entity.knowledge_graph_uuid
                         )
@@ -757,7 +882,7 @@ async def update_knowledge_graph(self, uuid: str, user_token: str, obj_data: dic
                     try:
                         # 如果数据库没有实体，则新建
                         source_entity_uuid = await knowledge_entity_service.add(obj=source_entity)
-                    except Exception:
+                    except ForbiddenError:
                         exist_source_entity = await knowledge_entity_service.get_knowledge_entity(
                             name=source_entity.name, knowledge_graph_uuid=source_entity.knowledge_graph_uuid
                         )
@@ -775,7 +900,7 @@ async def update_knowledge_graph(self, uuid: str, user_token: str, obj_data: dic
                     try:
                         # 如果数据库没有，则新建
                         target_entity_uuid = await knowledge_entity_service.add(obj=target_entity)
-                    except Exception:
+                    except ForbiddenError:
                         exist_target_entity = await knowledge_entity_service.get_knowledge_entity(
                             name=target_entity.name, knowledge_graph_uuid=target_entity.knowledge_graph_uuid
                         )
@@ -822,7 +947,7 @@ async def update_knowledge_graph(self, uuid: str, user_token: str, obj_data: dic
         error_payload = {
             'error': {
                 'code': 'INTERNAL_ERROR',
-                'message': '任务失败, 请检查API账户并稍后重试!',
+                'message': str(e) or '知识图谱更新失败，请稍后重试',
                 'type': e.__class__.__name__,
                 'details': {'task_id': self.request.id, 'module': e.__class__.__module__},
             },
@@ -897,7 +1022,7 @@ async def infer_knowledge_graph(self, uuid: str, user_token: str):
                 try:
                     # 如果数据库没有实体，则新建
                     source_entity_uuid = await knowledge_entity_service.add(obj=source_entity)
-                except Exception:
+                except ForbiddenError:
                     exist_source_entity = await knowledge_entity_service.get_knowledge_entity(
                         name=source_entity.name, knowledge_graph_uuid=source_entity.knowledge_graph_uuid
                     )
@@ -915,7 +1040,7 @@ async def infer_knowledge_graph(self, uuid: str, user_token: str):
                 try:
                     # 如果数据库没有，则新建
                     target_entity_uuid = await knowledge_entity_service.add(obj=target_entity)
-                except Exception:
+                except ForbiddenError:
                     exist_target_entity = await knowledge_entity_service.get_knowledge_entity(
                         name=target_entity.name, knowledge_graph_uuid=target_entity.knowledge_graph_uuid
                     )
@@ -966,7 +1091,7 @@ async def infer_knowledge_graph(self, uuid: str, user_token: str):
         error_payload = {
             'error': {
                 'code': 'INTERNAL_ERROR',
-                'message': '任务失败, 请检查API账户并稍后重试!',
+                'message': str(e) or '知识推理失败，请稍后重试',
                 'type': e.__class__.__name__,
                 'details': {'task_id': self.request.id, 'module': e.__class__.__module__},
             },
@@ -981,7 +1106,8 @@ async def infer_knowledge_graph(self, uuid: str, user_token: str):
     summary='（批量）删除实例图谱',
     dependencies=[Depends(RequestPermission('sys:knowledge_graph:del'))],
 )
-async def delete_knowledge_graph(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def delete_knowledge_graph(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=uuid)
     count = await knowledge_graph_service.delete(uuid=uuid)
     if count > 0:
         return response_base.success()
@@ -993,7 +1119,8 @@ async def delete_knowledge_graph(uuid: Annotated[str, Path(...)]) -> ResponseMod
     summary='更新实例图谱状态',
     dependencies=[Depends(RequestPermission('sys:knowledge_graph:status'))],
 )
-async def update_knowledge_graph_status(pk: Annotated[int, Path(...)]) -> ResponseModel:
+async def update_knowledge_graph_status(request: Request, pk: Annotated[int, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, pk=pk)
     count = await knowledge_graph_service.update_status(pk=pk)
     if count > 0:
         return response_base.success()

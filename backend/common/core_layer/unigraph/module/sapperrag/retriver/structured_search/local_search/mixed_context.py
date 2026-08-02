@@ -35,7 +35,14 @@ class LocalSearchMixedContext(LocalContextBuilder):
         :param kwargs: 其他参数
         """
         token_encoder = tiktoken.get_encoding('cl100k_base')
-        selected_entities = await map_query_to_entities(extracted_entities, self.entities, api_key, base_url, k=10)
+        selected_entities = await map_query_to_entities(
+            extracted_entities,
+            self.entities,
+            api_key,
+            base_url,
+            kwargs.get('embedding_model', ''),
+            k=10,
+        )
         logger.info('已匹配到实体😊')
 
         human_read_id = 0  # 用于替换复杂的ID,方便模型溯源

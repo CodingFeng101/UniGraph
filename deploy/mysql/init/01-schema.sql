@@ -176,7 +176,7 @@ CREATE TABLE `kg_base` (
   `updated_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `ix_kg_base_name` (`name`),
+  UNIQUE KEY `uq_kg_base_user_name` (`user_uuid`,`name`),
   KEY `user_uuid` (`user_uuid`),
   KEY `ix_kg_base_id` (`id`),
   CONSTRAINT `kg_base_ibfk_1` FOREIGN KEY (`user_uuid`) REFERENCES `sys_user` (`uuid`)
@@ -303,7 +303,7 @@ CREATE TABLE `llm_provider` (
   `uuid` varchar(50) NOT NULL DEFAULT (uuid()),
   `user_uuid` varchar(50) NOT NULL,
   `name` varchar(255) NOT NULL,
-  `api_key` varchar(255) DEFAULT NULL,
+  `api_key` text DEFAULT NULL COMMENT '加密后的 API 密钥',
   `api_url` varchar(512) DEFAULT NULL,
   `document_url` varchar(512) DEFAULT NULL,
   `status` int DEFAULT '1',
@@ -312,6 +312,7 @@ CREATE TABLE `llm_provider` (
   `updated_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uuid` (`uuid`),
+  UNIQUE KEY `uq_llm_provider_user_name` (`user_uuid`,`name`),
   KEY `user_uuid` (`user_uuid`),
   CONSTRAINT `llm_provider_ibfk_1` FOREIGN KEY (`user_uuid`) REFERENCES `sys_user` (`uuid`)
 ) ENGINE=InnoDB AUTO_INCREMENT=141 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -756,7 +757,7 @@ CREATE TABLE `sys_user` (
   `dept_id` int DEFAULT NULL COMMENT '部门关联ID',
   `created_time` datetime NOT NULL COMMENT '创建时间',
   `updated_time` datetime DEFAULT NULL COMMENT '更新时间',
-  `api_key` varchar(255) DEFAULT NULL COMMENT 'api_key',
+  `api_key` text DEFAULT NULL COMMENT '加密后的旧版 API Key',
   `base_url` varchar(255) DEFAULT NULL COMMENT 'base_url',
   `model` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),

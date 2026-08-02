@@ -12,7 +12,6 @@ from backend.app.admin.model import User
 from backend.app.admin.schema.user import (
     AddUserParam,
     AvatarParam,
-    RegisterUserParam,
     ResetPasswordParam,
     UpdateUserDeptParam,
     UpdateUserParam,
@@ -26,23 +25,6 @@ from backend.database.db_redis import redis_client
 
 
 class UserService:
-    @staticmethod
-    async def register(*, obj: RegisterUserParam) -> None:
-        async with async_db_session.begin() as db:
-            if not obj.password:
-                raise errors.ForbiddenError(msg='密码为空')
-            username = await user_dao.get_by_username(db, obj.username)
-            if username:
-                raise errors.ForbiddenError(msg='用户已注册')
-            obj.nickname = obj.nickname if obj.nickname else f'#{random.randrange(10000, 88888)}'
-            nickname = await user_dao.get_by_nickname(db, obj.nickname)
-            if nickname:
-                raise errors.ForbiddenError(msg='昵称已注册')
-            email = await user_dao.check_email(db, obj.email)
-            if email:
-                raise errors.ForbiddenError(msg='邮箱已注册')
-            await user_dao.create(db, obj)
-
     @staticmethod
     async def add(*, request: Request, obj: AddUserParam) -> None:
         async with async_db_session.begin() as db:
@@ -107,17 +89,10 @@ class UserService:
             return user
 
     @staticmethod
-    async def get_sso_userinfo(*, username: str) -> User:
-        async with async_db_session() as db:
-            user = await user_dao.get_with_relation(db, username=username)
-            return user
-
-    @staticmethod
     async def update(*, request: Request, username: str, obj: UpdateUserParam) -> int:
         async with async_db_session.begin() as db:
-            # if not request.user.is_superuser:
-            #     if request.user.username != username:
-            #         raise errors.ForbiddenError(msg='你只能修改自己的信息')
+            if not request.user.is_superuser and request.user.username != username:
+                raise errors.ForbiddenError(msg='你只能修改自己的信息')
             input_user = await user_dao.get_with_relation(db, username=username)
             if not input_user:
                 raise errors.NotFoundError(msg='用户不存在')
@@ -179,9 +154,8 @@ class UserService:
     @staticmethod
     async def update_avatar(*, request: Request, username: str, avatar: AvatarParam) -> int:
         async with async_db_session.begin() as db:
-            # if not request.user.is_superuser:
-            #     if request.user.username != username:
-            #         raise errors.AuthorizationError
+            if not request.user.is_superuser and request.user.username != username:
+                raise errors.ForbiddenError(msg='你只能修改自己的头像')
             input_user = await user_dao.get_by_username(db, username)
             if not input_user:
                 raise errors.NotFoundError(msg='用户不存在')

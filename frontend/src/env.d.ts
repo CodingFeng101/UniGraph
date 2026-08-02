@@ -11,9 +11,9 @@ interface Window {
   GraphRenderer: Record<string, any>;
   KgBaseAPI: Record<string, (...args: any[]) => any>;
   lucide: { createIcons: () => void };
+  showToast?: (message: string) => void;
   TaskManager: Record<string, any>;
 }
 
 declare module 'cytoscape-cose-bilkent';
-declare module 'cytoscape-dagre';
 declare module 'cytoscape-fcose';

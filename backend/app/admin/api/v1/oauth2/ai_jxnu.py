@@ -7,10 +7,11 @@ from typing import Optional
 import httpx
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from backend.app.admin.service.wx_oauth2_service import wx_oauth2_service
 from backend.common.exception.errors import RequestError
+from backend.common.rate_limit import rate_limiter
 from backend.common.schema import SchemaBase
 from backend.core.conf import settings
 
@@ -56,7 +57,10 @@ def decrypt_token(encrypted_token: str, iv: str) -> Optional[str]:
 
 
 @router.post(
-    '/jxnu-auth', summary='江西师大AI门户一键登录', response_description='授权成功返回用户凭证', dependencies=[]
+    '/jxnu-auth',
+    summary='江西师大AI门户一键登录',
+    response_description='授权成功返回用户凭证',
+    dependencies=[Depends(rate_limiter(times=10, seconds=60))],
 )
 async def ai_jxnu_login(obj: JxnuLoginRequest):
     """
@@ -73,12 +77,10 @@ async def ai_jxnu_login(obj: JxnuLoginRequest):
     if not decrypted_token:
         raise HTTPException(status_code=400, detail='Token解密失败，请检查参数')
 
-    wx_api_url = 'https://ai.jxselab.com/tsp/v1/sys/users/me'
-
     try:
         async with httpx.AsyncClient(timeout=5) as client:
             response = await client.get(
-                wx_api_url,
+                settings.JXNU_USER_INFO_URL,
                 headers={
                     'Accept': 'application/json',
                     'User-Agent': 'AI-Portal-Auth/1.0',
@@ -102,13 +104,13 @@ async def ai_jxnu_login(obj: JxnuLoginRequest):
 
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail='江西师大AI门户接口请求超时')
-    except httpx.RequestError as e:
-        raise HTTPException(status_code=502, detail=f'江西师大AI门户接口网络错误: {str(e)}')
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail='江西师大AI门户接口网络错误') from exc
     except json.JSONDecodeError:
         raise RequestError(msg='江西师大AI门户返回数据解析失败')
 
     try:
         data = await wx_oauth2_service.create_with_login(user_uuid=user_uuid)
         return data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'用户会话创建失败: {str(e)}')
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail='用户会话创建失败') from exc

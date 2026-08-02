@@ -73,12 +73,16 @@ def setup_logging():
                 'level': settings.LOG_STDOUT_LEVEL,
                 'filter': lambda record: correlation_id_filter(record) and record['level'].no <= 25,
                 'format': settings.LOG_STD_FORMAT,
+                'backtrace': False,
+                'diagnose': False,
             },
             {
                 'sink': stderr,
                 'level': settings.LOG_STDERR_LEVEL,
                 'filter': lambda record: correlation_id_filter(record) and record['level'].no >= 30,
                 'format': settings.LOG_STD_FORMAT,
+                'backtrace': False,
+                'diagnose': False,
             },
         ]
     )
@@ -115,8 +119,8 @@ def set_customize_logfile():
         str(log_stderr_file),
         level=settings.LOG_STDERR_LEVEL,
         **log_config,
-        backtrace=True,
-        diagnose=True,
+        backtrace=False,
+        diagnose=False,
     )
 
 

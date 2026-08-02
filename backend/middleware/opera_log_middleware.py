@@ -35,8 +35,12 @@ class OperaLogMiddleware(BaseHTTPMiddleware):
         except AttributeError:
             username = None
         method = request.method
-        args = await self.get_request_args(request)
-        args = await self.desensitization(args)
+        try:
+            args = await self.get_request_args(request)
+            args = await self.desensitization(args)
+        except Exception:
+            log.exception(f'操作日志读取请求参数失败: {request.method} {path}')
+            args = {**request.query_params, **request.path_params}
 
         # 执行请求
         start_time = timezone.now()
@@ -70,7 +74,8 @@ class OperaLogMiddleware(BaseHTTPMiddleware):
             cost_time=cost_time,
             opera_time=start_time,
         )
-        create_task(OperaLogService.create(obj_in=opera_log_in))
+        log_task = create_task(OperaLogService.create(obj_in=opera_log_in))
+        log_task.add_done_callback(self.handle_log_task_result)
 
         # 错误抛出
         err = request_next.err
@@ -78,6 +83,13 @@ class OperaLogMiddleware(BaseHTTPMiddleware):
             raise err from None
 
         return request_next.response
+
+    @staticmethod
+    def handle_log_task_result(task) -> None:
+        try:
+            task.result()
+        except Exception:
+            log.exception('操作日志写入失败')
 
     async def execute_request(self, request: Request, call_next) -> RequestCallNext:
         """执行请求"""

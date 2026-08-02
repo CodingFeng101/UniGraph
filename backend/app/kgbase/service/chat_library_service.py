@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import asyncio
 import json
 
 from sqlalchemy import delete, func, select
@@ -15,7 +14,6 @@ from backend.database.db_mysql import async_db_session, uuid4_str
 
 
 class ChatLibraryService:
-    _lock = asyncio.Lock()  # 创建一个类级别的异步锁
     MAX_SHARE_MESSAGES = 500
     MAX_SHARE_SNAPSHOT_BYTES = 5 * 1024 * 1024
 
@@ -68,8 +66,13 @@ class ChatLibraryService:
         async with async_db_session.begin() as db:
             library = await ChatLibraryService._get_owned_library(db, uuid, user_uuid, for_update=True)
 
-            # 更新图谱库信息
-            count = await library_dao.update_library(db, library.id, obj)
+            update_obj = obj.model_copy(deep=True)
+            existing_metadata = dict(library.messages) if isinstance(library.messages, dict) else {}
+            context_state = existing_metadata.get('_chat_context')
+            if context_state:
+                update_obj.messages = dict(update_obj.messages or {})
+                update_obj.messages['_chat_context'] = context_state
+            count = await library_dao.update_library(db, library.id, update_obj)
             # await redis_client.delete(f'{settings.KG_BASE_REDIS_PREFIX}:{source.id}')
             return count
 
@@ -359,7 +362,7 @@ class ChatLibraryService:
             db.add_all([user_message, assistant_message])
             await db.flush()
             source_rows = []
-            for position, source_type in enumerate(('Sources', 'Entities', 'Relationships', 'Communities')):
+            for position, source_type in enumerate(('Reports', 'Sources', 'Relationships', 'Entities')):
                 content = obj.sources.get(source_type, [])
                 source_rows.append(
                     ChatMessageSource(
@@ -402,14 +405,14 @@ class ChatLibraryService:
                         content=obj.sources.get(source_type, []),
                         position=position,
                     )
-                    for position, source_type in enumerate(('Sources', 'Entities', 'Relationships', 'Communities'))
+                    for position, source_type in enumerate(('Reports', 'Sources', 'Relationships', 'Entities'))
                 ])
             return {'message_uuid': message.uuid}
 
     @staticmethod
     async def update_message(*, uuid: str, message_uuid: str, user_uuid: str, content: str) -> dict:
         async with async_db_session.begin() as db:
-            await ChatLibraryService._get_owned_library(db, uuid, user_uuid, for_update=True)
+            library = await ChatLibraryService._get_owned_library(db, uuid, user_uuid, for_update=True)
             result = await db.execute(
                 select(ChatMessage).where(
                     ChatMessage.uuid == message_uuid,
@@ -421,8 +424,29 @@ class ChatLibraryService:
             if not message:
                 raise errors.NotFoundError(msg='用户消息不存在')
             message.content = content
+            later_message_uuids = select(ChatMessage.uuid).where(
+                ChatMessage.chat_library_uuid == uuid,
+                ChatMessage.sequence > message.sequence,
+            )
+            await db.execute(delete(ChatMessageSource).where(ChatMessageSource.message_uuid.in_(later_message_uuids)))
+            deleted_result = await db.execute(
+                delete(ChatMessage).where(
+                    ChatMessage.chat_library_uuid == uuid,
+                    ChatMessage.sequence > message.sequence,
+                )
+            )
+            metadata = dict(library.messages) if isinstance(library.messages, dict) else {}
+            context_state = metadata.get('_chat_context', {})
+            summarized_through = int(context_state.get('summarized_through_sequence') or 0)
+            if message.sequence <= summarized_through:
+                metadata.pop('_chat_context', None)
+                library.messages = metadata
             await db.flush()
-            return {'message_uuid': message.uuid, 'content': message.content}
+            return {
+                'message_uuid': message.uuid,
+                'content': message.content,
+                'deleted_message_count': deleted_result.rowcount,
+            }
 
     @staticmethod
     async def generate_title(*, uuid: str, content: str, user_token: str, user_uuid: str) -> str:

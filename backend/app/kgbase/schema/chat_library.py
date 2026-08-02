@@ -15,7 +15,7 @@ class LibraryBase(SchemaBase):
 
 
 class LibraryDetail(LibraryBase):
-    messages: Dict[str, str] | None = Field(default_factory=dict)
+    messages: Dict[str, Any] | None = Field(default_factory=dict)
     conversation: List[Dict[str, Any]] = Field(default_factory=list)
 
 
@@ -30,7 +30,7 @@ class LibraryResponse(LibraryBase):
 
 
 class UpdateLibraryParam(LibraryBase):
-    messages: Dict[str, str] | None = Field(default_factory=dict)
+    messages: Dict[str, Any] | None = Field(default_factory=dict)
 
 
 class AppendTurnParam(SchemaBase):

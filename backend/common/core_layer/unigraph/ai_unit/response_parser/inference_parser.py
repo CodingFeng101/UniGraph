@@ -33,8 +33,8 @@ class MaskedTripleInferenceResponseParser(ResponseParser):
                     triples.append((e1, r, e2))
                     # 将提取得实体添加进列表
                     extracted_entities.extend([e1, e2])
-            except Exception:
-                pass
+            except (TypeError, ValueError):
+                continue
 
         return triples, list(set(extracted_entities))
 

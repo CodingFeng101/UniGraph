@@ -1,4 +1,6 @@
 /* Generated from pages/profile.html; keep behavior changes in the source controller during migration. */
+import { MAX_IMAGE_SIZE, validateUploadSize } from '@/utils/upload';
+
 export function createProfileViewController() {
   const { Auth, API, KgBaseAPI } = window;
 
@@ -7,6 +9,7 @@ export function createProfileViewController() {
 
   var editingLlmCapsule = null;
   var editingProfile = false;
+  var hasEmbeddingModel = false;
 
   async function ensureCurrentUser() {
     var cached = Auth.getUserInfo() || {};
@@ -52,9 +55,6 @@ export function createProfileViewController() {
         username: user.username,
         nickname: nickname.value.trim(),
         email: email.value.trim(),
-        api_key: user.api_key || null,
-        base_url: user.base_url || null,
-        model: user.model || null,
       });
       if (response.code !== 200) return showToast(response.msg || '保存资料失败');
       Auth.setUserInfo({ ...user, nickname: nickname.value.trim(), email: email.value.trim() });
@@ -117,6 +117,7 @@ export function createProfileViewController() {
     var file = input?.files?.[0];
     if (!file) return;
     try {
+      validateUploadSize(file, MAX_IMAGE_SIZE);
       var user = await ensureCurrentUser();
       var upload = await API.uploadFile(file);
       if (upload.code !== 200 || !upload.data?.url) throw new Error(upload.msg || '头像上传失败');
@@ -144,11 +145,14 @@ export function createProfileViewController() {
     pill.dataset.modelUuid = model.uuid || '';
     pill.dataset.providerUuid = provider.uuid || '';
     pill.dataset.providerName = provider.name || model.name || '';
-    pill.dataset.apiKey = provider.api_key || '';
+    pill.dataset.hasApiKey = provider.api_key ? 'true' : 'false';
     pill.dataset.apiUrl = provider.api_url || '';
     pill.dataset.modelType = type;
     pill.innerHTML =
       '<span class="text-xs font-medium" style="font-family:var(--claude-font-mono);color:var(--claude-foreground);"></span>' +
+      (provider.api_key
+        ? '<span class="inline-flex items-center gap-1 text-[10px]" style="color:var(--claude-success-500);" title="API Key 已加密保存"><i data-lucide="shield-check" style="width:11px;height:11px;"></i>已保存</span>'
+        : '<span class="text-[10px]" style="color:var(--claude-destructive);">未配置密钥</span>') +
       '<button type="button" onclick="editCapsule(this)" class="w-5 h-5 rounded-full flex items-center justify-center transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-muted-foreground);" title="编辑" aria-label="' + (isEmbed ? '编辑嵌入模型' : '编辑模型') + '"><i data-lucide="pencil" style="width:11px;height:11px;"></i></button>' +
       '<button type="button" onclick="removeCapsule(this)" class="w-5 h-5 rounded-full flex items-center justify-center transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-muted-foreground);" title="删除" aria-label="' + (isEmbed ? '删除嵌入模型' : '删除模型') + '"><i data-lucide="x" style="width:11px;height:11px;"></i></button>';
     pill.querySelector('span').textContent = model.name || '未命名模型';
@@ -170,9 +174,12 @@ export function createProfileViewController() {
       var embedAdd = embedContainer.lastElementChild;
       llmContainer.querySelectorAll('.group').forEach(function(item) { item.remove(); });
       embedContainer.querySelectorAll('.group').forEach(function(item) { item.remove(); });
-      details.forEach(function(provider) {
+      var embeddingCount = 0;
+      details.filter(function(provider) { return provider.status !== 0; }).forEach(function(provider) {
         (provider.models || []).forEach(function(model) {
-          var type = model.type === 'embedding' ? 'embedding' : 'llm';
+          if (model.status === 0) return;
+          var type = ['embedding', 'text-embedding'].includes(model.type) ? 'embedding' : 'llm';
+          if (type === 'embedding') embeddingCount += 1;
           var capsule = createModelCapsule(model, provider, type);
           (type === 'embedding' ? embedContainer : llmContainer).insertBefore(
             capsule,
@@ -180,6 +187,13 @@ export function createProfileViewController() {
           );
         });
       });
+      hasEmbeddingModel = embeddingCount > 0;
+      if (embedAdd) {
+        embedAdd.disabled = hasEmbeddingModel;
+        embedAdd.classList.toggle('opacity-40', hasEmbeddingModel);
+        embedAdd.classList.toggle('cursor-not-allowed', hasEmbeddingModel);
+        embedAdd.title = hasEmbeddingModel ? '每个用户只能配置一个嵌入模型' : '添加嵌入模型';
+      }
       lucide.createIcons();
     } catch (error) {
       showToast(error.message || '加载模型配置失败');
@@ -192,16 +206,25 @@ export function createProfileViewController() {
     var title = document.getElementById('modal-llm-title');
     var modelInput = document.getElementById('llm-model-input');
     var keyInput = document.getElementById('llm-key-input');
+    var keyStatus = document.getElementById('llm-key-status');
     var urlInput = document.getElementById('llm-url-input');
     if (editingLlmCapsule) {
       title.textContent = '编辑大模型';
       modelInput.value = editingLlmCapsule.querySelector('span').textContent;
-      keyInput.value = editingLlmCapsule.dataset.apiKey || '';
+      keyInput.value = '';
+      keyInput.placeholder = editingLlmCapsule.dataset.hasApiKey === 'true'
+        ? 'API Key 已保存，留空则不修改'
+        : '请输入 API Key';
+      keyStatus.textContent = editingLlmCapsule.dataset.hasApiKey === 'true'
+        ? '密钥已安全保存，服务端不会向浏览器回显明文。'
+        : '当前尚未保存 API Key。';
       urlInput.value = editingLlmCapsule.dataset.apiUrl || '';
     } else {
       title.textContent = '添加大模型';
       modelInput.value = '';
       keyInput.value = '';
+      keyInput.placeholder = '请输入 API Key';
+      keyStatus.textContent = '密钥将加密保存，保存后不会回显明文。';
       urlInput.value = '';
     }
     modal.classList.remove('hidden');
@@ -212,6 +235,45 @@ export function createProfileViewController() {
     editingLlmCapsule = null;
   }
 
+  async function testModelConnection(modelType) {
+    var prefix = modelType === 'embedding' ? 'embed' : 'llm';
+    var modelVal = document.getElementById(prefix + '-model-input').value.trim();
+    var apiKey = document.getElementById(prefix + '-key-input').value.trim();
+    var apiUrl = document.getElementById(prefix + '-url-input').value.trim();
+    if (!modelVal || !apiKey || !apiUrl) {
+      showToast('请先填写模型名称、API Key 和 Base URL');
+      return;
+    }
+
+    var button = document.getElementById(prefix + '-test-button');
+    var originalText = button?.textContent || '测试连接';
+    if (button) {
+      button.disabled = true;
+      button.textContent = '测试中…';
+      button.style.opacity = '0.6';
+      button.style.cursor = 'wait';
+    }
+    try {
+      var result = await KgBaseAPI.llm.testModel({
+        base_url: apiUrl,
+        api_key: apiKey,
+        model_name: modelVal,
+        model_type: modelType,
+      });
+      if (result.code !== 200) throw new Error(result.msg || '模型连接测试失败');
+      showToast(modelType === 'embedding' ? '嵌入模型连接测试成功' : '大模型连接测试成功');
+    } catch (error) {
+      showToast(error.message || '模型连接测试失败，请检查填写信息');
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText;
+        button.style.opacity = '';
+        button.style.cursor = '';
+      }
+    }
+  }
+
   async function saveLlmCapsule() {
     var modelVal = document.getElementById('llm-model-input').value.trim();
     var apiKey = document.getElementById('llm-key-input').value.trim();
@@ -220,14 +282,23 @@ export function createProfileViewController() {
       showToast('请输入模型名称');
       return;
     }
+    if (!apiUrl) {
+      showToast('请输入 Base URL');
+      return;
+    }
+    if (!editingLlmCapsule && !apiKey) {
+      showToast('请输入 API Key');
+      return;
+    }
     try {
       if (editingLlmCapsule && editingLlmCapsule.dataset.modelUuid) {
         var providerUuid = editingLlmCapsule.dataset.providerUuid;
-        var providerResult = await KgBaseAPI.llm.updateProvider(providerUuid, {
+        var providerPayload = {
           name: editingLlmCapsule.dataset.providerName || modelVal,
-          api_key: apiKey || editingLlmCapsule.dataset.apiKey || '',
           api_url: apiUrl || editingLlmCapsule.dataset.apiUrl || '',
-        });
+        };
+        if (apiKey) providerPayload.api_key = apiKey;
+        var providerResult = await KgBaseAPI.llm.updateProvider(providerUuid, providerPayload);
         if (providerResult.code !== 200) throw new Error(providerResult.msg || '保存失败');
         var modelResult = await KgBaseAPI.llm.updateModel(editingLlmCapsule.dataset.modelUuid, {
           name: modelVal,
@@ -238,7 +309,10 @@ export function createProfileViewController() {
         if (modelResult.code !== 200) throw new Error(modelResult.msg || '保存失败');
       } else {
         await ensureCurrentUser();
-        var createdProvider = await KgBaseAPI.llm.createProvider(modelVal);
+        var createdProvider = await KgBaseAPI.llm.createProvider(modelVal, {
+          api_key: apiKey,
+          api_url: apiUrl,
+        });
         if (createdProvider.code !== 200 || !createdProvider.data?.uuid) {
           throw new Error(createdProvider.msg || '创建模型服务失败');
         }
@@ -250,11 +324,6 @@ export function createProfileViewController() {
           status: 1,
         });
         if (createdModel.code !== 200) throw new Error(createdModel.msg || '创建模型失败');
-        await KgBaseAPI.llm.updateProvider(createdProvider.data.uuid, {
-          name: modelVal,
-          api_key: apiKey,
-          api_url: apiUrl,
-        });
       }
       closeLlmModal();
       await loadModelConfig();
@@ -267,18 +336,32 @@ export function createProfileViewController() {
   var editingEmbedCapsule = null;
 
   function openEmbedModal(capsule) {
+    if (!capsule && hasEmbeddingModel) {
+      showToast('每个用户只能配置一个嵌入模型');
+      return;
+    }
     editingEmbedCapsule = capsule || null;
     var modal = document.getElementById('modal-embed');
     var title = document.getElementById('modal-embed-title');
     var modelInput = document.getElementById('embed-model-input');
+    var keyInput = document.getElementById('embed-key-input');
+    var keyStatus = document.getElementById('embed-key-status');
     if (editingEmbedCapsule) {
       title.textContent = '编辑嵌入模型';
       modelInput.value = editingEmbedCapsule.querySelector('span').textContent;
+      keyInput.placeholder = editingEmbedCapsule.dataset.hasApiKey === 'true'
+        ? 'API Key 已保存，留空则不修改'
+        : '请输入 API Key';
+      keyStatus.textContent = editingEmbedCapsule.dataset.hasApiKey === 'true'
+        ? '密钥已安全保存，服务端不会向浏览器回显明文。'
+        : '当前尚未保存 API Key。';
     } else {
       title.textContent = '添加嵌入模型';
       modelInput.value = '';
+      keyInput.placeholder = '请输入 API Key';
+      keyStatus.textContent = '密钥将加密保存，保存后不会回显明文。';
     }
-    document.getElementById('embed-key-input').value = editingEmbedCapsule?.dataset.apiKey || '';
+    keyInput.value = '';
     document.getElementById('embed-url-input').value = editingEmbedCapsule?.dataset.apiUrl || '';
     modal.classList.remove('hidden');
   }
@@ -296,14 +379,27 @@ export function createProfileViewController() {
       showToast('请输入模型名称');
       return;
     }
+    if (!apiUrl) {
+      showToast('请输入 Base URL');
+      return;
+    }
+    if (!editingEmbedCapsule && !apiKey) {
+      showToast('请输入 API Key');
+      return;
+    }
+    if (!editingEmbedCapsule && hasEmbeddingModel) {
+      showToast('每个用户只能配置一个嵌入模型');
+      return;
+    }
     try {
       if (editingEmbedCapsule && editingEmbedCapsule.dataset.modelUuid) {
         var providerUuid = editingEmbedCapsule.dataset.providerUuid;
-        var providerResult = await KgBaseAPI.llm.updateProvider(providerUuid, {
+        var providerPayload = {
           name: editingEmbedCapsule.dataset.providerName || modelVal,
-          api_key: apiKey || editingEmbedCapsule.dataset.apiKey || '',
           api_url: apiUrl || editingEmbedCapsule.dataset.apiUrl || '',
-        });
+        };
+        if (apiKey) providerPayload.api_key = apiKey;
+        var providerResult = await KgBaseAPI.llm.updateProvider(providerUuid, providerPayload);
         if (providerResult.code !== 200) throw new Error(providerResult.msg || '保存失败');
         var modelResult = await KgBaseAPI.llm.updateModel(editingEmbedCapsule.dataset.modelUuid, {
           name: modelVal,
@@ -314,7 +410,10 @@ export function createProfileViewController() {
         if (modelResult.code !== 200) throw new Error(modelResult.msg || '保存失败');
       } else {
         await ensureCurrentUser();
-        var createdProvider = await KgBaseAPI.llm.createProvider(modelVal);
+        var createdProvider = await KgBaseAPI.llm.createProvider(modelVal, {
+          api_key: apiKey,
+          api_url: apiUrl,
+        });
         if (createdProvider.code !== 200 || !createdProvider.data?.uuid) {
           throw new Error(createdProvider.msg || '创建模型服务失败');
         }
@@ -326,11 +425,6 @@ export function createProfileViewController() {
           status: 1,
         });
         if (createdModel.code !== 200) throw new Error(createdModel.msg || '创建模型失败');
-        await KgBaseAPI.llm.updateProvider(createdProvider.data.uuid, {
-          name: modelVal,
-          api_key: apiKey,
-          api_url: apiUrl,
-        });
       }
       closeEmbedModal();
       await loadModelConfig();
@@ -359,7 +453,7 @@ export function createProfileViewController() {
         var providerResult = await KgBaseAPI.llm.deleteProvider(providerUuid);
         if (providerResult.code !== 200) throw new Error(providerResult.msg || '模型已删除，但服务商清理失败');
       }
-      capsule.remove();
+      await loadModelConfig();
       showToast('模型已删除');
     } catch (error) {
       showToast(error.message || '删除失败');
@@ -401,6 +495,7 @@ export function createProfileViewController() {
     removeCapsule,
     saveEmbedCapsule,
     saveLlmCapsule,
+    testModelConnection,
     toggleTaskPanel,
   };
 }

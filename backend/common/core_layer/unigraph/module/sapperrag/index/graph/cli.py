@@ -8,7 +8,19 @@ from ...model.model_load import load_entities
 
 
 class GraphIndexer(Indexer):
-    async def build_index(self, entities, relationships, level: int, api_key, base_url, model, progress_callback=None):
+    async def build_index(
+        self,
+        entities,
+        relationships,
+        level: int,
+        api_key,
+        base_url,
+        model,
+        embedding_api_key,
+        embedding_base_url,
+        embedding_model,
+        progress_callback=None,
+    ):
         """
         主要是创建社区报告和对实体信息进行嵌入
 
@@ -56,8 +68,9 @@ class GraphIndexer(Indexer):
         embedder = AttributeEmbedder()
         entities_list = await embedder.add_attribute_vectors(
             entities,
-            api_key=api_key,
-            base_url=base_url,
+            api_key=embedding_api_key,
+            base_url=embedding_base_url,
+            model=embedding_model,
             progress_callback=(
                 (lambda done, total, entity, error: progress_callback('embeddings', done, total, (entity, error)))
                 if progress_callback

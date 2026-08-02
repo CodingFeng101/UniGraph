@@ -8,40 +8,12 @@
   <header class="h-14 flex items-center justify-between px-5 shrink-0 min-w-0" style="background:var(--claude-card);">
     <div class="flex items-center gap-2">
       <div class="relative" id="graph-dropdown-wrapper-top">
-        <button type="button" @click="toggleElement('graph-dropdown-top')" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors w-[240px]" style="background:var(--claude-accent);border:1px solid var(--claude-brand-500);">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-success-500);"></span>
-          <span class="text-xs font-medium truncate flex-1 text-left" style="color:var(--claude-foreground);">企业知识图谱 v3.2</span>
+        <button id="graph-dropdown-trigger" type="button" disabled @click="toggleElement('graph-dropdown-top')" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors w-[240px] disabled:cursor-not-allowed disabled:opacity-60" style="background:var(--claude-accent);border:1px solid var(--claude-border);">
+          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-muted-foreground);opacity:0.4;"></span>
+          <span class="text-xs font-medium truncate flex-1 text-left" style="color:var(--claude-muted-foreground);">暂无知识图谱</span>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="2.5" class="shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
-        <div id="graph-dropdown-top" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-[240px]" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-          <div class="px-3 py-2 flex items-center justify-between" style="background:var(--claude-accent);">
-            <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full" style="background:var(--claude-success-500);"></span>
-              <span class="text-xs font-medium truncate" style="color:var(--claude-foreground);">企业知识图谱 v3.2</span>
-            </div>
-            <button type="button" @click="$event.stopPropagation();deleteCurrentKnowledgeGraph()" class="w-5 h-5 flex items-center justify-center rounded transition-colors hover:opacity-70 cursor-pointer shrink-0" style="color:var(--claude-destructive);background:none;border:none;padding:0;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </div>
-          <div class="px-3 py-2 flex items-center justify-between transition-colors hover:opacity-80 cursor-pointer">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-muted-foreground);opacity:0.4;"></span>
-              <span class="text-xs truncate" style="color:var(--claude-muted-foreground);">产品关系图谱 v1.0</span>
-            </div>
-            <button type="button" @click="$event.stopPropagation();deleteCurrentKnowledgeGraph()" class="w-5 h-5 flex items-center justify-center rounded transition-colors hover:opacity-70 cursor-pointer shrink-0 opacity-0 group-hover:opacity-100" style="color:var(--claude-destructive);background:none;border:none;padding:0;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </div>
-          <div class="px-3 py-2 flex items-center justify-between transition-colors hover:opacity-80 cursor-pointer">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-muted-foreground);opacity:0.4;"></span>
-              <span class="text-xs truncate" style="color:var(--claude-muted-foreground);">技术栈图谱 v2.1</span>
-            </div>
-            <button type="button" @click="$event.stopPropagation();deleteCurrentKnowledgeGraph()" class="w-5 h-5 flex items-center justify-center rounded transition-colors hover:opacity-70 cursor-pointer shrink-0 opacity-0 group-hover:opacity-100" style="color:var(--claude-destructive);background:none;border:none;padding:0;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </div>
-        </div>
+        <div id="graph-dropdown-top" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-[240px]" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
       </div>
     </div>
     <div class="flex items-center gap-1.5 shrink-0">
@@ -275,32 +247,20 @@
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">选择知识架构</label>
         <div class="relative">
-          <button type="button" @click="toggleDropdown('arch-dropdown-modal')" class="w-full h-9 px-3 text-sm rounded-lg border flex items-center justify-between outline-none cursor-pointer transition-colors" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);">
-            <span id="arch-modal-value">企业架构 v2</span>
+          <button id="arch-modal-trigger" type="button" disabled @click="toggleDropdown('arch-dropdown-modal')" class="w-full h-9 px-3 text-sm rounded-lg border flex items-center justify-between outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-60" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-muted-foreground);">
+            <span id="arch-modal-value">暂无知识架构</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="2" class="shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
-          <div id="arch-dropdown-modal" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-full" style="background:#fff;border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-            <div class="px-3 py-2 cursor-pointer transition-colors" style="background:var(--claude-accent);" @click="selectArch($event.currentTarget,'企业架构 v2')">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-medium" style="color:var(--claude-foreground);">企业架构 v2</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-            </div>
-            <div class="px-3 py-2 cursor-pointer transition-colors hover:opacity-80" @click="selectArch($event.currentTarget,'企业架构 v1')">
-              <span class="text-xs" style="color:var(--claude-muted-foreground);">企业架构 v1</span>
-            </div>
-            <div class="px-3 py-2 cursor-pointer transition-colors hover:opacity-80" @click="selectArch($event.currentTarget,'基础实体模型')">
-              <span class="text-xs" style="color:var(--claude-muted-foreground);">基础实体模型</span>
-            </div>
-          </div>
+          <div id="arch-dropdown-modal" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-full" style="background:#fff;border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
         </div>
       </div>
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">上传文档</label>
-        <input id="new-graph-files" type="file" class="hidden" multiple accept=".pdf,.doc,.docx,.txt" @change="onNewGraphFilesSelected($event.currentTarget)">
+        <input id="new-graph-files" type="file" class="hidden" multiple accept=".pdf,.docx,.txt" @change="onNewGraphFilesSelected($event.currentTarget)">
         <div class="flex flex-col items-center justify-center gap-1.5 py-6 px-3 rounded-lg cursor-pointer" style="border:1.5px dashed var(--claude-border);background:var(--claude-accent);" @click="clickElement('new-graph-files')">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="1.8"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
           <span id="new-graph-files-label" class="text-xs" style="color:var(--claude-muted-foreground);">上传 PDF/Word/TXT 文档</span>
+          <span class="text-[10px]" style="color:var(--claude-muted-foreground);opacity:0.75;">支持 PDF、DOC、DOCX、TXT，单个文件最大 50 MB</span>
         </div>
       </div>
     </div>
@@ -320,10 +280,11 @@
     <div class="px-5 py-4 space-y-4">
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">上传文档</label>
-        <input type="file" id="update-graph-file" class="hidden" @change="onUpdateFileSelected($event.currentTarget)" accept=".pdf,.doc,.docx,.txt">
+        <input type="file" id="update-graph-file" class="hidden" @change="onUpdateFileSelected($event.currentTarget)" accept=".pdf,.docx,.txt">
         <div class="flex flex-col items-center justify-center gap-1.5 py-6 px-3 rounded-lg cursor-pointer" style="border:1.5px dashed var(--claude-border);background:var(--claude-accent);" @click="triggerUpdateFile()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="1.8"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
           <span id="update-graph-file-label" class="text-xs" style="color:var(--claude-muted-foreground);">上传 PDF/Word/TXT 文档</span>
+          <span class="text-[10px]" style="color:var(--claude-muted-foreground);opacity:0.75;">支持 PDF、DOC、DOCX、TXT，单个文件最大 50 MB</span>
         </div>
       </div>
     </div>

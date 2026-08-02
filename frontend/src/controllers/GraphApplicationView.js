@@ -1,8 +1,13 @@
 /* Generated from pages/graph-app.html; keep behavior changes in the source controller during migration. */
 import { copyText } from '@/utils/clipboard';
-import DOMPurify from 'dompurify';
-import MarkdownIt from 'markdown-it';
 import { gsap } from 'gsap';
+import { validateUploadSize } from '@/utils/upload';
+import { displayChatName } from '@/utils/chat-name';
+import {
+  normalizeChatSources as normalizeSources,
+  renderAnswerWithCitations,
+  renderChatMarkdown as renderMarkdown,
+} from '@/utils/chat-content';
 
 export function createGraphApplicationViewController() {
   const { API, Auth, KgBaseAPI } = window;
@@ -12,6 +17,7 @@ lucide.createIcons();
 var currentShare = null;
 var messageSequence = 0;
 var motionContext = null;
+var effortRetrievalDepth = { Low: 1, Medium: 2, High: 3, Max: 4 };
 
 function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -189,6 +195,10 @@ function cancelUserMessageEdit(button) {
 }
 
 async function saveUserMessageEdit(button) {
+  if (isStreaming) {
+    showToast('正在生成回答，请稍候...');
+    return;
+  }
   var group = button.closest('.chat-user-message');
   var bubble = group?.querySelector('.chat-user-bubble');
   var textarea = group?.querySelector('.chat-inline-edit__input');
@@ -222,13 +232,16 @@ async function saveUserMessageEdit(button) {
         ? '<p class="text-[15px] leading-relaxed whitespace-pre-wrap" style="color:var(--claude-foreground);">' + escapeHtml(textarea.value.trim()) + '</p>'
         : '');
     group.querySelector('.chat-user-actions')?.classList.remove('hidden');
+    while (group.nextElementSibling) group.nextElementSibling.remove();
     lucide.createIcons();
     renderChatOutline();
-    showToast('消息已更新');
+    await streamAnswer(content, { message_uuid: group.dataset.messageUuid }, Promise.resolve());
   } catch (error) {
-    button.disabled = false;
-    button.textContent = '保存';
-    showToast(error.message || '保存失败');
+    if (document.body.contains(button)) {
+      button.disabled = false;
+      button.textContent = '保存';
+    }
+    showToast(error.message || '重新发送失败');
   }
 }
 
@@ -281,6 +294,7 @@ async function handleChatAttachments(input) {
   for (var index = 0; index < files.length; index += 1) {
     var file = files[index];
     try {
+      validateUploadSize(file);
       var response = await API.uploadFile(file);
       if (response.code !== 200 || !response.data?.url) {
         throw new Error(response.msg || '附件上传失败');
@@ -348,12 +362,36 @@ function toggleMoreModelsPanel() {
   panel.classList.toggle('hidden');
 }
 
-function selectModel(el, name) {
+function selectModel(el, name, modelUuid, notify = true) {
+  selectedLlmModelUuid = modelUuid || null;
   document.getElementById('model-value').textContent = name;
   var currentModelItem = document.getElementById('current-model-item');
   currentModelItem.innerHTML = '<div class="flex items-center justify-between"><span class="text-[13px] font-medium" style="color:var(--claude-foreground);">' + name + '</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>';
   document.getElementById('model-dropdown').classList.add('hidden');
-  showToast('已切换模型：' + name);
+  renderOtherModels();
+  if (notify) showToast('已切换模型：' + name);
+}
+
+function renderOtherModels() {
+  var panel = document.querySelector('#more-models-panel .px-2.space-y-0\\.5');
+  if (!panel) return;
+  panel.innerHTML = '';
+  var otherModels = availableLlmModels.filter(function(model) {
+    return model.uuid !== selectedLlmModelUuid;
+  });
+  if (!otherModels.length) {
+    panel.innerHTML = '<div class="px-2.5 py-2 text-[12px]" style="color:var(--claude-muted-foreground);">暂无其它已配置模型</div>';
+    return;
+  }
+  otherModels.forEach(function(model) {
+    var item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'w-full px-2 py-1.5 rounded-lg text-left text-[12px] cursor-pointer';
+    item.style.cssText = 'background:none;border:none;color:var(--claude-foreground);';
+    item.textContent = model.name;
+    item.onclick = function() { selectModel(item, model.name, model.uuid); };
+    panel.appendChild(item);
+  });
 }
 
 function selectEffort(level) {
@@ -367,14 +405,19 @@ function selectEffort(level) {
     div.className = 'px-2.5 py-1.5 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]';
     div.setAttribute('onclick', "selectEffort('" + lv + "')");
     if (lv === level) {
-      var badge = lv === 'Medium' ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:var(--claude-accent);color:var(--claude-muted-foreground);">Default</span>' : '';
-      div.innerHTML = '<div class="flex items-center justify-between"><div class="flex items-center gap-1.5"><span class="text-[13px] font-medium" style="color:var(--claude-foreground);">' + lv + '</span>' + badge + '</div><svg class="effort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>';
+      var badge = lv === 'Low' ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:var(--claude-accent);color:var(--claude-muted-foreground);">Default</span>' : '';
+      div.innerHTML = '<div class="flex items-center justify-between"><div class="flex items-center gap-1.5"><span class="text-[13px] font-medium" style="color:var(--claude-foreground);">' + lv + ' · ' + effortRetrievalDepth[lv] + ' 跳</span>' + badge + '</div><svg class="effort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>';
     } else {
-      div.innerHTML = '<span class="text-[13px]" style="color:var(--claude-muted-foreground);">' + lv + '</span>';
+      div.innerHTML = '<span class="text-[13px]" style="color:var(--claude-muted-foreground);">' + lv + ' · ' + effortRetrievalDepth[lv] + ' 跳</span>';
     }
     container.appendChild(div);
   });
-  showToast('已切换 Effort：' + level);
+  showToast('已切换检索档位：' + level + '（' + effortRetrievalDepth[level] + ' 跳）');
+}
+
+function getSelectedEffort() {
+  var level = document.getElementById('effort-value')?.textContent || 'Low';
+  return effortRetrievalDepth[level] ? level : 'Low';
 }
 
 function updateSendBtn() {
@@ -420,8 +463,9 @@ async function sendMessage() {
   renderChatAttachments();
   updateSendBtn();
 
+  var savedMessage;
   try {
-    var savedMessage = await saveConversationMessage('user', requestText);
+    savedMessage = await saveConversationMessage('user', requestText);
     if (userMessageElement && savedMessage?.message_uuid) {
       userMessageElement.dataset.messageUuid = savedMessage.message_uuid;
     }
@@ -444,6 +488,10 @@ async function sendMessage() {
       // Title generation is secondary and must never block the answer.
     });
 
+  return streamAnswer(requestText, savedMessage, titlePromise);
+}
+
+async function streamAnswer(requestText, savedMessage, titlePromise) {
   var aiDiv = appendAIThinking();
   var thinkingEl = aiDiv.querySelector('.ai-thinking');
   var answerEl = aiDiv.querySelector('.ai-answer');
@@ -451,36 +499,98 @@ async function sendMessage() {
   isStreaming = true;
   var finalAnswer = '';
   var finalSources = {};
+  var hasAnswerDelta = false;
+  var hasRenderedError = false;
+  var renderFrame = null;
+  var displayedAnswer = '';
+  var finalReceived = false;
+  var resolveStreamFlush;
+  var streamFlush = new Promise(function(resolve) { resolveStreamFlush = resolve; });
 
-  KgBaseAPI.knowledgeGraph.ask(currentGraphUuid, {
+  function finishStreamFlush() {
+    if (!resolveStreamFlush) return;
+    resolveStreamFlush();
+    resolveStreamFlush = null;
+  }
+
+  function renderAskFailure(message) {
+    if (hasRenderedError) return;
+    hasRenderedError = true;
+    if (renderFrame != null) cancelAnimationFrame(renderFrame);
+    renderFrame = null;
+    var safeMessage = normalizeAskErrorMessage(message);
+    failThinkingLog(thinkingEl, safeMessage);
+    answerEl.innerHTML = '<div class="ai-answer-error" role="alert">' +
+      '<i data-lucide="circle-alert" aria-hidden="true"></i>' +
+      '<span>' + escapeHtml(safeMessage) + '</span></div>';
+    lucide.createIcons();
+    scrollToBottom();
+    finishStreamFlush();
+  }
+
+  function scheduleStreamRender() {
+    if (renderFrame != null) return;
+    renderFrame = requestAnimationFrame(function renderStreamingFrame() {
+      renderFrame = null;
+      if (!finalAnswer.startsWith(displayedAnswer)) displayedAnswer = '';
+      var pendingLength = finalAnswer.length - displayedAnswer.length;
+      if (pendingLength > 0) {
+        var revealLength = Math.max(1, Math.min(28, Math.ceil(pendingLength / 9)));
+        displayedAnswer = finalAnswer.slice(0, displayedAnswer.length + revealLength);
+      }
+      if (finalReceived && displayedAnswer.length >= finalAnswer.length) {
+        answerEl.innerHTML = renderAnswerWithCitations(finalAnswer, finalSources);
+        finishStreamFlush();
+      } else {
+        answerEl.innerHTML = renderMarkdown(displayedAnswer) + '<span class="streaming-caret" aria-hidden="true"></span>';
+      }
+      scrollToBottom();
+      if (displayedAnswer.length < finalAnswer.length) scheduleStreamRender();
+    });
+  }
+
+  var selectedEffort = getSelectedEffort();
+  return KgBaseAPI.knowledgeGraph.ask(currentGraphUuid, {
     message: requestText,
-    infer: false,
-    depth: 1
+    infer: true,
+    depth: effortRetrievalDepth[selectedEffort],
+    chat_library_uuid: currentChatUuid,
+    current_message_uuid: savedMessage?.message_uuid || null,
+    llm_model_uuid: selectedLlmModelUuid
   }, function(event) {
     if (!event) return;
     if (event.type === 'processing') {
       var msg = event.message || (event.data && event.data.message) || '正在思考...';
-      var span = thinkingEl.querySelector('.ai-thinking-text');
-      if (span) span.textContent = msg;
       appendThinkingLog(thinkingEl, msg, event.detail || '');
+    } else if (event.type === 'answer_delta') {
+      var delta = event.delta || '';
+      if (!delta) return;
+      if (!hasAnswerDelta) {
+        hasAnswerDelta = true;
+        appendThinkingLog(thinkingEl, '生成回答', '正在根据检索到的知识逐步生成回答');
+      }
+      finalAnswer += delta;
+      scheduleStreamRender();
     } else if (event.type === 'final_result') {
-      if (thinkingEl) thinkingEl.style.display = 'none';
       var content = '';
       if (event.data) {
         if (typeof event.data === 'string') content = event.data;
         else content = event.data.results || event.data.answer || event.data.content || event.data.message || event.data.response || '';
         finalSources = event.data.context_data || {};
       }
-      finalAnswer = content;
-      answerEl.innerHTML = renderMarkdown(content) + renderSourceBadges(finalSources);
-      scrollToBottom();
+      finalAnswer = content || finalAnswer;
+      finalReceived = true;
+      completeThinkingLog(thinkingEl);
+      scheduleStreamRender();
     } else if (event.type === 'error') {
-      if (thinkingEl) thinkingEl.style.display = 'none';
-      var errMsg = event.msg || event.message || '请求失败';
-      answerEl.innerHTML = '<p style="color:var(--claude-destructive);">' + escapeHtml(errMsg) + '</p>';
-      scrollToBottom();
+      renderAskFailure(event.msg || event.message || '请求失败');
     }
   }).then(async function() {
+    if (!hasRenderedError) {
+      finalReceived = true;
+      scheduleStreamRender();
+      await streamFlush;
+    }
     isStreaming = false;
     if (finalAnswer) {
       try {
@@ -493,13 +603,41 @@ async function sendMessage() {
     }
   }).catch(function(err) {
     isStreaming = false;
-    if (thinkingEl) thinkingEl.style.display = 'none';
-    answerEl.innerHTML = '<p style="color:var(--claude-destructive);">' + escapeHtml(err.message || '请求失败') + '</p>';
-    scrollToBottom();
+    renderAskFailure(err.message || '请求失败');
   });
 }
 
+function normalizeAskErrorMessage(message) {
+  var text = String(message || '').trim();
+  if (/401|unauthorized|无效的令牌|invalid\s+(token|api\s*key)/i.test(text)) {
+    return '当前模型凭据无效，请到个人中心重新配置 API Key';
+  }
+  if (/500:\s*error code|request id|v_api_error/i.test(text)) {
+    return '模型服务调用失败，请检查模型配置或稍后重试';
+  }
+  return text || '请求失败，请稍后重试';
+}
+
 document.addEventListener('click', function(e) {
+  var citation = e.target.closest('[data-citation]');
+  if (citation && !e.target.closest('.source-popup')) {
+    var shouldOpen = !citation.classList.contains('is-open');
+    document.querySelectorAll('[data-citation].is-open').forEach(function(item) {
+      item.classList.remove('is-open');
+      item.setAttribute('aria-expanded', 'false');
+    });
+    if (shouldOpen) {
+      citation.classList.add('is-open');
+      citation.setAttribute('aria-expanded', 'true');
+    }
+    return;
+  }
+  if (!e.target.closest('.source-popup')) {
+    document.querySelectorAll('[data-citation].is-open').forEach(function(item) {
+      item.classList.remove('is-open');
+      item.setAttribute('aria-expanded', 'false');
+    });
+  }
   var modelDropdown = document.getElementById('model-dropdown');
   if (modelDropdown && !modelDropdown.contains(e.target) && !e.target.closest('[data-role="model-trigger"]')) {
     modelDropdown.classList.add('hidden');
@@ -514,6 +652,14 @@ document.addEventListener('click', function(e) {
   if (graphMenu && !graphMenu.contains(e.target) && !e.target.closest('[data-role="kg-trigger"]')) {
     graphMenu.classList.add('hidden');
   }
+});
+
+document.addEventListener('pointerout', function(e) {
+  var citation = e.target.closest('[data-citation]');
+  if (!citation || citation.contains(e.relatedTarget)) return;
+  citation.classList.remove('is-open');
+  citation.setAttribute('aria-expanded', 'false');
+  citation.blur();
 });
 
 document.querySelectorAll('.trace-toggle').forEach(function(btn) {
@@ -549,13 +695,13 @@ const kgBaseUuid = urlParams.get('uuid');
 var currentGraphUuid = null;
 var currentChatUuid = null;
 var currentChatName = '新对话';
+var availableLlmModels = [];
+var selectedLlmModelUuid = null;
 var knowledgeGraphList = [];
 var chatHistoryItems = [];
 var chatSortAscending = false;
 var isStreaming = false;
 var pendingAttachments = [];
-
-const markdown = new MarkdownIt({ breaks: true, linkify: true });
 
 // Update sidebar navigation links with UUID
 function updateSidebarLinks(uuid) {
@@ -580,16 +726,6 @@ function escapeHtml(str) {
 function escapeQuotes(str) {
   if (str == null) return '';
   return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
-// Render markdown content and sanitize backend/LLM output before inserting it.
-function renderMarkdown(text) {
-  if (text == null || text === '') return '';
-  try {
-    return DOMPurify.sanitize(markdown.render(String(text)));
-  } catch (e) {
-    return escapeHtml(text).replace(/\n/g, '<br>');
-  }
 }
 
 // Scroll chat container to bottom
@@ -747,20 +883,14 @@ function appendAIThinking() {
   div.className = 'group';
   div.innerHTML =
     '<div class="max-w-[680px] w-full">' +
-      '<div class="ai-thinking mb-3">' +
-        '<div class="flex items-center gap-2">' +
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--claude-muted-foreground);">' +
-          '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' +
-        '</svg>' +
-        '<span class="ai-thinking-text text-[15px]" style="color:var(--claude-muted-foreground);font-family:var(--claude-font-serif);">正在思考</span>' +
-        '<span class="inline-flex gap-0.5">' +
-          '<span class="w-1 h-1 rounded-full" style="background:var(--claude-muted-foreground);animation:dot-blink 1.2s infinite 0s;"></span>' +
-          '<span class="w-1 h-1 rounded-full" style="background:var(--claude-muted-foreground);animation:dot-blink 1.2s infinite 0.2s;"></span>' +
-          '<span class="w-1 h-1 rounded-full" style="background:var(--claude-muted-foreground);animation:dot-blink 1.2s infinite 0.4s;"></span>' +
-        '</span>' +
-        '</div>' +
-        '<div class="ai-thinking-log"></div>' +
-      '</div>' +
+      '<details class="ai-thinking mb-4" aria-label="回答处理进度" open>' +
+        '<summary class="ai-thinking-summary">' +
+          '<span class="ai-thinking-summary__status"><i data-lucide="loader-circle" aria-hidden="true"></i></span>' +
+          '<span class="ai-thinking-summary__text">正在思考...</span>' +
+          '<i class="ai-thinking-summary__chevron" data-lucide="chevron-right" aria-hidden="true"></i>' +
+        '</summary>' +
+        '<div class="ai-thinking-body"><div class="ai-thinking-log"></div></div>' +
+      '</details>' +
       '<div class="ai-answer text-[15px] leading-[1.75] space-y-3" style="font-family:var(--claude-font-serif);color:var(--claude-card-foreground);"></div>' +
     '</div>';
   container.appendChild(div);
@@ -771,25 +901,91 @@ function appendAIThinking() {
 
 function appendThinkingLog(thinkingEl, message, detail) {
   if (!thinkingEl) return;
+  updateThinkingSummary(thinkingEl, message, 'running');
   var log = thinkingEl.querySelector('.ai-thinking-log');
   if (!log) return;
   var last = log.lastElementChild;
   if (last && last.dataset.message === message) {
     var detailEl = last.querySelector('.ai-thinking-log__detail');
     if (detailEl && detail) detailEl.textContent = detail;
+    lucide.createIcons();
     return;
   }
+  if (last) {
+    last.classList.remove('is-current');
+    last.classList.add('is-complete');
+  }
   var item = document.createElement('div');
-  item.className = 'ai-thinking-log__item';
+  item.className = 'ai-thinking-log__item is-current' + (/对话上下文/.test(message) ? ' is-context' : '');
   item.dataset.message = message;
-  item.innerHTML = '<span class="ai-thinking-log__dot"></span><span>' + escapeHtml(message) + '</span>' +
-    (detail ? '<small class="ai-thinking-log__detail">' + escapeHtml(detail) + '</small>' : '');
+  item.innerHTML = '<span class="ai-thinking-log__marker"><i data-lucide="' + thinkingIcon(message) + '" aria-hidden="true"></i></span>' +
+    '<div class="ai-thinking-log__content"><div class="ai-thinking-log__label">' + escapeHtml(message) + '</div>' +
+    (detail ? '<div class="ai-thinking-log__detail">' + escapeHtml(detail) + '</div>' : '') + '</div>';
   log.appendChild(item);
-  while (log.children.length > 6) log.removeChild(log.firstElementChild);
-  Array.from(log.children).forEach(function(child, index, list) {
-    child.style.opacity = index === list.length - 1 ? '1' : '.48';
-  });
+  while (log.children.length > 12) log.removeChild(log.firstElementChild);
+  lucide.createIcons();
   scrollToBottom();
+}
+
+function thinkingIcon(message) {
+  var text = String(message || '');
+  if (/接收|问题/.test(text)) return 'message-square-text';
+  if (/加载|索引|数据/.test(text)) return 'database';
+  if (/检索|查询|召回|匹配/.test(text)) return 'search';
+  if (/实体|关系|图谱|上下文/.test(text)) return 'network';
+  if (/历史|社区|摘要|概览/.test(text)) return 'layers-3';
+  if (/来源|证据|引用|整理/.test(text)) return 'file-search';
+  if (/生成|回答/.test(text)) return 'sparkles';
+  return 'clock-3';
+}
+
+function completeThinkingLog(thinkingEl) {
+  if (!thinkingEl) return;
+  var items = thinkingEl.querySelectorAll('.ai-thinking-log__item');
+  items.forEach(function(item) {
+    item.classList.remove('is-current');
+    item.classList.add('is-complete');
+  });
+  updateThinkingSummary(thinkingEl, '已完成知识图谱检索与回答生成。', 'complete');
+  thinkingEl.removeAttribute('open');
+  lucide.createIcons();
+}
+
+function updateThinkingSummary(thinkingEl, message, state) {
+  if (!thinkingEl) return;
+  var text = thinkingEl.querySelector('.ai-thinking-summary__text');
+  var status = thinkingEl.querySelector('.ai-thinking-summary__status');
+  if (text) text.textContent = message;
+  thinkingEl.dataset.state = state;
+  if (status) {
+    var icon = state === 'complete' ? 'circle-check' : state === 'error' ? 'circle-alert' : 'loader-circle';
+    status.innerHTML = '<i data-lucide="' + icon + '" aria-hidden="true"></i>';
+  }
+}
+
+function failThinkingLog(thinkingEl, message) {
+  if (!thinkingEl) return;
+  var item = thinkingEl.querySelector('.ai-thinking-log__item.is-current') ||
+    thinkingEl.querySelector('.ai-thinking-log__item:last-child');
+  if (!item) {
+    appendThinkingLog(thinkingEl, '处理失败', message);
+    item = thinkingEl.querySelector('.ai-thinking-log__item:last-child');
+  }
+  if (!item) return;
+  item.classList.remove('is-current', 'is-complete');
+  item.classList.add('is-error');
+  updateThinkingSummary(thinkingEl, '思考过程未完成', 'error');
+  thinkingEl.setAttribute('open', '');
+  var marker = item.querySelector('.ai-thinking-log__marker');
+  if (marker) marker.innerHTML = '<i data-lucide="circle-alert" aria-hidden="true"></i>';
+  var detail = item.querySelector('.ai-thinking-log__detail');
+  if (!detail) {
+    detail = document.createElement('div');
+    detail.className = 'ai-thinking-log__detail';
+    item.appendChild(detail);
+  }
+  detail.textContent = message;
+  lucide.createIcons();
 }
 
 // Append a final AI message (no streaming)
@@ -799,7 +995,7 @@ function appendAIMessage(text, sources) {
   var thinkingEl = aiDiv.querySelector('.ai-thinking');
   var answerEl = aiDiv.querySelector('.ai-answer');
   if (thinkingEl) thinkingEl.style.display = 'none';
-  answerEl.innerHTML = renderMarkdown(text) + renderSourceBadges(sources || {});
+  answerEl.innerHTML = renderAnswerWithCitations(text, sources || {});
   scrollToBottom();
 }
 
@@ -807,7 +1003,8 @@ function appendAIMessage(text, sources) {
 function setConversationTitle(title) {
   var titleEl = document.getElementById('conversation-title');
   if (!titleEl) return;
-  var normalizedTitle = String(title || '').trim();
+  var rawTitle = String(title || '').trim();
+  var normalizedTitle = rawTitle ? displayChatName(rawTitle) : '';
   var titleWrap = document.getElementById('conversation-title-wrap');
   var shouldShow = normalizedTitle !== '' && normalizedTitle !== '新对话' && normalizedTitle !== '对话';
   if (titleWrap) titleWrap.classList.toggle('hidden', !shouldShow);
@@ -855,11 +1052,14 @@ function renameCurrentChat() {
 // Update the knowledge-graph index indicator text
 function updateGraphIndicator(graph) {
   var label = document.getElementById('kg-selector-label');
-  var dot = document.getElementById('kg-status-dot');
-  if (label) label.textContent = graph?.name || '选择知识图谱';
-  if (dot) dot.style.background = isGraphIndexed(graph)
-    ? 'var(--claude-success-500)'
-    : 'var(--claude-destructive)';
+  var trigger = document.querySelector('[data-role="kg-trigger"]');
+  var hasGraph = Boolean(graph);
+  if (label) label.textContent = graph?.name || '暂无可用索引';
+  if (trigger) {
+    trigger.disabled = !hasGraph;
+    trigger.title = hasGraph ? '选择知识图谱索引' : '暂无已建立索引的图谱';
+    trigger.style.color = hasGraph ? 'var(--claude-foreground)' : 'var(--claude-muted-foreground)';
+  }
 }
 
 function chatNameFromMessage(message) {
@@ -889,7 +1089,7 @@ async function saveConversationMessage(role, content, sources) {
     content: content,
     knowledge_graph_uuid: currentGraphUuid,
     model_name: role === 'assistant' ? document.getElementById('model-value')?.textContent || null : null,
-    effort: role === 'assistant' ? document.getElementById('effort-value')?.textContent || null : null,
+    effort: role === 'assistant' ? getSelectedEffort() : null,
     sources: normalizeSources(sources),
   });
   if (response.code !== 200) throw new Error(response.msg || '保存对话失败');
@@ -915,31 +1115,6 @@ function parseStoredMessages(messages) {
   return parsed;
 }
 
-function normalizeSources(sources) {
-  var normalized = {};
-  ['Sources', 'Entities', 'Relationships', 'Communities'].forEach(function(type) {
-    normalized[type] = sources && sources[type] != null ? sources[type] : [];
-  });
-  return normalized;
-}
-
-function renderSourceBadges(sources) {
-  var normalized = normalizeSources(sources);
-  var labels = { Sources: '原始来源', Entities: '实体', Relationships: '关系', Communities: '社区' };
-  return '<div class="flex flex-wrap gap-2 mt-4">' + Object.keys(labels).map(function(type) {
-    var content = normalized[type];
-    var detail = escapeHtml(JSON.stringify(content, null, 2));
-    return '<span class="source-tag inline-flex items-center px-2 py-1 rounded-md text-[11px] cursor-pointer relative" style="background:var(--claude-accent);color:var(--claude-brand-700);">' +
-      labels[type] +
-      '<span class="source-popup"><span class="source-popup-title">' + labels[type] + '</span><pre class="source-popup-row whitespace-pre-wrap">' + detail + '</pre></span>' +
-      '</span>';
-  }).join('') + '</div>';
-}
-
-function isGraphIndexed(graph) {
-  return Boolean(graph && (Number(graph.index_status) === 1 || Number(graph.depth) > 0));
-}
-
 // Load knowledge graph list and select the first graph
 async function loadKnowledgeGraphs() {
   if (!kgBaseUuid) {
@@ -948,13 +1123,11 @@ async function loadKnowledgeGraphs() {
   }
   try {
     var res = await KgBaseAPI.knowledgeGraph.getAll(kgBaseUuid);
-    if (res.code === 200 && res.data && res.data.length > 0) {
-      knowledgeGraphList = res.data;
-      currentGraphUuid = res.data[0].uuid;
-      updateGraphIndicator(res.data[0]);
+    if (res.code === 200 && Array.isArray(res.data)) {
+      knowledgeGraphList = res.data.filter(function(graph) { return Number(graph.index_status) === 1; });
+      currentGraphUuid = knowledgeGraphList[0]?.uuid || null;
+      updateGraphIndicator(knowledgeGraphList[0] || null);
       renderKnowledgeGraphMenu();
-    } else if (res.code === 200) {
-      showToast('当前知识库暂无知识图谱');
     } else {
       showToast(res.msg || '加载知识图谱失败');
     }
@@ -966,7 +1139,7 @@ async function loadKnowledgeGraphs() {
 
 function selectKnowledgeGraph() {
   if (!knowledgeGraphList.length) {
-    showToast('当前知识库暂无知识图谱');
+    showToast('当前知识库暂无已建立索引的图谱');
     return;
   }
   renderKnowledgeGraphMenu();
@@ -976,12 +1149,15 @@ function selectKnowledgeGraph() {
 function renderKnowledgeGraphMenu() {
   var menu = document.getElementById('kg-selector-menu');
   if (!menu) return;
+  if (!knowledgeGraphList.length) {
+    menu.innerHTML = '';
+    menu.classList.add('hidden');
+    return;
+  }
   menu.innerHTML = knowledgeGraphList.map(function(item) {
-    var indexed = isGraphIndexed(item);
     var active = item.uuid === currentGraphUuid;
-    return '<button type="button" data-kg-uuid="' + escapeHtml(item.uuid) + '" class="claude-menu-item w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left cursor-pointer" style="background:' +
-      (active ? 'var(--claude-accent)' : 'transparent') + ';border:none;color:var(--claude-foreground);">' +
-      '<span data-status="' + (indexed ? 'indexed' : 'unindexed') + '" class="w-2 h-2 rounded-full shrink-0" style="background:' + (indexed ? 'var(--claude-success-500)' : 'var(--claude-destructive)') + ';"></span>' +
+    return '<button type="button" data-kg-uuid="' + escapeHtml(item.uuid) + '" class="claude-menu-item w-full flex items-center px-2 py-2 rounded-lg text-left cursor-pointer" style="background:transparent;border:none;color:var(--claude-foreground);font-weight:' +
+      (active ? '600' : '400') + ';">' +
       '<span class="text-xs truncate flex-1">' + escapeHtml(item.name || '未命名图谱') + '</span></button>';
   }).join('');
   menu.querySelectorAll('[data-kg-uuid]').forEach(function(button) {
@@ -1013,32 +1189,31 @@ async function loadAvailableModels() {
       });
     });
     if (!models.length) {
+      availableLlmModels = [];
+      selectedLlmModelUuid = null;
+      var modelTrigger = document.querySelector('[data-role="model-trigger"]');
+      if (modelTrigger) modelTrigger.disabled = true;
+      document.getElementById('model-value').textContent = '暂无可用模型';
+      var currentModel = document.getElementById('current-model-item');
+      if (currentModel) currentModel.onclick = null;
       if (panel) panel.innerHTML = '<div class="px-2.5 py-2 text-[12px]" style="color:var(--claude-muted-foreground);">请先在个人中心配置模型</div>';
       return;
     }
+    modelTrigger = document.querySelector('[data-role="model-trigger"]');
+    if (modelTrigger) {
+      modelTrigger.disabled = false;
+      modelTrigger.style.color = 'var(--claude-foreground)';
+    }
+    availableLlmModels = models;
+    selectedLlmModelUuid = models[0].uuid;
     document.getElementById('model-value').textContent = models[0].name;
     var current = document.getElementById('current-model-item');
-    if (current) current.onclick = function() { selectModel(current, models[0].name); };
+    if (current) current.onclick = null;
     if (current) {
       var nameElement = current.querySelector('span');
       if (nameElement) nameElement.textContent = models[0].name;
     }
-    if (!panel) return;
-    panel.innerHTML = '';
-    var otherModels = models.slice(1);
-    if (!otherModels.length) {
-      panel.innerHTML = '<div class="px-2.5 py-2 text-[12px]" style="color:var(--claude-muted-foreground);">暂无其它已配置模型</div>';
-      return;
-    }
-    otherModels.forEach(function(model) {
-      var item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'w-full px-2 py-1.5 rounded-lg text-left text-[12px] cursor-pointer';
-      item.style.cssText = 'background:none;border:none;color:var(--claude-foreground);';
-      item.textContent = model.name;
-      item.onclick = function() { selectModel(item, model.name); };
-      panel.appendChild(item);
-    });
+    renderOtherModels();
   } catch (error) {
     console.error('Failed to load models:', error);
   }
@@ -1100,7 +1275,7 @@ function renderChatHistory(list) {
   }
   function renderRows(rows) {
     return rows.map(function(item) {
-      var name = item.name || item.title || '未命名对话';
+      var name = displayChatName(item.name || item.title || '未命名对话');
       var uuid = item.uuid || '';
       var isActive = uuid === currentChatUuid;
       var bgStyle = (isActive || item.is_favorite) ? 'style="background:var(--claude-accent);"' : '';
@@ -1164,7 +1339,7 @@ function renderChatSearchResults(list) {
     return;
   }
   container.innerHTML = '<div class="px-2 py-2">' + list.map(function(item) {
-    var name = item.name || item.title || '未命名对话';
+    var name = displayChatName(item.name || item.title || '未命名对话');
     return '<div class="chat-search-item flex items-center justify-between cursor-pointer px-3 py-2.5 rounded-lg transition-colors hover:opacity-80" onclick="switchChat(\'' +
       escapeQuotes(item.uuid || '') + '\',\'' + escapeQuotes(name) + '\');toggleSearchModal();">' +
       '<span class="text-sm" style="color:var(--claude-foreground);">' + escapeHtml(name) + '</span>' +
@@ -1266,8 +1441,8 @@ async function switchChat(chatUuid, name) {
   }
   currentChatUuid = chatUuid;
   syncCurrentChatQuery(chatUuid);
-  currentChatName = name || '对话';
-  setConversationTitle(name || '对话');
+  currentChatName = displayChatName(name || '对话');
+  setConversationTitle(currentChatName);
   clearChatContainer();
   setChatMode(false);
   var loadedMessages = 0;
@@ -1286,9 +1461,13 @@ async function switchChat(chatUuid, name) {
             appendUserMessage(content, msg.uuid);
           } else {
             var sources = {};
-            (msg.sources || []).forEach(function(source) {
-              sources[source.source_type] = source.content;
-            });
+            if (Array.isArray(msg.sources)) {
+              msg.sources.forEach(function(source) {
+                sources[source.source_type] = source.content;
+              });
+            } else {
+              sources = normalizeSources(msg.sources);
+            }
             appendAIMessage(content, sources);
           }
         });

@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 from typing import Any
 
 import numpy as np
@@ -41,13 +40,16 @@ async def extract_entities_from_query(query, llm, api_key, base_url, model, max_
     return [f'{query}']
 
 
-async def map_query_to_entities(extracted_entities, all_entities, api_key, base_url, k=10):
+async def map_query_to_entities(extracted_entities, all_entities, api_key, base_url, model, k=10):
     embeder = GenericResponseGetter()
     if extracted_entities:
         entities_list = []
         for extracted_entity in extracted_entities:
             extracted_entity_embed = await embeder.get_vector(
-                query=extracted_entity, api_key=os.getenv('OPENAI_API_KEY', ''), base_url='https://api.rcouyi.com/v1'
+                query=extracted_entity,
+                api_key=api_key,
+                base_url=base_url,
+                model=model,
             )
             extracted_entity_embed = np.array(extracted_entity_embed)
             # 确保entity_embed是二维数组
@@ -56,15 +58,32 @@ async def map_query_to_entities(extracted_entities, all_entities, api_key, base_
             similarities = []
             # 计算查询与所有实体之间的相似度
             for entity in all_entities:
-                entity_embed = np.array(entity.attributes_embedding)
+                entity_embed = np.asarray(entity.attributes_embedding, dtype=float)
+                if entity_embed.ndim == 0 or entity_embed.size == 0 or not np.isfinite(entity_embed).all():
+                    continue
 
                 # 确保entity_embed是二维数组
                 if entity_embed.ndim == 1:
                     entity_embed = entity_embed.reshape(1, -1)
+                if entity_embed.shape[1] != extracted_entity_embed.shape[1]:
+                    continue
 
                 similarity = cosine_similarity(extracted_entity_embed, entity_embed)[0][0]
                 similarities.append((entity, similarity))
             entities_list.extend(similarities)
+        if not entities_list:
+            normalized_queries = [str(item).strip().lower() for item in extracted_entities if str(item).strip()]
+            lexical_matches = [
+                entity
+                for entity in all_entities
+                if any(
+                    query in str(getattr(entity, 'name', '')).lower()
+                    or str(getattr(entity, 'name', '')).lower() in query
+                    for query in normalized_queries
+                )
+            ]
+            return lexical_matches[:k] or list(all_entities)[:k]
+
         entities_list.sort(key=lambda x: x[1], reverse=True)
         top_k_entities = [entity for entity, similarity in entities_list[:k]]
         unique_top_k_entities = list({entity.id: entity for entity in top_k_entities}.values())

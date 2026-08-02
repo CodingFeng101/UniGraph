@@ -1,5 +1,6 @@
 /* Generated from pages/kb-info.html; keep behavior changes in the source controller during migration. */
 import { copyText } from '@/utils/clipboard';
+import { MAX_IMAGE_SIZE, validateUploadSize } from '@/utils/upload';
 
 export function createKnowledgeBaseInfoViewController() {
   const { AppConfig, Auth, API, KgBaseAPI } = window;
@@ -88,7 +89,10 @@ function applyCover(path) {
   var coverEl = document.getElementById('kb-cover');
   if (!coverEl) return;
   var coverPath = path || 'static/default/kg_base_default.png';
-  coverEl.style.backgroundImage = 'url(' + AppConfig.SHOW_IMAGE_API + coverPath + ')';
+  var coverUrl = /^(https?:|data:|blob:|\/)/i.test(coverPath)
+    ? coverPath
+    : (AppConfig.SHOW_IMAGE_API || '') + coverPath;
+  coverEl.style.backgroundImage = 'url(' + JSON.stringify(coverUrl) + ')';
   coverEl.style.backgroundSize = 'cover';
   coverEl.style.backgroundPosition = 'center';
 }
@@ -98,6 +102,13 @@ async function uploadCover(input) {
   if (!file) return;
   if (!file.type.startsWith('image/')) {
     showToast('请选择图片文件');
+    input.value = '';
+    return;
+  }
+  try {
+    validateUploadSize(file, MAX_IMAGE_SIZE);
+  } catch (error) {
+    showToast(error.message);
     input.value = '';
     return;
   }

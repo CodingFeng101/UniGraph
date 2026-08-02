@@ -1,44 +1,31 @@
 # 公开发布前清单
 
-当前工作树已经移除环境文件、私钥、证书密码、运行日志、本地数据库、Python 缓存和未使用的第三方源码副本，并补齐了自动化安全检查。
+本清单对应当前工作树。代码、依赖、普通进程和真实模型链路已经检查；Docker 运行态仍需在具有 Docker 管道权限的终端中验收。
 
 ## 已完成
 
-- [x] 删除当前版本中的 `.env`、PFX、私钥、密码文件、日志、SQLite/Chroma 数据和缓存。
-- [x] 收紧上传、模型密钥测试、生产 OpenAPI、CORS、服务端口和日志脱敏策略。
-- [x] 从实际源码依赖重建 `backend/requirements.txt`，并通过 `pip-audit` 零已知漏洞检查。
-- [x] 通过后端 Ruff、6 项安全回归测试和全新 Python 环境应用导入测试。
-- [x] 通过前端 ESLint、TypeScript、生产构建和 npm 高危漏洞检查。
-- [x] 通过开发与生产 Compose 配置解析。
-- [x] 补齐 README、MIT License、第三方声明、安全政策、贡献指南、CI 和 Dependabot。
-- [x] 生成不包含旧 Git 历史的干净发布仓库 `.codex-release-git`。
+- [x] 运行文件、环境文件、上传文件、缓存、构建产物和证书未被 Git 跟踪。
+- [x] 当前工作树与全部现有提交历史未发现高置信度密钥或敏感路径。
+- [x] 资源接口增加用户归属校验；异步任务状态、结果、撤销和重试按用户隔离。
+- [x] 新注册账号默认为普通用户；用户资料和头像禁止跨账号修改；旧的不安全 SSO 入口已移除。
+- [x] 模型 API Key 数据库加密、响应掩码和出站地址 SSRF 校验已启用。
+- [x] 上传文件有前后端大小限制，普通文档位于非公开目录，路径解析拒绝目录穿越。
+- [x] 问答支持 NDJSON 流式答案和操作阶段时间线，不展示隐藏推理内容。
+- [x] 后端 Ruff、编译检查、运行时导入和 38 项测试通过。
+- [x] 前端 ESLint、TypeScript 与生产构建通过。
+- [x] `npm audit` 与 `pip-audit` 未发现已知漏洞。
+- [x] 开发与生产叠加 Compose 配置解析通过；后端/前端健康检查、流式 Nginx、非 root 后端镜像和传统 systemd/Nginx 示例已就绪。
+- [x] 使用数据库中已保存的语言模型和嵌入模型完成真实问答链路，两个上游请求均成功并生成答案。
+- [x] README、技术架构、12 张技术路线图、部署文档、教程链接、License、第三方声明、安全政策、贡献指南、CI 和 Dependabot 已就绪。
 
 ## 发布者仍需完成
 
-- [ ] 在各服务控制台轮换所有曾提交过的数据库密码、JWT 密钥、OAuth 密钥、LLM API Key、证书和 PFX 密码。删除文件不能撤销已经泄露的凭据。
-- [ ] 使用全新凭据从 `.codex-release-git` 创建新的公开仓库；不要直接公开当前仓库的旧历史。
-- [ ] 使用全新 `.env.docker` 从零启动 Compose，人工验证注册、登录、文件上传、图谱构建和问答主流程。
-- [ ] 在 GitHub 启用 Secret Scanning、Dependabot alerts、分支保护和必需 CI 检查。
+- [ ] 在具有 Docker Desktop 管道权限的终端执行迁移，并运行 `docker compose --env-file .env.docker up -d --build`；当前 Codex 进程访问 `//./pipe/docker_engine` 被 Windows 拒绝。
+- [ ] 人工验收两个独立账号的注册、登录、资源隔离、文件上传、图谱构建、任务重试和流式问答。
+- [ ] 使用真实浏览器按参考图复核问答阶段时间线；当前环境未授权浏览器自动化，视觉差异检查尚未完成。
+- [ ] 生产环境设置 `ENVIRONMENT=pro`、`COOKIE_SECURE=true`、明确的 `CORS_ALLOWED_ORIGINS`、独立随机密钥和 HTTPS。
+- [ ] 在 GitHub 启用 Secret Scanning、Dependabot alerts、`main` 分支防删除/防强推和必需 CI 检查。
 
-## 如果必须保留旧提交历史
+## 发布结论
 
-先做镜像备份并通知所有协作者，再在仓库副本中使用 `git-filter-repo` 删除以下路径及源码中出现过的真实密钥：
-
-```bash
-git filter-repo --sensitive-data-removal --invert-paths \
-  --path backend/.env \
-  --path backend/.env.dev \
-  --path backend/.env.prod \
-  --path frontend/.env.development \
-  --path frontend/.env.production \
-  --path frontend/Apache \
-  --path frontend/IIS \
-  --path backend/log \
-  --path celery.log \
-  --path backend/embedding/web_data_embeddings/chroma.sqlite3 \
-  --path backend/common/core_layer/unigraph/web_search/web_data_embeddings/chroma.sqlite3 \
-  --path-glob '*/__pycache__/*' \
-  --path-glob '*.pyc'
-```
-
-历史改写后必须重新扫描全部分支与标签，并协调强制推送和协作者重新克隆。对首次公开发布而言，使用已生成的单提交干净仓库更简单、安全。
+代码级、依赖级和普通进程检查已经达到候选发布状态；在完成 Docker 启动与双账号运行态验收前，建议发布为首个候选版本而不是“生产稳定版”。

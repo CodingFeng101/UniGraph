@@ -18,10 +18,12 @@ from backend.app.kgbase.schema.schema_graph import (
     UpdateSchemaGraphParam,
 )
 from backend.app.kgbase.schema.schema_relationship import AddSchemaRelationshipParam
+from backend.app.kgbase.service.ownership_service import ownership_service
 from backend.app.kgbase.service.schema_entity_service import schema_entity_service
 from backend.app.kgbase.service.schema_graph_service import resolve_local_file_path, schema_graph_service
 from backend.app.kgbase.service.schema_relationship_service import schema_relationship_service
 from backend.app.task.celery import celery_app
+from backend.common.exception.errors import NotFoundError
 from backend.common.pagination import DependsPagination, paging_data
 from backend.common.response.response_schema import ResponseModel, response_base
 from backend.common.security.jwt import DependsJwtAuth
@@ -36,14 +38,16 @@ router = APIRouter()
 
 
 @router.get('/all/{kg_base_uuid}', summary='获取kgbase下所有架构图谱', dependencies=[DependsJwtAuth])
-async def get_all_schema_graphs(kg_base_uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_all_schema_graphs(request: Request, kg_base_uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_kg_base(user_uuid=request.user.uuid, uuid=kg_base_uuid)
     schema_graphs = await schema_graph_service.get_all(kg_base_uuid=kg_base_uuid)
     data = [SchemaGraphResponse(**select_as_dict(schema_graph)) for schema_graph in schema_graphs]
     return response_base.success(data=data)
 
 
 @router.get('/{uuid}', summary='获取架构图谱详情', dependencies=[DependsJwtAuth])
-async def get_schema_graph(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_schema_graph(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_schema_graph(user_uuid=request.user.uuid, uuid=uuid)
     schema_graph = await schema_graph_service.get_schema_graph(uuid=uuid)
     data = GetSchemaGraphDetail(**select_as_dict(schema_graph))
     return response_base.success(data=data)
@@ -76,7 +80,8 @@ async def get_pagination_schema_graphs(
         DependsPagination,
     ],
 )
-async def export_schema_graph(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def export_schema_graph(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_schema_graph(user_uuid=request.user.uuid, uuid=uuid)
     schema_graph = await schema_graph_service.get_schema_graph(uuid=uuid)
 
     # 处理 entities
@@ -197,7 +202,8 @@ async def export_schema_graph(uuid: Annotated[str, Path(...)]) -> ResponseModel:
     summary='导入知识架构',
     dependencies=[DependsJwtAuth, Depends(RequestPermission('sys:schema_graph:add'))],
 )
-async def import_schema_graph(obj: ImportSchemaGraphParam) -> ResponseModel:
+async def import_schema_graph(request: Request, obj: ImportSchemaGraphParam) -> ResponseModel:
+    await ownership_service.require_kg_base(user_uuid=request.user.uuid, uuid=obj.data.kg_base_uuid)
     for file_path in obj.file_paths:
         # 从文件中读取架构以及架构的定义（都存储在kg_schema中）
         try:
@@ -217,9 +223,7 @@ async def import_schema_graph(obj: ImportSchemaGraphParam) -> ResponseModel:
         obj.data.name = name
         obj.data.modify_info = modify_info
         obj.data.modify_suggestion = modify_suggestion
-        print(f'modify_suggestion:{modify_suggestion}')
         schema_uuid = await schema_graph_service.add(obj=obj.data)
-        print(schema_uuid)
         # 从架构中获取实体类型的source
         entity_source = {}
 
@@ -249,8 +253,6 @@ async def import_schema_graph(obj: ImportSchemaGraphParam) -> ResponseModel:
         for key in entity_source:
             entity_source[key] = list(dict.fromkeys(entity_source[key]))
 
-        print(entity_source)
-
         # 从架构中得到关系类型的source
         relation_source = {}
 
@@ -264,8 +266,6 @@ async def import_schema_graph(obj: ImportSchemaGraphParam) -> ResponseModel:
 
             # 将当前 item 的 source 合并到结果字典中
             relation_source[relation_type].update(sources)
-
-        print(relation_source)
 
         # 遍历提取的架构数据，处理实体和关系
         for item in schema:
@@ -281,7 +281,7 @@ async def import_schema_graph(obj: ImportSchemaGraphParam) -> ResponseModel:
                         name=directional_entity.get('Name'), schema_graph_uuid=schema_uuid
                     )
                     source_entity_uuid = entity.uuid  # 如果实体已存在，则获取其 uuid
-                except Exception:
+                except NotFoundError:
                     # 如果实体不存在，则创建新的实体
                     source_entity = AddSchemaEntityParam(
                         schema_graph_uuid=schema_uuid,
@@ -299,7 +299,7 @@ async def import_schema_graph(obj: ImportSchemaGraphParam) -> ResponseModel:
                         name=directed_entity.get('Name'), schema_graph_uuid=schema_uuid
                     )
                     target_entity_uuid = entity.uuid  # 如果实体已存在，则获取其 uuid
-                except Exception:
+                except NotFoundError:
                     # 如果实体不存在，则创建新的实体
                     target_entity = AddSchemaEntityParam(
                         schema_graph_uuid=schema_uuid,
@@ -347,6 +347,9 @@ async def create_schema_graph(self, user_token: str, obj_data: dict):
 
         # 获取用户信息
         api_key, base_url, model = await schema_graph_service.get_user_llm_info(user_token=user_token)
+        embedding_api_key, embedding_base_url, embedding_model = await schema_graph_service.get_user_embedding_info(
+            user_token=user_token
+        )
         task_progress(
             self,
             '架构资料已就绪',
@@ -387,6 +390,9 @@ async def create_schema_graph(self, user_token: str, obj_data: dict):
             api_key=api_key,
             base_url=base_url,
             model=model,
+            embedding_api_key=embedding_api_key,
+            embedding_base_url=embedding_base_url,
+            embedding_model=embedding_model,
             progress_callback=report_schema_progress,
         )
         entity_types = {
@@ -457,7 +463,7 @@ async def create_schema_graph(self, user_token: str, obj_data: dict):
                         name=directional_entity.get('Name'), schema_graph_uuid=schema_uuid
                     )
                     source_entity_uuid = entity.uuid
-                except Exception:
+                except NotFoundError:
                     source_entity = AddSchemaEntityParam(
                         schema_graph_uuid=schema_uuid,
                         name=directional_entity.get('Name'),
@@ -474,7 +480,7 @@ async def create_schema_graph(self, user_token: str, obj_data: dict):
                         name=directed_entity.get('Name'), schema_graph_uuid=schema_uuid
                     )
                     target_entity_uuid = entity.uuid
-                except Exception:
+                except NotFoundError:
                     target_entity = AddSchemaEntityParam(
                         schema_graph_uuid=schema_uuid,
                         name=directed_entity.get('Name'),
@@ -551,6 +557,9 @@ async def update_schema_graph(self, uuid: str, user_token: str, obj_data: dict):
 
         # 获取用户信息和架构图谱
         api_key, base_url, model = await schema_graph_service.get_user_llm_info(user_token=user_token)
+        embedding_api_key, embedding_base_url, embedding_model = await schema_graph_service.get_user_embedding_info(
+            user_token=user_token
+        )
         task_progress(
             self,
             '架构更新资料已就绪',
@@ -596,6 +605,9 @@ async def update_schema_graph(self, uuid: str, user_token: str, obj_data: dict):
                 api_key=api_key,
                 base_url=base_url,
                 model=model,
+                embedding_api_key=embedding_api_key,
+                embedding_base_url=embedding_base_url,
+                embedding_model=embedding_model,
                 progress_callback=report_schema_progress,
             )
             entity_types = {
@@ -670,7 +682,7 @@ async def update_schema_graph(self, uuid: str, user_token: str, obj_data: dict):
                             name=directional_entity.get('Name'), schema_graph_uuid=uuid
                         )
                         source_entity_uuid = entity.uuid
-                    except Exception:
+                    except NotFoundError:
                         source_entity = AddSchemaEntityParam(
                             schema_graph_uuid=uuid,
                             name=directional_entity.get('Name'),
@@ -687,7 +699,7 @@ async def update_schema_graph(self, uuid: str, user_token: str, obj_data: dict):
                             name=directed_entity.get('Name'), schema_graph_uuid=uuid
                         )
                         target_entity_uuid = entity.uuid
-                    except Exception:
+                    except NotFoundError:
                         target_entity = AddSchemaEntityParam(
                             schema_graph_uuid=uuid,
                             name=directed_entity.get('Name'),
@@ -723,16 +735,11 @@ async def update_schema_graph(self, uuid: str, user_token: str, obj_data: dict):
         return task_result(self, '知识架构更新完毕', detail='架构类型与关系约束已完成合并')
 
     except Exception as e:
-        # 这里需要将错误信息整合打包回前端，进行统一整合，避免信息管理混乱
-        fromat_msg = e.__annotations__.values()  # 获取当前版本升级，为后续升级改造预留升级空间、
-        if 'ForbiddenError' in str(e):
-            # 如果是 ForbiddenError 异常，返回特定的错误信息
-            return response_base.fail(message='新建知识架构已存在！')
-            # 其他策略
+        is_conflict = e.__class__.__name__ == 'ForbiddenError'
         error_payload = {
             'error': {
                 'code': 'INTERNAL_ERROR',
-                'message': '任务失败, 请检查API账户并稍后重试!',
+                'message': '知识架构已存在' if is_conflict else (str(e) or '知识架构更新失败，请稍后重试'),
                 'type': e.__class__.__name__,
                 'details': {
                     'task_id': self.request.id,
@@ -744,11 +751,6 @@ async def update_schema_graph(self, uuid: str, user_token: str, obj_data: dict):
             'exc_message': str(e),
         }
 
-        # 获取魔法属性
-        module_description = e.__module__.startswith('backend.common.exception.errors')
-        error_payload.update({'new_description': module_description})  # 返回魔法属性
-        error_payload.update({'new_format_msg': fromat_msg})  # 返回当前版本升级信息，以便前端进行升级迭代提醒
-
         return task_error_result(self, error_payload)
 
 
@@ -757,7 +759,8 @@ async def update_schema_graph(self, uuid: str, user_token: str, obj_data: dict):
     summary='（批量）删除架构图谱',
     dependencies=[Depends(RequestPermission('sys:schema_graph:del'))],
 )
-async def delete_schema_graph(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def delete_schema_graph(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_schema_graph(user_uuid=request.user.uuid, uuid=uuid)
     count = await schema_graph_service.delete(uuid=uuid)
     if count > 0:
         return response_base.success()
@@ -769,7 +772,8 @@ async def delete_schema_graph(uuid: Annotated[str, Path(...)]) -> ResponseModel:
     summary='更新架构图谱状态',
     dependencies=[Depends(RequestPermission('sys:schema_graph:status'))],
 )
-async def update_schema_graph_status(pk: Annotated[int, Path(...)]) -> ResponseModel:
+async def update_schema_graph_status(request: Request, pk: Annotated[int, Path(...)]) -> ResponseModel:
+    await ownership_service.require_schema_graph(user_uuid=request.user.uuid, pk=pk)
     count = await schema_graph_service.update_status(pk=pk)
     if count > 0:
         return response_base.success()
@@ -833,7 +837,7 @@ async def update_schema_graph_suggestion(self, uuid: str, user_token: str):
         error_payload = {
             'error': {
                 'code': 'INTERNAL_ERROR',
-                'message': '任务失败, 请检查API账户并稍后重试!',
+                'message': str(e) or '架构修改建议生成失败，请稍后重试',
                 'type': e.__class__.__name__,
                 'details': {'task_id': self.request.id, 'module': e.__class__.__module__},
             },
@@ -850,7 +854,10 @@ async def update_schema_graph_suggestion(self, uuid: str, user_token: str):
         Depends(RequestPermission('sys:schema_graph:edit')),
     ],
 )
-async def update_schema_detail(uuid: Annotated[str, Path(...)], obj: UpdateSchemaGraphBase) -> ResponseModel:
+async def update_schema_detail(
+    request: Request, uuid: Annotated[str, Path(...)], obj: UpdateSchemaGraphBase
+) -> ResponseModel:
+    await ownership_service.require_schema_graph(user_uuid=request.user.uuid, uuid=uuid)
     await schema_graph_service.update(uuid=uuid, obj=obj)
     return response_base.success()
 

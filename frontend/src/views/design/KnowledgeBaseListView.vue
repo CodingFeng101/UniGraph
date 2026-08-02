@@ -183,7 +183,11 @@
       </button>
     </div>
     <div class="p-6 flex flex-col gap-5 min-w-0">
-      <div id="new-kb-cover-picker" class="h-[110px] rounded-xl relative overflow-hidden flex flex-col items-center justify-center gap-2 cursor-pointer transition-all" style="border:1.5px dashed var(--claude-border);background:var(--claude-secondary);" @click="triggerNewKBCoverUpload()" @mouseenter="$event.currentTarget.style.borderColor='var(--claude-brand-500)'" @mouseleave="$event.currentTarget.style.borderColor='var(--claude-border)'">
+      <div class="flex flex-col gap-2">
+        <label class="text-xs font-medium" style="color:var(--claude-foreground);">名称</label>
+        <input type="text" id="new-kb-name" placeholder="输入知识库名称" class="h-10 px-3.5 rounded-lg text-sm outline-none transition-colors" style="background:var(--claude-secondary);border:1px solid var(--claude-border);color:var(--claude-foreground);font-family:var(--claude-font-sans);" onfocus="this.style.borderColor='var(--claude-brand-500)'" onblur="this.style.borderColor='var(--claude-border)'" />
+      </div>
+      <div id="new-kb-cover-picker" class="h-[110px] rounded-lg relative overflow-hidden flex flex-col items-center justify-center gap-2 cursor-pointer transition-all" style="border:1.5px dashed var(--claude-border);background:var(--claude-accent);" @click="triggerNewKBCoverUpload()" @mouseenter="$event.currentTarget.style.borderColor='var(--claude-brand-500)'" @mouseleave="$event.currentTarget.style.borderColor='var(--claude-border)'">
         <img id="new-kb-cover-preview" class="hidden absolute inset-0 w-full h-full object-cover" alt="知识库封面预览" />
         <div id="new-kb-cover-prompt" class="relative flex flex-col items-center gap-2">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
@@ -192,10 +196,6 @@
         </div>
       </div>
       <input id="new-kb-cover-file" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="uploadNewKBCover($event.currentTarget)" />
-      <div class="flex flex-col gap-2">
-        <label class="text-xs font-medium" style="color:var(--claude-foreground);">名称</label>
-        <input type="text" id="new-kb-name" placeholder="输入知识库名称" class="h-10 px-3.5 rounded-lg text-sm outline-none transition-colors" style="background:var(--claude-secondary);border:1px solid var(--claude-border);color:var(--claude-foreground);font-family:var(--claude-font-sans);" onfocus="this.style.borderColor='var(--claude-brand-500)'" onblur="this.style.borderColor='var(--claude-border)'" />
-      </div>
       <div class="flex flex-col gap-2">
         <label class="text-xs font-medium" style="color:var(--claude-foreground);">描述</label>
         <textarea id="new-kb-desc" placeholder="输入知识库描述" rows="3" class="px-3.5 py-2.5 rounded-lg text-sm outline-none resize-none transition-colors" style="background:var(--claude-secondary);border:1px solid var(--claude-border);color:var(--claude-foreground);font-family:var(--claude-font-sans);" onfocus="this.style.borderColor='var(--claude-brand-500)'" onblur="this.style.borderColor='var(--claude-border)'"></textarea>

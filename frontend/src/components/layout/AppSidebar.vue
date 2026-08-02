@@ -180,25 +180,25 @@
     <div id="user-dropdown" class="hidden absolute bottom-full left-3 w-[236px] mb-2 rounded-xl overflow-visible z-50" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
       <div class="px-4 py-3" style="border-bottom:1px solid var(--claude-border);"><p class="text-xs" style="color:var(--claude-muted-foreground);">zhanglei@company.com</p></div>
       <div class="py-1">
-        <a href="/unigraph/usercenter" class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:opacity-80" style="color:var(--claude-foreground);">
+        <a href="/unigraph/usercenter" class="user-menu-item flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" style="color:var(--claude-foreground);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           个人中心
         </a>
-        <a href="/unigraph/tutorial" class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:opacity-80" style="color:var(--claude-foreground);">
+        <a href="/unigraph/tutorial" class="user-menu-item flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" style="color:var(--claude-foreground);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
           视频教程
         </a>
-        <a href="/unigraph/docs" class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:opacity-80" style="color:var(--claude-foreground);">
+        <a href="/unigraph/docs" class="user-menu-item flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" style="color:var(--claude-foreground);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           技术文档
         </a>
         <div style="border-top:1px solid var(--claude-border);margin:4px 0;"></div>
-        <a href="/unigraph/settings" class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:opacity-80" style="color:var(--claude-foreground);">
+        <a href="/unigraph/settings" class="user-menu-item flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" style="color:var(--claude-foreground);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           设置
         </a>
         <div class="relative" @mouseenter="openThemeSubmenu()" @mouseleave="closeThemeSubmenu()">
-          <button type="button" @click="toggleThemeSubmenu()" class="claude-menu-item w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
+          <button type="button" @click="toggleThemeSubmenu()" class="user-menu-item w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
             <span class="flex items-center gap-3">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
               主题
@@ -221,7 +221,7 @@
           </div>
         </div>
         <div class="relative" @mouseenter="openLangSubmenu()" @mouseleave="closeLangSubmenu()">
-          <button type="button" @click="toggleLangSubmenu()" class="w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors hover:opacity-80 cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
+          <button type="button" @click="toggleLangSubmenu()" class="user-menu-item w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
             <span class="flex items-center gap-3">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               语言
@@ -240,10 +240,10 @@
           </div>
         </div>
         <div style="border-top:1px solid var(--claude-border);margin:4px 0;"></div>
-        <a href="javascript:void(0)" @click="Auth.logout()" class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:opacity-80" style="color:var(--claude-destructive);">
+        <button type="button" @click="handleLogout" class="user-menu-item w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer" style="background:transparent;border:none;color:var(--claude-destructive);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           退出登录
-        </a>
+        </button>
       </div>
     </div>
   </div>
@@ -251,6 +251,8 @@
 </template>
 
 <script>
+import { Auth } from '@/api/runtime/auth';
+
 export default {
   name: 'AppSidebar',
   props: {
@@ -274,6 +276,10 @@ export default {
     this.updateNavigation();
   },
   methods: {
+    async handleLogout() {
+      document.getElementById('user-dropdown')?.classList.add('hidden');
+      await Auth.logout();
+    },
     handleNewChat(event) {
       if (this.active !== 'app') return;
       event.preventDefault();
@@ -304,6 +310,8 @@ export default {
         item.style.opacity = disabled ? '0.42' : '';
         item.style.cursor = disabled ? 'not-allowed' : '';
         item.tabIndex = disabled ? -1 : 0;
+        if (isActivePage) item.setAttribute('aria-current', 'page');
+        else item.removeAttribute('aria-current');
       });
     },
     applySavedPreferences() {
@@ -404,9 +412,32 @@ export default {
   letter-spacing: -0.01em;
 }
 
+#app-sidebar.sidebar-collapsed { width: 48px; }
+#app-sidebar.sidebar-collapsed .sidebar-text,
+#app-sidebar.sidebar-collapsed .sidebar-logo,
+#app-sidebar.sidebar-collapsed .sidebar-content,
+#app-sidebar.sidebar-collapsed .sidebar-collapsed-hide,
+#app-sidebar.sidebar-collapsed nav a span { display: none; }
+#app-sidebar.sidebar-collapsed .h-12 { justify-content: center; }
+#app-sidebar.sidebar-collapsed .sidebar-toggle-btn { margin: 0; }
+
 .sidebar-nav-item {
   font-size: 15px;
   font-weight: 400;
   line-height: 22px;
+}
+
+.sidebar-nav-item:not([aria-disabled="true"]):hover {
+  background: var(--claude-secondary) !important;
+  color: var(--claude-foreground) !important;
+}
+
+.user-menu-item {
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.user-menu-item:hover {
+  background: var(--claude-accent) !important;
 }
 </style>

@@ -1,5 +1,4 @@
 import asyncio
-import os
 from typing import Dict, List
 
 import numpy as np
@@ -7,23 +6,22 @@ import numpy as np
 from backend.common.core_layer.unigraph.ai_unit.llm.response_getter import GenericResponseGetter
 
 
-async def batch_get_vectors(words: List[str]) -> Dict[str, List[float]]:
+async def batch_get_vectors(words: List[str], *, api_key: str, base_url: str, model: str) -> Dict[str, List[float]]:
     """
     批量获取词向量（改为逐个调用 get_vector 实现）
 
     参数:
         words: 需要获取嵌入向量的单词/短语列表
-        model: 使用的嵌入模型名称（默认从 settings 读取）
+        api_key: 嵌入模型密钥
+        base_url: 嵌入模型服务地址
+        model: 嵌入模型名称
 
     返回:
         字典形式返回每个单词对应的嵌入向量
     """
     # 为每个单词创建获取向量的异步任务
     tasks = [
-        GenericResponseGetter.get_vector(
-            query=word, api_key=os.getenv('OPENAI_API_KEY', ''), base_url='https://api.rcouyi.com/v1'
-        )
-        for word in words
+        GenericResponseGetter.get_vector(query=word, api_key=api_key, base_url=base_url, model=model) for word in words
     ]
 
     # 并发执行所有任务

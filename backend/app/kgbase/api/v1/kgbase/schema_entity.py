@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 
 from backend.app.kgbase.schema.schema_entity import AddSchemaEntityParam, SchemaEntityResponse, UpdateSchemaEntityParam
 from backend.app.kgbase.schema.schema_graph import UpdateSchemaGraphBase
+from backend.app.kgbase.service.ownership_service import ownership_service
 from backend.app.kgbase.service.schema_entity_service import schema_entity_service
 from backend.app.kgbase.service.schema_graph_service import schema_graph_service
 from backend.common.pagination import DependsPagination, paging_data
@@ -22,14 +23,16 @@ router = APIRouter()
 
 
 @router.get('/all/{schema_graph_uuid}', summary='获取架构下所有实体类型', dependencies=[DependsJwtAuth])
-async def get_all_schema_entities(schema_graph_uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_all_schema_entities(request: Request, schema_graph_uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_schema_graph(user_uuid=request.user.uuid, uuid=schema_graph_uuid)
     schema_entities = await schema_entity_service.get_all(schema_graph_uuid=schema_graph_uuid)
     data = [SchemaEntityResponse(**select_as_dict(schema_entity)) for schema_entity in schema_entities]
     return response_base.success(data=data)
 
 
 @router.get('/{uuid}', summary='获取实体类型详情', dependencies=[DependsJwtAuth])
-async def get_schema_entity(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_schema_entity(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_schema_entity(user_uuid=request.user.uuid, uuid=uuid)
     schema_entity = await schema_entity_service.get_schema_entity(uuid=uuid)
     data = SchemaEntityResponse(**select_as_dict(schema_entity))
     return response_base.success(data=data)
@@ -59,7 +62,8 @@ async def get_pagination_schema_entities(
     summary='创建实体类型',
     dependencies=[DependsJwtAuth, Depends(RequestPermission('sys:schema_entity:add'))],
 )
-async def create_schema_entity(obj: AddSchemaEntityParam) -> ResponseModel:
+async def create_schema_entity(request: Request, obj: AddSchemaEntityParam) -> ResponseModel:
+    await ownership_service.require_schema_graph(user_uuid=request.user.uuid, uuid=obj.schema_graph_uuid)
     await schema_entity_service.add(obj=obj)
     schema_graph = await schema_graph_service.get_schema_graph(uuid=obj.schema_graph_uuid)
 
@@ -82,7 +86,10 @@ async def create_schema_entity(obj: AddSchemaEntityParam) -> ResponseModel:
     summary='更新实体类型',
     dependencies=[Depends(RequestPermission('sys:schema_entity:edit'))],
 )
-async def update_schema_entity(uuid: Annotated[str, Path(...)], obj: UpdateSchemaEntityParam) -> ResponseModel:
+async def update_schema_entity(
+    request: Request, uuid: Annotated[str, Path(...)], obj: UpdateSchemaEntityParam
+) -> ResponseModel:
+    await ownership_service.require_schema_entity(user_uuid=request.user.uuid, uuid=uuid)
     count = await schema_entity_service.update(uuid=uuid, obj=obj)
 
     if count > 0:
@@ -97,7 +104,8 @@ async def update_schema_entity(uuid: Annotated[str, Path(...)], obj: UpdateSchem
         Depends(RequestPermission('sys:schema_entity:del')),
     ],
 )
-async def delete_schema_entity(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def delete_schema_entity(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_schema_entity(user_uuid=request.user.uuid, uuid=uuid)
     schema_entity = await schema_entity_service.get_schema_entity(uuid=uuid)
     schema_graph = await schema_graph_service.get_schema_graph(uuid=schema_entity.schema_graph_uuid)
 
@@ -124,7 +132,8 @@ async def delete_schema_entity(uuid: Annotated[str, Path(...)]) -> ResponseModel
     summary='更新实体类型状态',
     dependencies=[Depends(RequestPermission('sys:schema_entity:status'))],
 )
-async def update_schema_entity_status(pk: Annotated[int, Path(...)]) -> ResponseModel:
+async def update_schema_entity_status(request: Request, pk: Annotated[int, Path(...)]) -> ResponseModel:
+    await ownership_service.require_schema_entity(user_uuid=request.user.uuid, pk=pk)
     count = await schema_entity_service.update_status(pk=pk)
     if count > 0:
         return response_base.success()

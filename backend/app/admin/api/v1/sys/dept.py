@@ -72,7 +72,6 @@ async def create_dept(obj: CreateDeptParam) -> ResponseModel:
 async def update_dept(pk: Annotated[int, Path(...)], obj: UpdateDeptParam) -> ResponseModel:
     count = await dept_service.update(pk=pk, obj=obj)
     if count > 0:
-        print(response_base.success())
         return response_base.success()
     return response_base.fail()
 

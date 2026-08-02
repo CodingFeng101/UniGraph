@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import json
 import logging
 
 import redis
@@ -28,6 +29,22 @@ class TaskService:
     @staticmethod
     def _result_backend_key(uid: str) -> str:
         return f'{task_settings.CELERY_BACKEND_REDIS_PREFIX}_celery-task-meta-{uid}'
+
+    @staticmethod
+    def _task_owner_key(uid: str) -> str:
+        return f'unigraph:task-owner:{uid}'
+
+    @classmethod
+    def register_owner(cls, uid: str, user_uuid: str) -> None:
+        client = cls._get_redis_client(task_settings.CELERY_BACKEND_REDIS_DATABASE)
+        client.setex(cls._task_owner_key(uid), task_settings.CELERY_TASK_OWNER_TTL_SECONDS, user_uuid)
+
+    @classmethod
+    def require_owner(cls, uid: str, user_uuid: str) -> None:
+        client = cls._get_redis_client(task_settings.CELERY_BACKEND_REDIS_DATABASE)
+        owner = client.get(cls._task_owner_key(uid))
+        if owner is None or owner.decode('utf-8') != user_uuid:
+            raise NotFoundError(msg='任务不存在')
 
     @classmethod
     def is_task_known(cls, uid: str) -> bool:
@@ -81,9 +98,23 @@ class TaskService:
             raise NotFoundError(msg='任务不存在') from exc
         return result
 
+    @classmethod
+    def get_cached_progress(cls, uid: str) -> dict | None:
+        result_redis = cls._get_redis_client(task_settings.CELERY_BACKEND_REDIS_DATABASE)
+        payload = result_redis.get(f'task:{uid}:progress')
+        if not payload:
+            return None
+        try:
+            value = json.loads(payload)
+        except (TypeError, ValueError):
+            logger.warning('Invalid cached task payload for %s', uid)
+            return None
+        return value if isinstance(value, dict) else None
+
     @staticmethod
-    def run(*, name: str, args: list | None = None, kwargs: dict | None = None):
+    def run(*, name: str, user_uuid: str, args: list | None = None, kwargs: dict | None = None):
         task = celery_app.send_task(name=name, args=args, kwargs=kwargs)
+        TaskService.register_owner(task.id, user_uuid)
         return {
             'task_id': task.id,
             'status': 'started',

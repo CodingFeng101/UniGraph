@@ -177,10 +177,8 @@ class ExtractionInstruction3(BaseInstruction):
                     else:
                         # 如果没有冒号，可能是错误的格式，跳过
                         continue
-                except ValueError:
-                    pass
-                except Exception:
-                    pass
+                except (IndexError, ValueError):
+                    continue
             return match_dict
 
         ins3_output_ = parse_match_result(response_)  # 实体属性嵌套字典entity_attribute_dict

@@ -187,7 +187,6 @@ class CRUDSchemaGraph(CRUDPlus[SchemaGraph]):
         stmt = select(User).filter(User.uuid == user_uuid)
         user = await db.execute(stmt)
         user = user.scalar_one_or_none()
-        print(f'api_key:{user.api_key}')
         if user:
             return user.api_key, user.base_url
         return None

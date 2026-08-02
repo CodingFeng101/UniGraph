@@ -12,6 +12,13 @@ from backend.core.conf import settings
 
 route = APIRouter()
 
+
+@route.get(f'{settings.FASTAPI_API_V1_PATH}/health', include_in_schema=False)
+async def health_check() -> dict[str, str]:
+    """Lightweight liveness endpoint for deployments and load balancers."""
+    return {'status': 'ok'}
+
+
 route.include_router(admin_v1, prefix=f'{settings.FASTAPI_API_V1_PATH}')
 route.include_router(generator_v1, prefix=f'{settings.FASTAPI_API_V1_PATH}')
 route.include_router(task_v1, prefix=f'{settings.FASTAPI_API_V1_PATH}')

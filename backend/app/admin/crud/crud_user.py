@@ -86,14 +86,10 @@ class CRUDUser(CRUDPlus[User]):
             salt = text_captcha(5)
             obj.password = get_hash_password(f'{obj.password}{salt}')
             dict_obj = obj.model_dump()
-            dict_obj.update({'is_staff': True, 'salt': salt})
-            dict_obj.update({'is_superuser': True})
+            dict_obj.update({'is_staff': False, 'is_superuser': False, 'salt': salt})
         else:
             dict_obj = obj.model_dump()
-            dict_obj.update({'is_staff': True, 'salt': None})
-
-            # 临时增加超级管理员权限
-            dict_obj.update({'is_superuser': True})
+            dict_obj.update({'is_staff': False, 'is_superuser': False, 'salt': None})
         new_user = self.model(**dict_obj)
         db.add(new_user)
 

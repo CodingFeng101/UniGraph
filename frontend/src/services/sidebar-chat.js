@@ -1,5 +1,6 @@
 import { Auth } from '@/api/runtime/auth';
 import { KgBaseAPI } from '@/api';
+import { displayChatName } from '@/utils/chat-name';
 
 export const ChatSidebar = window.ChatSidebar = (() => {
   let items = [];
@@ -21,10 +22,11 @@ export const ChatSidebar = window.ChatSidebar = (() => {
 
   function row(item) {
     const active = new URLSearchParams(location.search).get('chat') === item.uuid;
+    const name = displayChatName(item.name);
     return `
       <div class="group relative px-3 py-2 rounded-lg transition-colors hover:bg-[var(--claude-accent)]"${active ? ' style="background:var(--claude-accent);"' : ''}>
         <a href="${hrefFor(item)}" class="block" style="text-decoration:none;">
-          <p class="text-[15px] leading-[22px] font-normal truncate pr-7" style="color:var(--claude-foreground);">${escapeHtml(item.name || '未命名对话')}</p>
+          <p class="text-[15px] leading-[22px] font-normal truncate pr-7" style="color:var(--claude-foreground);">${escapeHtml(name)}</p>
         </a>
         <button type="button" onclick="event.stopPropagation();ChatSidebar.toggleMenu(this)" class="absolute right-2 top-1.5 flex w-6 h-6 items-center justify-center rounded-md claude-menu-item opacity-55 group-hover:opacity-100 transition-opacity" style="background:transparent;border:none;color:var(--claude-muted-foreground);font-size:18px;line-height:1;" aria-label="对话菜单">⋮</button>
         <div class="chat-context-menu hidden absolute right-2 top-8 z-50 min-w-28 rounded-xl p-1" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
@@ -57,7 +59,7 @@ export const ChatSidebar = window.ChatSidebar = (() => {
     const container = document.querySelector('#search-modal .max-h-\\[50vh\\]');
     if (!container) return;
     container.innerHTML = list.length
-      ? `<div class="px-2 py-2">${list.map((item) => `<a href="${hrefFor(item)}" class="chat-search-item block px-3 py-2.5 rounded-lg claude-menu-item text-sm" style="color:var(--claude-foreground);">${escapeHtml(item.name || '未命名对话')}</a>`).join('')}</div>`
+      ? `<div class="px-2 py-2">${list.map((item) => `<a href="${hrefFor(item)}" class="chat-search-item block px-3 py-2.5 rounded-lg claude-menu-item text-sm" style="color:var(--claude-foreground);">${escapeHtml(displayChatName(item.name))}</a>`).join('')}</div>`
       : '<div class="px-4 py-8 text-center text-sm" style="color:var(--claude-muted-foreground);">暂无历史对话</div>';
   }
 
@@ -166,6 +168,7 @@ export const ChatSidebar = window.ChatSidebar = (() => {
         ? '确定要删除“' + item.name + '”吗？删除后无法恢复。'
         : '确定要删除这段对话吗？删除后无法恢复。',
       confirmText: '删除',
+      size: 'compact',
     });
     if (!confirmed) return;
     const response = await KgBaseAPI.chatLibrary.delete(uuid);

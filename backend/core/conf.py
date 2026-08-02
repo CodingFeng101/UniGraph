@@ -6,7 +6,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from backend.core.path_conf import BasePath
@@ -23,8 +23,29 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: Literal['dev', 'pro']
 
-    SSO_USER_INFO_URL: str | None = 'http://127.0.0.1:8000/tsp/v1/sys/users/me'
     INDEX_EXPORT_URL_ROOT: str | None = 'http://127.0.0.1:8000/knowg/v1/knowledge/ask'
+    JXNU_USER_INFO_URL: str = 'https://ai.jxselab.com/tsp/v1/sys/users/me'
+
+    CHAT_CONTEXT_RECENT_TURNS: int = 8
+    CHAT_CONTEXT_COMPRESSION_THRESHOLD_TOKENS: int = 6000
+    CHAT_CONTEXT_TRIGGER_RATIO: float = 0.7
+    CHAT_CONTEXT_SUMMARY_MAX_TOKENS: int = 1500
+    CHAT_CONTEXT_DEFAULT_MODEL_LIMIT: int = 128000
+    CHAT_CONTEXT_MODEL_LIMITS: dict[str, int] = Field(
+        default_factory=lambda: {
+            'gpt-5': 400000,
+            'gpt-4.1': 1000000,
+            'gpt-4o': 128000,
+            'o1': 200000,
+            'o3': 200000,
+            'claude': 200000,
+            'deepseek': 128000,
+            'gemini': 1000000,
+        }
+    )
+    LLM_MAX_CONCURRENCY: int = Field(default=8, ge=1, le=64)
+    ALLOW_PRIVATE_LLM_ENDPOINTS: bool = False
+    ENABLE_PUBLIC_PASSWORD_RESET: bool = False
 
     MYSQL_HOST: str
     MYSQL_PORT: int
@@ -37,6 +58,8 @@ class Settings(BaseSettings):
     REDIS_DATABASE: int
 
     TOKEN_SECRET_KEY: str
+    AUTH_AES_SECRET_KEY: str
+    LLM_API_KEY_ENCRYPTION_KEY: str | None = None
     OPERA_LOG_ENCRYPT_SECRET_KEY: str
     JXNU_AES_SECRET_KEY: str | None = None
 
@@ -61,6 +84,9 @@ class Settings(BaseSettings):
     MYSQL_ECHO: bool = False
     MYSQL_DATABASE: str = 'onlineunigraph'
     MYSQL_CHARSET: str = 'utf8mb4'
+    MYSQL_POOL_SIZE: int = Field(default=10, ge=1, le=100)
+    MYSQL_MAX_OVERFLOW: int = Field(default=20, ge=0, le=200)
+    MYSQL_POOL_TIMEOUT: int = Field(default=30, ge=1, le=300)
 
     REDIS_TIMEOUT: int = 5
 
@@ -71,14 +97,11 @@ class Settings(BaseSettings):
     TOKEN_REFRESH_REDIS_PREFIX: str = 'fba:refresh_token'
 
     TOKEN_REQUEST_PATH_EXCLUDE: list[str] = [
+        f'{FASTAPI_API_V1_PATH}/health',
         f'{FASTAPI_API_V1_PATH}/auth/login',
         f'{FASTAPI_API_V1_PATH}/oauth2/jxnu/jxnu-auth',
         f'{FASTAPI_API_V1_PATH}/auth/captcha',
         f'{FASTAPI_API_V1_PATH}/auth/register',
-        f'{FASTAPI_API_V1_PATH}/sys/users/register',
-        f'{FASTAPI_API_V1_PATH}/sys/users/reset_password',
-        f'{FASTAPI_API_V1_PATH}/auth/sso',
-        f'{FASTAPI_API_V1_PATH}/auth/ssologin',
     ]
 
     JWT_USER_REDIS_PREFIX: str = 'fba:user'
@@ -99,6 +122,7 @@ class Settings(BaseSettings):
 
     COOKIE_REFRESH_TOKEN_KEY: str = 'fba_refresh_token'
     COOKIE_REFRESH_TOKEN_EXPIRE_SECONDS: int = TOKEN_REFRESH_EXPIRE_SECONDS
+    COOKIE_SECURE: bool = False
 
     LOG_ROOT_LEVEL: str = 'NOTSET'
     LOG_STD_FORMAT: str = (
@@ -138,6 +162,27 @@ class Settings(BaseSettings):
     CORS_EXPOSE_HEADERS: list[str] = [
         TRACE_ID_REQUEST_HEADER_KEY,
     ]
+
+    @model_validator(mode='after')
+    def validate_production_security(self):
+        if self.ENVIRONMENT != 'pro':
+            return self
+
+        secrets = {
+            'TOKEN_SECRET_KEY': self.TOKEN_SECRET_KEY,
+            'AUTH_AES_SECRET_KEY': self.AUTH_AES_SECRET_KEY,
+            'LLM_API_KEY_ENCRYPTION_KEY': self.LLM_API_KEY_ENCRYPTION_KEY or '',
+            'OPERA_LOG_ENCRYPT_SECRET_KEY': self.OPERA_LOG_ENCRYPT_SECRET_KEY,
+        }
+        for name, value in secrets.items():
+            lowered = value.lower()
+            if len(value) < 32 or any(marker in lowered for marker in ('replace-with', 'changeme', 'test-secret')):
+                raise ValueError(f'{name} must be a non-placeholder secret of at least 32 characters')
+        if not self.COOKIE_SECURE:
+            raise ValueError('COOKIE_SECURE must be true in production')
+        if not self.CORS_ALLOWED_ORIGINS or '*' in self.CORS_ALLOWED_ORIGINS:
+            raise ValueError('CORS_ALLOWED_ORIGINS must list explicit trusted origins in production')
+        return self
 
     DATETIME_TIMEZONE: str = 'Asia/Shanghai'
     DATETIME_FORMAT: str = '%Y-%m-%d %H:%M:%S'

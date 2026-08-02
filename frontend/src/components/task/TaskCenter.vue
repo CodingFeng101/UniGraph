@@ -1,4 +1,5 @@
 <template>
+<Teleport to="body">
   <div
     v-if="showFab"
     id="task-fab-wrapper"
@@ -29,6 +30,7 @@
       </div>
     </section>
   </div>
+</Teleport>
 </template>
 
 <script>
@@ -62,8 +64,8 @@ export default {
       };
     },
     panelStyle() {
-      const width = Math.min(420, window.innerWidth - 24);
-      const height = Math.min(824, window.innerHeight - 24);
+      const width = Math.min(340, window.innerWidth - 24);
+      const height = Math.min(580, window.innerHeight - 24);
       const dockLeft = this.position.x < window.innerWidth / 2;
       const orbLeft = dockLeft ? 10 : window.innerWidth - 62;
       const left = dockLeft
@@ -188,7 +190,7 @@ export default {
 .task-fab,
 .task-panel {
   position: fixed;
-  z-index: 90;
+  z-index: 2147483000;
 }
 
 .task-fab {
@@ -209,15 +211,15 @@ export default {
 
 .task-orb-button {
   position: relative;
-  width: 50px;
-  height: 50px;
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   color: var(--claude-primary-foreground);
   background: var(--task-orb-color, #a7cfb2);
-  border: 3px solid var(--claude-card);
-  box-shadow: 0 8px 24px rgba(78, 55, 42, .22), 0 0 0 1px var(--claude-border);
+  border: 2px solid var(--claude-card);
+  box-shadow: 0 10px 24px rgba(78, 55, 42, .18), 0 0 0 1px var(--claude-border);
   cursor: pointer;
   transition: transform .18s cubic-bezier(.16, 1, .3, 1), background-color .35s ease;
 }
@@ -263,16 +265,16 @@ export default {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border-radius: 24px;
+  border-radius: 16px;
   color: var(--claude-foreground);
   background: var(--claude-card);
   border: 1px solid color-mix(in srgb, var(--claude-border) 82%, transparent);
-  box-shadow: 0 18px 50px rgba(74, 55, 42, .16), inset 0 1px 0 rgba(255, 255, 255, .52);
+  box-shadow: 0 16px 42px rgba(74, 55, 42, .14), inset 0 1px 0 rgba(255, 255, 255, .58);
 }
 
 .task-panel-header {
-  height: 38px;
-  padding: 0 14px;
+  min-height: 46px;
+  padding: 10px 14px 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -282,17 +284,17 @@ export default {
 
 .task-panel-header h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 13px;
   line-height: 1;
   font-weight: 650;
 }
 
 .task-running-count {
-  padding: 5px 11px;
+  padding: 4px 9px;
   border-radius: 999px;
   color: var(--claude-brand-500);
   background: color-mix(in srgb, var(--claude-brand-500) 9%, var(--claude-card));
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1;
   font-weight: 500;
 }
@@ -300,11 +302,11 @@ export default {
 .task-list {
   min-height: 0;
   flex: 1;
-  padding: 0 8px 12px;
+  padding: 0 10px 10px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   scrollbar-width: thin;
   overscroll-behavior: contain;
 }
@@ -318,19 +320,19 @@ export default {
 
 :deep(.task-card) {
   overflow: hidden;
-  border-radius: 24px;
-  background: color-mix(in srgb, var(--claude-secondary) 70%, var(--claude-card));
+  border-radius: 12px;
+  background: var(--claude-background);
   border: 1px solid transparent;
 }
 
 :deep(.task-card__summary) {
   width: 100%;
-  min-height: 50px;
-  padding: 12px 14px 8px;
+  min-height: 42px;
+  padding: 10px 10px 7px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  column-gap: 9px;
+  column-gap: 7px;
   color: var(--claude-foreground);
   background: transparent;
 }
@@ -339,9 +341,9 @@ export default {
   min-width: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: 13px 8px minmax(0, 1fr);
+  grid-template-columns: 13px 7px minmax(0, 1fr);
   align-items: center;
-  column-gap: 8px;
+  column-gap: 6px;
   color: var(--claude-foreground);
   background: transparent;
   border: 0;
@@ -364,8 +366,8 @@ export default {
 }
 
 :deep(.task-status-dot) {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
 }
 
@@ -374,7 +376,7 @@ export default {
   overflow: hidden;
   margin: 0;
   color: var(--claude-foreground);
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1.25;
   font-weight: 500;
   text-overflow: ellipsis;
@@ -382,7 +384,9 @@ export default {
 }
 
 :deep(.task-card__state) {
-  font-size: 11px;
+  min-width: 30px;
+  text-align: right;
+  font-size: 10px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -390,18 +394,18 @@ export default {
 :deep(.task-inline-actions) {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 :deep(.task-inline-action) {
-  width: 25px;
-  height: 25px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--claude-muted-foreground);
   background: color-mix(in srgb, var(--claude-border) 36%, transparent);
   cursor: pointer;
@@ -416,11 +420,11 @@ export default {
 :deep(.task-inline-action:active) { transform: scale(.94); }
 :deep(.task-inline-action:disabled) { opacity: .38; cursor: not-allowed; }
 :deep(.task-delete-action) { color: var(--claude-destructive); }
-:deep(.task-inline-action svg) { width: 13px; height: 13px; stroke-width: 1.8; }
+:deep(.task-inline-action svg) { width: 12px; height: 12px; stroke-width: 1.8; }
 
 :deep(.task-progress) {
   height: 3px;
-  margin: 0 14px 10px 46px;
+  margin: 0 10px 9px 36px;
   overflow: hidden;
   border-radius: 999px;
   background: color-mix(in srgb, var(--claude-border) 82%, transparent);
@@ -433,8 +437,8 @@ export default {
 }
 
 :deep(.task-detail) {
-  margin: 0 15px 9px 34px;
-  padding: 14px 0 1px;
+  margin: 0 11px 9px 27px;
+  padding: 10px 0 1px;
   border-top: 1px dashed color-mix(in srgb, var(--claude-border) 82%, transparent);
   background: transparent;
 }
@@ -442,7 +446,7 @@ export default {
 :deep(.task-detail.hidden) { display: none; }
 
 :deep(.task-timeline) {
-  max-height: 286px;
+  max-height: 250px;
   padding: 1px 6px 1px 0;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -451,22 +455,34 @@ export default {
 
 :deep(.task-step) {
   position: relative;
-  min-height: 48px;
-  padding: 0 0 11px 22px;
+  min-height: 40px;
+  padding: 0 0 9px 18px;
   opacity: .74;
   transition: opacity 180ms ease;
 }
 
 :deep(.task-step.is-latest) {
   opacity: 1;
+}
+
+:deep(.task-step.is-new) {
   animation: task-log-enter 240ms ease-out both;
+}
+
+:deep(.task-card__start-time) {
+  margin-left: 6px;
+  color: var(--claude-muted-foreground);
+  font-family: var(--claude-font-mono);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: .02em;
 }
 
 :deep(.task-step:not(:last-child)::after) {
   content: '';
   position: absolute;
-  left: 5px;
-  top: 13px;
+  left: 4px;
+  top: 11px;
   bottom: -2px;
   width: 1px;
   background: color-mix(in srgb, var(--claude-border) 92%, transparent);
@@ -476,11 +492,25 @@ export default {
   position: absolute;
   left: 0;
   top: 3px;
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
   border-radius: 999px;
   background: var(--step-color);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--step-color) 22%, var(--claude-card));
+}
+
+:deep(.task-step.is-running .task-step__dot::after) {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid var(--step-color);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: task-step-ripple 1.8s cubic-bezier(.16, 1, .3, 1) infinite;
+}
+
+:deep(.task-step.is-running .task-step__label) {
+  animation: task-step-breathe 1.8s ease-in-out infinite;
 }
 
 :deep(.task-step__head) {
@@ -492,7 +522,7 @@ export default {
 :deep(.task-step__label) {
   overflow: hidden;
   color: var(--claude-foreground);
-  font-size: 12px;
+  font-size: 10px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -502,20 +532,38 @@ export default {
   flex: none;
   color: var(--claude-muted-foreground);
   font-family: var(--claude-font-mono);
-  font-size: 10px;
+  font-size: 9px;
   letter-spacing: .04em;
 }
 
 :deep(.task-step__description) {
   margin: 3px 0 0;
   color: var(--claude-muted-foreground);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.35;
 }
 
 @keyframes task-log-enter {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes task-step-ripple {
+  0% { opacity: .75; transform: scale(.7); }
+  75%, 100% { opacity: 0; transform: scale(2.5); }
+}
+
+@keyframes task-step-breathe {
+  0%, 100% { opacity: .72; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :deep(.task-step.is-running .task-step__dot::after),
+  :deep(.task-step.is-running .task-step__label),
+  :deep(.task-step.is-new) {
+    animation: none;
+  }
 }
 
 @media (max-width: 560px) {

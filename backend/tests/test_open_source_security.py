@@ -1,5 +1,6 @@
 import ast
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -47,7 +48,7 @@ def dependency_names(decorator: ast.Call) -> set[str]:
 
 
 class OpenSourceSecurityTests(unittest.TestCase):
-    def test_sensitive_runtime_files_are_absent(self):
+    def test_sensitive_runtime_files_are_not_tracked(self):
         sensitive_paths = [
             'backend/.env',
             'backend/.env.dev',
@@ -58,8 +59,15 @@ class OpenSourceSecurityTests(unittest.TestCase):
             'frontend/IIS/fullchain.pfx',
             'frontend/IIS/password.txt',
         ]
-        present = [path for path in sensitive_paths if (REPO_ROOT / path).exists()]
-        self.assertEqual(present, [])
+        tracked = set(
+            subprocess.run(
+                ['git', '-C', str(REPO_ROOT), 'ls-files'],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.splitlines()
+        )
+        self.assertEqual([path for path in sensitive_paths if path in tracked], [])
 
     def test_required_open_source_documents_exist(self):
         required = [
@@ -85,12 +93,65 @@ class OpenSourceSecurityTests(unittest.TestCase):
         decorator = route_decorator(function, 'post', '/upload')
         self.assertIn('DependsJwtAuth', dependency_names(decorator))
         self.assertIn('MAX_UPLOAD_SIZE = 50 * 1024 * 1024', source)
+        self.assertIn('MAX_IMAGE_UPLOAD_SIZE = 5 * 1024 * 1024', source)
         self.assertIn("filename in {'.', '..'}", source)
+        self.assertIn('ALLOWED_EXTENSIONS', source)
+        self.assertIn('image.verify()', source)
+
+    def test_raw_upload_directories_are_not_publicly_mounted(self):
+        source = read_source('backend/core/registrar.py')
+        self.assertNotIn("app.mount('/static'", source)
+        self.assertNotIn("app.mount('/files'", source)
+
+    def test_auth_encryption_key_is_not_hard_coded_in_source(self):
+        frontend_source = read_source('frontend/src/api/runtime/config.js')
+        backend_source = read_source('backend/app/admin/service/auth_service.py')
+        self.assertIn('VITE_AUTH_AES_SECRET_KEY', frontend_source)
+        self.assertIn('settings.AUTH_AES_SECRET_KEY', backend_source)
+        self.assertNotIn('G8ZyYyZ0Xf5x5f6uZrwf6ft4gD0pniYAkHp/Y6f4Pv4=', frontend_source + backend_source)
+
+    def test_arbitrary_llm_provider_creation_route_is_not_mounted(self):
+        source = read_source('backend/app/admin/api/v1/llm/__init__.py')
+        self.assertNotIn('creater_router', source)
+
+    def test_legacy_sso_login_bypass_is_not_mounted(self):
+        source = read_source('backend/app/admin/api/v1/auth/__init__.py')
+        self.assertNotIn('sso_router', source)
+
+    def test_public_registration_does_not_grant_admin_permissions(self):
+        source = read_source('backend/app/admin/crud/crud_user.py')
+        self.assertNotIn("dict_obj.update({'is_superuser': True})", source)
+        self.assertIn("'is_superuser': False", source)
+
+    def test_profile_updates_enforce_resource_owner(self):
+        source = read_source('backend/app/admin/service/user_service.py')
+        self.assertGreaterEqual(source.count('request.user.username != username'), 2)
+
+    def test_model_api_keys_are_not_returned_to_the_browser(self):
+        source = read_source('backend/app/admin/schema/llm_provider_schema.py')
+        self.assertGreaterEqual(source.count("self.api_key = '********' if self.api_key else ''"), 2)
 
     def test_production_openapi_is_disabled(self):
         source = read_source('backend/core/conf.py')
         for setting in ('FASTAPI_DOCS_URL', 'FASTAPI_REDOCS_URL', 'FASTAPI_OPENAPI_URL'):
             self.assertRegex(source, rf"values\[['\"]{setting}['\"]\]\s*=\s*None")
+
+    def test_error_logging_does_not_dump_local_variables(self):
+        source = read_source('backend/common/log.py')
+        self.assertNotIn("'diagnose': True", source)
+        self.assertNotIn('diagnose=True', source)
+        self.assertNotIn('backtrace=True', source)
+
+    def test_unhandled_exceptions_are_not_returned_to_clients(self):
+        source = read_source('backend/common/exception/exception_handler.py')
+        self.assertNotIn("'msg': str(exc)", source)
+        self.assertIn("'msg': '服务暂时不可用，请稍后重试'", source)
+
+    def test_registration_maps_database_conflicts_to_business_errors(self):
+        source = read_source('backend/app/admin/service/auth_service.py')
+        self.assertIn('await db.flush()', source)
+        self.assertIn('except IntegrityError as exc:', source)
+        self.assertIn("msg='用户名、邮箱或昵称已存在'", source)
 
     def test_source_tree_has_no_high_confidence_secrets(self):
         patterns = [

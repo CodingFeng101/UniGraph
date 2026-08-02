@@ -8,23 +8,38 @@ import { getTaskNotificationPreferences } from '@/services/preferences';
 import { gsap } from 'gsap';
 
 export const TaskManager = window.TaskManager = (() => {
-  const STORAGE_KEY = 'unigraph_task_queue';
+  const LEGACY_STORAGE_KEY = 'unigraph_task_queue';
   const completionById = new Map();
   let audioContext = null;
   let tasks = load();
   const expandedTasks = new Set();
+  const renderedStepCounts = new Map();
+
+  function storageKey() {
+    const userUuid = Auth.getUserInfo()?.uuid || 'anonymous';
+    return `unigraph_task_queue:${userUuid}`;
+  }
+
+  function sanitizeKwargs(kwargs) {
+    const safe = { ...(kwargs || {}) };
+    delete safe.user_token;
+    return safe;
+  }
 
   function load() {
     try {
-      const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      return Array.isArray(value) ? value : [];
+      const value = JSON.parse(localStorage.getItem(storageKey()) || '[]');
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      return Array.isArray(value)
+        ? value.map((task) => ({ ...task, kwargs: sanitizeKwargs(task.kwargs) }))
+        : [];
     } catch (error) {
       return [];
     }
   }
 
   function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    localStorage.setItem(storageKey(), JSON.stringify(tasks));
   }
 
   function escapeHtml(value) {
@@ -179,6 +194,7 @@ export const TaskManager = window.TaskManager = (() => {
       const canRetry = !canCancel && task.state !== 'SUCCESS';
       const isOpen = expandedTasks.has(task.uid);
       const steps = getTaskSteps(task);
+      const previousStepCount = renderedStepCounts.get(task.uid) ?? steps.length;
       const title = [task.displayName, task.objectName].filter(Boolean).join(': ');
       const statusText = canCancel ? `${Math.round(progress)}%` : (task.state === 'SUCCESS' ? '完成' : stateLabel(task.state));
       const stepMarkup = steps.map((step, index) => {
@@ -188,7 +204,7 @@ export const TaskManager = window.TaskManager = (() => {
           ? `已处理 ${Math.round(Number(step.progress))}%`
           : '');
         return `
-          <div class="task-step${isLast ? ' is-latest' : ''}" style="--step-color:${color};">
+          <div class="task-step${isLast ? ' is-latest' : ''}${isLast && canCancel ? ' is-running' : ''}${index >= previousStepCount ? ' is-new' : ''}" style="--step-color:${color};">
             <span class="task-step__dot"></span>
             <div class="task-step__head">
               <span class="task-step__label">${escapeHtml(step.label)}</span>
@@ -205,7 +221,7 @@ export const TaskManager = window.TaskManager = (() => {
               ${task.state === 'SUCCESS'
                 ? '<i data-lucide="check" class="task-status-check" style="color:' + stateColor(task.state) + ';"></i>'
                 : '<span class="task-status-dot" style="background:' + stateColor(task.state) + ';"></span>'}
-              <p class="task-card__title">${escapeHtml(title || '后台任务')}</p>
+              <p class="task-card__title">${escapeHtml(title || '后台任务')}<span class="task-card__start-time">${escapeHtml(formatTaskTime(task.createdAt))}</span></p>
             </button>
             <div class="task-inline-actions">
               ${canCancel ? `<button type="button" onclick="TaskManager.pause('${escapeHtml(task.uid)}')" class="task-inline-action" title="暂停" aria-label="暂停"><i data-lucide="pause"></i></button>` : ''}
@@ -220,6 +236,7 @@ export const TaskManager = window.TaskManager = (() => {
           </div>
         </div>`;
     }).join('');
+    tasks.forEach((task) => renderedStepCounts.set(task.uid, getTaskSteps(task).length));
     window.lucide?.createIcons();
     requestAnimationFrame(() => {
       container.scrollTop = previousScrollTop;
@@ -282,7 +299,8 @@ export const TaskManager = window.TaskManager = (() => {
     task.state = status.state || task.state;
     if (task.state === 'SUCCESS' && (meta.type === 'error' || meta.error)) task.state = 'FAILURE';
     task.progress = task.state === 'SUCCESS' ? 100 : Number(meta.progress ?? task.progress ?? 0);
-    task.message = meta.message || meta.error?.message || stateLabel(task.state);
+    const errorMessage = typeof meta.error === 'string' ? meta.error : meta.error?.message;
+    task.message = meta.message || errorMessage || stateLabel(task.state);
     task.updatedAt = new Date().toLocaleString();
     if (Array.isArray(meta.logs) && meta.logs.length) {
       task.steps = meta.logs.slice(-60).map((log) => ({
@@ -304,16 +322,35 @@ export const TaskManager = window.TaskManager = (() => {
       task.steps = task.steps.slice(-60);
     } else if (Array.isArray(task.steps) && task.steps.length) {
       task.steps[task.steps.length - 1].progress = task.progress;
-      task.steps[task.steps.length - 1].time = formatTaskTime(task.updatedAt);
     }
     task.result = meta.data ?? meta.result ?? null;
     persistAndRender();
   }
 
-  async function poll(task) {
-    while (['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)) {
+  async function poll(task, taskUid = task.uid) {
+    let statusFailures = 0;
+    while (task.uid === taskUid && ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      const response = await KgBaseAPI.task.getStatus(task.uid);
+      if (task.uid !== taskUid) return null;
+      let response;
+      try {
+        response = await KgBaseAPI.task.getStatus(taskUid);
+        statusFailures = 0;
+      } catch (error) {
+        statusFailures += 1;
+        if (statusFailures < 5) continue;
+        task.state = 'FAILURE';
+        task.message = '无法获取任务状态，请检查后端服务后重试';
+        task.steps = Array.isArray(task.steps) ? task.steps : [];
+        task.steps.push({
+          label: '任务状态同步失败',
+          detail: error?.message || '网络连接异常',
+          time: formatTaskTime(new Date().toLocaleString()),
+          progress: task.progress,
+        });
+        persistAndRender();
+        throw new Error(task.message, { cause: error });
+      }
       if (response.code !== 200 || !response.data) {
         task.state = 'FAILURE';
         task.message = response.msg || '任务状态查询失败';
@@ -332,7 +369,8 @@ export const TaskManager = window.TaskManager = (() => {
   }
 
   async function submit(name, displayName, objectName, kwargs) {
-    const response = await KgBaseAPI.task.submit(name, kwargs || {});
+    const safeKwargs = sanitizeKwargs(kwargs);
+    const response = await KgBaseAPI.task.submit(name, safeKwargs);
     if (response.code !== 200 || !response.data?.task_id) {
       throw new Error(response.msg || '任务提交失败');
     }
@@ -341,7 +379,7 @@ export const TaskManager = window.TaskManager = (() => {
       name,
       displayName,
       objectName,
-      kwargs: kwargs || {},
+      kwargs: safeKwargs,
       state: 'PENDING',
       progress: 0,
       message: '任务已创建',
@@ -355,11 +393,12 @@ export const TaskManager = window.TaskManager = (() => {
     tasks.push(task);
     persistAndRender();
     notify(`${displayName}任务已提交`);
-    const completion = poll(task);
-    completionById.set(task.uid, completion);
+    const taskUid = task.uid;
+    const completion = poll(task, taskUid);
+    completionById.set(taskUid, completion);
     completion.then(
-      () => completionById.delete(task.uid),
-      () => completionById.delete(task.uid),
+      () => completionById.delete(taskUid),
+      () => completionById.delete(taskUid),
     );
     return { ...task, completion };
   }
@@ -384,7 +423,35 @@ export const TaskManager = window.TaskManager = (() => {
     if (['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)) {
       await cancel(uid);
     }
-    await submit(task.name, task.displayName, task.objectName, task.kwargs);
+    const response = await KgBaseAPI.task.submit(task.name, task.kwargs || {});
+    if (response.code !== 200 || !response.data?.task_id) {
+      throw new Error(response.msg || '任务重启失败');
+    }
+
+    const newUid = response.data.task_id;
+    const wasExpanded = expandedTasks.delete(uid);
+    completionById.delete(uid);
+    renderedStepCounts.delete(uid);
+
+    task.uid = newUid;
+    task.state = 'PENDING';
+    task.progress = 0;
+    task.message = '任务已重新启动';
+    task.createdAt = new Date().toLocaleString();
+    task.updatedAt = task.createdAt;
+    task.steps = [{ label: task.message, time: formatTaskTime(task.createdAt), progress: 0 }];
+    task.result = null;
+    task.completionNotified = false;
+    if (wasExpanded) expandedTasks.add(newUid);
+    persistAndRender();
+    notify(`${task.displayName}已重新启动`);
+
+    const completion = poll(task, newUid);
+    completionById.set(newUid, completion);
+    completion.then(
+      () => completionById.delete(newUid),
+      () => completionById.delete(newUid),
+    );
   }
 
   async function pause(uid) {
@@ -402,10 +469,6 @@ export const TaskManager = window.TaskManager = (() => {
   async function remove(uid) {
     const task = tasks.find((item) => item.uid === uid);
     if (!task) return;
-    if (typeof window.confirmAction === 'function') {
-      const confirmed = await window.confirmAction({ title: '删除任务', message: '确定要删除这条后台任务记录吗？' });
-      if (!confirmed) return;
-    }
     if (['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)) await cancel(uid);
     tasks = tasks.filter((item) => item.uid !== uid);
     expandedTasks.delete(uid);
@@ -415,11 +478,12 @@ export const TaskManager = window.TaskManager = (() => {
   function resume() {
     tasks.filter((task) => ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)).forEach((task) => {
       if (completionById.has(task.uid)) return;
-      const completion = poll(task).catch(() => null);
-      completionById.set(task.uid, completion);
+      const taskUid = task.uid;
+      const completion = poll(task, taskUid).catch(() => null);
+      completionById.set(taskUid, completion);
       completion.then(
-        () => completionById.delete(task.uid),
-        () => completionById.delete(task.uid),
+        () => completionById.delete(taskUid),
+        () => completionById.delete(taskUid),
       );
     });
   }

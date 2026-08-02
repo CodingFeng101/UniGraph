@@ -1,19 +1,16 @@
 #!/usr/bin/.env python3
 # -*- coding: utf-8 -*-
 from datetime import datetime
-from typing import TYPE_CHECKING
 
-from sqlalchemy import String
+from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from backend.app.admin.model.llm_provider_model import LlmProvider
 from backend.app.admin.model.sys_user_dept import sys_user_dept
 from backend.app.admin.model.sys_user_role import sys_user_role
 from backend.common.model import Base, id_key
 from backend.database.db_mysql import uuid4_str
 from backend.utils.timezone import timezone
-
-if TYPE_CHECKING:
-    from backend.app.admin.model.llm_provider_model import LlmProvider
 
 
 class User(Base):
@@ -36,7 +33,7 @@ class User(Base):
     phone: Mapped[str | None] = mapped_column(String(11), default=None, comment='手机号')
     join_time: Mapped[datetime] = mapped_column(init=False, default_factory=timezone.now, comment='注册时间')
     last_login_time: Mapped[datetime | None] = mapped_column(init=False, onupdate=timezone.now, comment='上次登录')
-    api_key: Mapped[str | None] = mapped_column(String(255), default=None, comment='API Key')  # 用户的API Key
+    api_key: Mapped[str | None] = mapped_column(Text, default=None, comment='加密后的旧版 API Key')
     base_url: Mapped[str | None] = mapped_column(String(255), default=None, comment='用户的基础URL')  # 用户的基础URL
     model: Mapped[str | None] = mapped_column(String(255), default=None, comment='Model')
 
@@ -49,4 +46,4 @@ class User(Base):
     )
 
     socials: Mapped[list['UserSocial']] = relationship(init=False, back_populates='user')  # noqa: F821
-    llm_models: Mapped[list['LlmProvider']] = relationship('LlmProvider', cascade='all, delete-orphan', init=False)
+    llm_models: Mapped[list[LlmProvider]] = relationship(LlmProvider, cascade='all, delete-orphan', init=False)

@@ -1,5 +1,6 @@
 import { getGraphExpansionDepth } from '@/services/preferences';
 import { renderGraphTooltipContent } from '@/utils/graphTooltip';
+import { validateUploadFiles } from '@/utils/upload';
 
 /* Generated from pages/graph-design.html; keep behavior changes in the source controller during migration. */
 export function createGraphDesignViewController() {
@@ -421,6 +422,23 @@ async function loadSchemaGraphs() {
 function populateArchDropdown(schemas) {
   var dropdown = document.getElementById('arch-dropdown-top');
   if (!dropdown) return;
+  var trigger = document.getElementById('arch-dropdown-trigger');
+  var label = trigger?.querySelector('span:nth-child(2)');
+  var dot = trigger?.querySelector('span:first-child');
+  var hasSchemas = schemas.length > 0;
+  if (trigger) {
+    trigger.disabled = !hasSchemas;
+    trigger.style.borderColor = hasSchemas ? 'var(--claude-brand-500)' : 'var(--claude-border)';
+  }
+  if (label) {
+    label.textContent = hasSchemas ? (schemas[0].name || '未命名架构') : '暂无知识架构';
+    label.style.color = hasSchemas ? 'var(--claude-foreground)' : 'var(--claude-muted-foreground)';
+  }
+  if (dot) {
+    dot.style.background = hasSchemas ? 'var(--claude-success-500)' : 'var(--claude-muted-foreground)';
+    dot.style.opacity = hasSchemas ? '1' : '0.4';
+  }
+  if (!hasSchemas) dropdown.classList.add('hidden');
   dropdown.innerHTML = '';
   schemas.forEach(function(schema, idx) {
     var isActive = idx === 0;
@@ -823,6 +841,7 @@ async function saveArchSuggestion() {
 }
 
 async function uploadFiles(files) {
+  validateUploadFiles(files);
   var paths = [];
   for (var index = 0; index < files.length; index += 1) {
     var response = await API.uploadFile(files[index]);
@@ -914,13 +933,42 @@ async function handleImportArchFile(input, shouldSubmit) {
 
 async function uploadArchFiles(files) {
   if (!files || !files.length) return;
+  var selectedFiles = Array.from(files);
+  renderArchFileList(selectedFiles, 'uploading');
   try {
-    pendingArchUpdatePaths = await uploadFiles(files);
+    pendingArchUpdatePaths = await uploadFiles(selectedFiles);
+    renderArchFileList(selectedFiles, 'uploaded');
     showToast('已上传 ' + pendingArchUpdatePaths.length + ' 个文件');
   } catch (error) {
     pendingArchUpdatePaths = [];
+    renderArchFileList([], '');
     showToast(error.message || '文件上传失败');
   }
+}
+
+function renderArchFileList(files, status) {
+  var list = document.getElementById('arch-file-list');
+  if (!list) return;
+  list.innerHTML = '';
+  list.classList.toggle('hidden', !files.length);
+  files.forEach(function(file) {
+    var item = document.createElement('div');
+    item.className = 'flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-xs';
+    item.style.cssText = 'background:var(--claude-background);border:1px solid var(--claude-border);color:var(--claude-foreground);';
+
+    var name = document.createElement('span');
+    name.className = 'min-w-0 truncate';
+    name.textContent = file.name;
+
+    var state = document.createElement('span');
+    state.className = 'shrink-0 text-[10px]';
+    state.style.color = 'var(--claude-muted-foreground)';
+    state.textContent = status === 'uploaded' ? '已上传' : '上传中...';
+
+    item.appendChild(name);
+    item.appendChild(state);
+    list.appendChild(item);
+  });
 }
 
 async function submitArchUpdate() {
@@ -953,6 +1001,9 @@ async function submitArchUpdate() {
     );
     modal.classList.add('hidden');
     pendingArchUpdatePaths = [];
+    renderArchFileList([], '');
+    var fileInput = document.getElementById('arch-file-input');
+    if (fileInput) fileInput.value = '';
     await task.completion;
     await loadSchemaDetail(currentSchemaUuid);
   } catch (error) {

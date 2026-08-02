@@ -21,6 +21,9 @@ async def build_index(
     api_key: str,
     base_url: str,
     model: str,
+    embedding_api_key: str,
+    embedding_base_url: str,
+    embedding_model: str,
     progress_callback=None,
 ) -> tuple:
     """
@@ -43,7 +46,16 @@ async def build_index(
     # 构建索引
     indexer = GraphIndexer()
     entities, community_reports = await indexer.build_index(
-        entities, relationships, level, api_key, base_url, model, progress_callback=progress_callback
+        entities,
+        relationships,
+        level,
+        api_key,
+        base_url,
+        model,
+        embedding_api_key,
+        embedding_base_url,
+        embedding_model,
+        progress_callback=progress_callback,
     )
     logger.info('索引构建成功😊')
     return entities, community_reports
@@ -59,6 +71,11 @@ async def query_kg(
     api_key: str = '',
     base_url: str = '',
     model: str = '',
+    embedding_api_key: str = '',
+    embedding_base_url: str = '',
+    embedding_model: str = '',
+    context_provider=None,
+    token_callback=None,
 ) -> tuple:
     """
     初始化搜索器
@@ -74,7 +91,19 @@ async def query_kg(
     context_builder = LocalSearchMixedContext(entities, relationships, community_reports)
     search_engine = LocalSearch(context_builder, LOCAL_SEARCH_SYSTEM_PROMPT)
     logger.info('搜索器初始化成功😊')
-    results = await search_engine.search(query, level, infer, api_key, base_url, model)
-    logger.info(f'上下文:{results}😊')
+    results = await search_engine.search(
+        query,
+        level,
+        infer,
+        api_key,
+        base_url,
+        model,
+        embedding_api_key=embedding_api_key,
+        embedding_base_url=embedding_base_url,
+        embedding_model=embedding_model,
+        context_provider=context_provider,
+        token_callback=token_callback,
+    )
+    logger.info('Knowledge graph query completed')
 
     return results, search_engine.context_text, search_engine.context_data

@@ -171,7 +171,6 @@
 
       <form v-else-if="mode === 'register'" id="register-form" class="auth-form auth-form--compact" autocomplete="off" @submit.prevent="submitRegister">
         <AuthField v-model="registerForm.username" compact input-id="register-username" label="用户名" icon="user" placeholder="请输入用户名" autocomplete="username" />
-        <AuthField v-model="registerForm.nickname" compact input-id="register-nickname" label="昵称" icon="contact-round" placeholder="请输入昵称" />
         <AuthField v-model="registerForm.email" compact input-id="register-email" label="邮箱" icon="mail" type="email" placeholder="请输入邮箱" autocomplete="email" />
         <AuthField v-model="registerForm.password" compact input-id="register-password" label="密码" icon="lock" type="password" placeholder="请输入密码" autocomplete="new-password" />
         <AuthField v-model="registerForm.confirmPassword" compact input-id="register-confirm-password" label="确认密码" icon="lock" type="password" placeholder="请再次输入密码" autocomplete="new-password" />
@@ -220,7 +219,7 @@ export default {
     rememberUsername: false,
     feedback: { message: '', success: false },
     loginForm: { username: '', password: '', captcha: '' },
-    registerForm: { username: '', nickname: '', email: '', password: '', confirmPassword: '', captcha: '' },
+    registerForm: { username: '', email: '', password: '', confirmPassword: '', captcha: '' },
     resetForm: { username: '', email: '', password: '', confirmPassword: '', captcha: '' },
   }),
   computed: {
@@ -315,7 +314,7 @@ export default {
       }
     },
     async submitRegister() {
-      const fields = ['username', 'nickname', 'email', 'password', 'confirmPassword', 'captcha'];
+      const fields = ['username', 'email', 'password', 'confirmPassword', 'captcha'];
       if (!this.validateRequired(this.registerForm, fields)) return;
       this.busy = true;
       this.feedback = { message: '', success: false };

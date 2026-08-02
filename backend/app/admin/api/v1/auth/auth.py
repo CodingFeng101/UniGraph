@@ -11,6 +11,7 @@ from backend.app.admin.schema.user import AuthLoginParam, AuthRegisterParam, Aut
 from backend.app.admin.service.auth_service import auth_service
 from backend.app.admin.service.llm_create_service import llm_create_service
 from backend.app.admin.service.user_service import user_service
+from backend.common.exception.errors import ForbiddenError
 from backend.common.rate_limit import rate_limiter
 from backend.common.response.response_schema import ResponseModel, response_base
 from backend.common.security.jwt import DependsJwtAuth
@@ -18,7 +19,12 @@ from backend.common.security.jwt import DependsJwtAuth
 router = APIRouter()
 
 
-@router.post('/login/swagger', summary='swagger 调试专用', description='用于快捷获取 token 进行 swagger 认证')
+@router.post(
+    '/login/swagger',
+    summary='swagger 调试专用',
+    description='用于快捷获取 token 进行 swagger 认证',
+    dependencies=[Depends(rate_limiter(times=5, seconds=60))],
+)
 async def swagger_login(obj: Annotated[HTTPBasicCredentials, Depends()]) -> GetSwaggerToken:
     token, user = await auth_service.swagger_login(obj=obj)
     return GetSwaggerToken(access_token=token, user=user)  # type: ignore
@@ -47,6 +53,10 @@ async def user_register(request: Request, obj: AuthRegisterParam) -> ResponseMod
 
 @router.put('/password/reset', summary='密码重置', dependencies=[Depends(rate_limiter(times=5, seconds=60))])
 async def forgetPassword(request: Request, obj: AuthResetPasswordParam) -> ResponseModel:
+    from backend.core.conf import settings
+
+    if not settings.ENABLE_PUBLIC_PASSWORD_RESET:
+        raise ForbiddenError(msg='公开密码重置未启用，请联系管理员重置密码')
     await auth_service.pwd_reset(request=request, obj=obj)
     return response_base.success(data='密码重置成功')
 

@@ -9,7 +9,6 @@ from backend.app.admin.schema.user import (
     AvatarParam,
     GetCurrentUserInfoDetail,
     GetUserInfoListDetails,
-    RegisterUserParam,
     ResetPasswordParam,
     UpdateUserDeptParam,
     UpdateUserParam,
@@ -25,12 +24,6 @@ from backend.database.db_mysql import CurrentSession
 from backend.utils.serializers import select_as_dict
 
 router = APIRouter()
-
-
-@router.post('/register', summary='注册用户')
-async def register_user(obj: RegisterUserParam) -> ResponseModel:
-    await user_service.register(obj=obj)
-    return response_base.success()
 
 
 @router.post('/add', summary='添加用户', dependencies=[DependsRBAC])
@@ -56,14 +49,14 @@ async def get_current_user(request: Request) -> ResponseModel:
     return response_base.success(data=data)
 
 
-@router.get('/uuid/{user_uuid}', summary='查看用户信息(uuid)', dependencies=[DependsJwtAuth])
+@router.get('/uuid/{user_uuid}', summary='查看用户信息(uuid)', dependencies=[DependsRBAC])
 async def get_user_by_uuid(user_uuid: Annotated[str, Path(...)]) -> ResponseModel:
     current_user = await user_service.get_userinfo_by_uuid(user_uuid=user_uuid)
     data = GetUserInfoListDetails(**select_as_dict(current_user))
     return response_base.success(data=data)
 
 
-@router.get('/{username}', summary='查看用户信息(name)', dependencies=[DependsJwtAuth])
+@router.get('/{username}', summary='查看用户信息(name)', dependencies=[DependsRBAC])
 async def get_user(username: Annotated[str, Path(...)]) -> ResponseModel:
     current_user = await user_service.get_userinfo(username=username)
     data = GetUserInfoListDetails(**select_as_dict(current_user))
@@ -120,7 +113,7 @@ async def update_avatar(request: Request, username: Annotated[str, Path(...)], a
     '',
     summary='（模糊条件）分页获取所有用户',
     dependencies=[
-        DependsJwtAuth,
+        DependsRBAC,
         DependsPagination,
     ],
 )

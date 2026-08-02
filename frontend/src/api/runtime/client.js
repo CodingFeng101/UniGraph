@@ -6,6 +6,13 @@
 import { Auth } from './auth';
 import { AppConfig } from './config';
 
+function redirectToLogin() {
+  Auth.clearToken();
+  Auth.clearUserInfo();
+  const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  window.location.replace(`${import.meta.env.BASE_URL}login?redirect=${encodeURIComponent(redirect)}`);
+}
+
 export const API = window.API = {
   /**
    * 发送请求
@@ -40,10 +47,7 @@ export const API = window.API = {
 
       // 401 未授权，跳转登录
       if (response.status === 401 && path !== '/v1/auth/login') {
-        Auth.clearToken();
-        Auth.clearUserInfo();
-        const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-        window.location.replace(`${import.meta.env.BASE_URL}login?redirect=${encodeURIComponent(redirect)}`);
+        redirectToLogin();
         return { code: 401, msg: '认证已失效，请重新登录', data: null };
       }
 
@@ -53,8 +57,14 @@ export const API = window.API = {
         return { code: 200, msg: 'success', data: blob };
       }
 
-      const data = await response.json();
-      return data;
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) return await response.json();
+      const message = (await response.text()).trim();
+      return {
+        code: response.status,
+        msg: message || (response.ok ? 'success' : `请求失败 (${response.status})`),
+        data: null,
+      };
     } catch (error) {
       console.error('API Error:', error);
       return { code: 500, msg: error.message || '网络请求失败', data: null };
@@ -104,8 +114,20 @@ export const API = window.API = {
       body: JSON.stringify({ ...body, user_token: token }),
     });
 
+    if (response.status === 401) {
+      redirectToLogin();
+      throw new Error('认证已失效，请重新登录');
+    }
+
     if (!response.ok || !response.body) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      let message = `请求失败 (${response.status})`;
+      try {
+        const errorBody = await response.json();
+        message = errorBody.msg || errorBody.detail || message;
+      } catch {
+        // Keep the status-based message when the server did not return JSON.
+      }
+      throw new Error(message);
     }
 
     const reader = response.body.getReader();
@@ -132,23 +154,19 @@ export const API = window.API = {
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
-          lines.filter((line) => line.trim()).forEach((line) => {
-            try {
-              handleMessage(JSON.parse(line));
-            } catch (e) {
-              // 忽略解析错误
-            }
-          });
-        }
-        if (buffer.trim()) {
-          try {
-            handleMessage(JSON.parse(buffer));
-          } catch (e) {
-            // 忽略
+          for (const line of lines.filter((item) => item.trim())) {
+            handleMessage(JSON.parse(line));
           }
         }
+        if (buffer.trim()) {
+          handleMessage(JSON.parse(buffer));
+        }
         if (!settled) reject(new Error('Response stream ended before completion'));
-      })();
+      })().catch((error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      });
     });
   },
 

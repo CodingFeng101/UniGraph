@@ -21,7 +21,7 @@ from backend.app.kgbase.schema.knowledge_graph import (
     KnowledgeGraphBase,
     UpdateKnowledgeGraphParam,
 )
-from backend.app.kgbase.service.llm_info_service import get_user_llm_info
+from backend.app.kgbase.service.llm_info_service import get_user_embedding_info, get_user_llm_info
 from backend.common.core_layer.interface.kg_services import create_infer_kg, create_kg
 from backend.common.core_layer.interface.query_service import build_index, query_kg
 from backend.common.core_layer.unigraph.module.sapperrag.model.model_load import (
@@ -33,7 +33,7 @@ from backend.common.core_layer.unigraph.module.sapperrag.utils import parse_json
 from backend.common.exception import errors
 from backend.common.security.jwt import superuser_verify
 from backend.core.conf import settings
-from backend.core.path_conf import STATIC_DIR, TEMP_DIR, BasePath
+from backend.core.path_conf import FILES_DIR, STATIC_DIR, TEMP_DIR
 from backend.database.db_mysql import async_db_session
 from backend.database.db_redis import redis_client
 from backend.scripts.init_data import logger
@@ -43,18 +43,22 @@ os.makedirs(PERMANENT_TEMP_DIR, exist_ok=True)
 
 
 def resolve_local_file_path(file_path: str) -> str:
-    normalized = file_path[2:] if file_path.startswith('./') else file_path
-    normalized_path = Path(os.path.normpath(normalized))
-
-    candidates = [normalized_path, Path(BasePath) / normalized_path]
-    if normalized_path.parts and normalized_path.parts[0] == 'static':
-        candidates.append(Path(STATIC_DIR) / Path(*normalized_path.parts[1:]))
-
-    for candidate in candidates:
-        if candidate.exists():
-            return str(candidate)
-
-    return str(candidates[0])
+    normalized = Path(file_path[2:] if file_path.startswith('./') else file_path)
+    if normalized.is_absolute():
+        candidate = normalized
+    elif normalized.parts and normalized.parts[0] == 'static':
+        candidate = Path(STATIC_DIR) / Path(*normalized.parts[1:])
+    elif normalized.parts and normalized.parts[0] == 'files':
+        candidate = Path(FILES_DIR) / Path(*normalized.parts[1:])
+    else:
+        raise FileNotFoundError('Uploaded file path is invalid')
+    resolved = candidate.resolve()
+    allowed_roots = (Path(STATIC_DIR).resolve(), Path(FILES_DIR).resolve())
+    if not any(resolved == root or root in resolved.parents for root in allowed_roots):
+        raise FileNotFoundError('Uploaded file is outside the managed upload directory')
+    if not resolved.is_file():
+        raise FileNotFoundError('Uploaded file does not exist')
+    return str(resolved)
 
 
 class KnowledgeGraphService:
@@ -211,7 +215,7 @@ class KnowledgeGraphService:
             )
             return {'entities': entities, 'relationships': relationships}
 
-    _lock = asyncio.Lock()  # 创建一个类级别的异步锁
+    _llm_slots = asyncio.Semaphore(settings.LLM_MAX_CONCURRENCY)
 
     @staticmethod
     async def add(*, obj: KnowledgeGraphBase) -> str:
@@ -300,7 +304,7 @@ class KnowledgeGraphService:
         model: str,
         task_client: Task,
     ) -> List[KnowledgeGraph]:
-        async with KnowledgeGraphService._lock:  # 使用异步锁确保同一时间只有一个请求被发送
+        async with KnowledgeGraphService._llm_slots:
             entities = schema.entities
             relationships = schema.relationships
             entity_map = {entity.uuid: entity for entity in entities}
@@ -358,7 +362,7 @@ class KnowledgeGraphService:
     async def infer(
         *, knowledge_graph: GetKnowledgeGraphDetail, api_key: str, base_url: str, model: str, task_client: Task
     ) -> List[KnowledgeGraph]:
-        async with KnowledgeGraphService._lock:  # 使用异步锁确保同一时间只有一个请求被发送
+        async with KnowledgeGraphService._llm_slots:
             entities = knowledge_graph.entities
             relationships = knowledge_graph.relationships
             # 创建实体映射表以便快速查找
@@ -411,6 +415,9 @@ class KnowledgeGraphService:
         api_key: str,
         base_url: str,
         model: str,
+        embedding_api_key: str,
+        embedding_base_url: str,
+        embedding_model: str,
         progress_callback=None,
     ):
         entities = [entity.to_dict() for entity in knowledge_graph.entities]
@@ -424,6 +431,9 @@ class KnowledgeGraphService:
                 api_key=api_key,
                 base_url=base_url,
                 model=model,
+                embedding_api_key=embedding_api_key,
+                embedding_base_url=embedding_base_url,
+                embedding_model=embedding_model,
                 progress_callback=progress_callback,
             )
             return {'entities': entities, 'community_reports': community_reports}
@@ -442,6 +452,11 @@ class KnowledgeGraphService:
         api_key: str,
         base_url: str,
         model: str,
+        embedding_api_key: str,
+        embedding_base_url: str,
+        embedding_model: str,
+        context_provider=None,
+        token_callback=None,
     ):
         entities = [entity.to_dict() for entity in knowledge_graph.entities]
         relationships = [relationship.to_dict() for relationship in knowledge_graph.relationships]
@@ -490,6 +505,11 @@ class KnowledgeGraphService:
                 api_key=api_key,
                 base_url=base_url,
                 model=model,
+                embedding_api_key=embedding_api_key,
+                embedding_base_url=embedding_base_url,
+                embedding_model=embedding_model,
+                context_provider=context_provider,
+                token_callback=token_callback,
             )
             return {'results': results, 'context_text': context_text, 'context_data': context_data}
 
@@ -522,13 +542,17 @@ class KnowledgeGraphService:
             return count
 
     @staticmethod
-    async def get_user_llm_info(user_token: str):
+    async def get_user_llm_info(user_token: str, model_uuid: str | None = None):
         """
         通过 user_token 查询用户的 api-key
         :param user_token: 用户 user_token
         :return: api-key 或 None
         """
-        return await get_user_llm_info(user_token=user_token)
+        return await get_user_llm_info(user_token=user_token, model_uuid=model_uuid)
+
+    @staticmethod
+    async def get_user_embedding_info(user_token: str):
+        return await get_user_embedding_info(user_token=user_token)
 
 
 knowledge_graph_service = KnowledgeGraphService()

@@ -4,14 +4,27 @@ const KEYS = {
   desktopNotifications: 'unigraph-desktop-notifications-enabled',
 };
 
+function userKey(key) {
+  const userUuid = Auth.getUserInfo()?.uuid || 'anonymous';
+  return `${key}:${userUuid}`;
+}
+
+function readValue(key) {
+  return localStorage.getItem(userKey(key)) ?? localStorage.getItem(key);
+}
+
 function readBoolean(key, fallback = false) {
-  const value = localStorage.getItem(key);
+  const value = readValue(key);
   return value == null ? fallback : value === 'true';
 }
 
+function readDepth(key, fallback = 1) {
+  const value = Number(readValue(key) ?? fallback);
+  return Math.max(1, Math.min(5, Number.isFinite(value) ? Math.round(value) : fallback));
+}
+
 export function getGraphExpansionDepth() {
-  const value = Number(localStorage.getItem(KEYS.graphExpansionDepth) || 1);
-  return Math.max(1, Math.min(5, Number.isFinite(value) ? Math.round(value) : 1));
+  return readDepth(KEYS.graphExpansionDepth);
 }
 
 export function getTaskNotificationPreferences() {
@@ -22,9 +35,9 @@ export function getTaskNotificationPreferences() {
 }
 
 export function savePreferences(preferences) {
-  localStorage.setItem(KEYS.graphExpansionDepth, String(preferences.graphExpansionDepth));
-  localStorage.setItem(KEYS.taskSound, String(Boolean(preferences.taskSound)));
-  localStorage.setItem(KEYS.desktopNotifications, String(Boolean(preferences.desktopNotifications)));
+  localStorage.setItem(userKey(KEYS.graphExpansionDepth), String(preferences.graphExpansionDepth));
+  localStorage.setItem(userKey(KEYS.taskSound), String(Boolean(preferences.taskSound)));
+  localStorage.setItem(userKey(KEYS.desktopNotifications), String(Boolean(preferences.desktopNotifications)));
   window.dispatchEvent(new CustomEvent('unigraph:preferences-changed'));
 }
-
+import { Auth } from '@/api/runtime/auth';

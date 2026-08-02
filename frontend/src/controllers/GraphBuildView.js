@@ -1,5 +1,6 @@
 import { getGraphExpansionDepth } from '@/services/preferences';
 import { renderGraphTooltipContent } from '@/utils/graphTooltip';
+import { validateUploadFiles } from '@/utils/upload';
 
 /* Generated from pages/graph-build.html; keep behavior changes in the source controller during migration. */
 export function createGraphBuildViewController() {
@@ -168,6 +169,13 @@ async function loadSchemaList() {
 function renderSchemaOptions() {
   var dropdown = document.getElementById('arch-dropdown-modal');
   if (!dropdown) return;
+  var trigger = document.getElementById('arch-modal-trigger');
+  var hasSchemas = schemaList.length > 0;
+  if (trigger) {
+    trigger.disabled = !hasSchemas;
+    trigger.style.color = hasSchemas ? 'var(--claude-foreground)' : 'var(--claude-muted-foreground)';
+  }
+  if (!hasSchemas) dropdown.classList.add('hidden');
   dropdown.innerHTML = '';
   schemaList.forEach(function(schema) {
     var item = document.createElement('div');
@@ -224,6 +232,19 @@ async function loadGraphList() {
 function renderGraphDropdown() {
   var dropdown = document.getElementById('graph-dropdown-top');
   if (!dropdown) return;
+  var trigger = document.getElementById('graph-dropdown-trigger');
+  var label = trigger?.querySelector('span:nth-child(2)');
+  var dot = trigger?.querySelector('span:first-child');
+  var hasGraphs = graphList.length > 0;
+  if (trigger) {
+    trigger.disabled = !hasGraphs;
+    trigger.style.borderColor = hasGraphs ? 'var(--claude-brand-500)' : 'var(--claude-border)';
+  }
+  if (dot) {
+    dot.style.background = hasGraphs ? 'var(--claude-success-500)' : 'var(--claude-muted-foreground)';
+    dot.style.opacity = hasGraphs ? '1' : '0.4';
+  }
+  if (!hasGraphs) dropdown.classList.add('hidden');
   var html = '';
   graphList.forEach(function(g) {
     var isActive = g.uuid === currentGraphUuid;
@@ -240,13 +261,10 @@ function renderGraphDropdown() {
     html += '</div>';
   });
   dropdown.innerHTML = html;
-  // Update top button label
-  if (currentGraphUuid) {
-    var current = graphList.find(function(g) { return g.uuid === currentGraphUuid; });
-    if (current) {
-      var label = document.querySelector('#graph-dropdown-wrapper-top > button > span:nth-child(2)');
-      if (label) label.textContent = current.name || '未命名图谱';
-    }
+  var current = graphList.find(function(g) { return g.uuid === currentGraphUuid; }) || graphList[0];
+  if (label) {
+    label.textContent = current ? (current.name || '未命名图谱') : '暂无知识图谱';
+    label.style.color = current ? 'var(--claude-foreground)' : 'var(--claude-muted-foreground)';
   }
 }
 
@@ -259,6 +277,7 @@ function onNewGraphFilesSelected(input) {
 }
 
 async function uploadGraphFiles(files) {
+  validateUploadFiles(files);
   var paths = [];
   for (var index = 0; index < files.length; index += 1) {
     var response = await API.uploadFile(files[index]);
@@ -962,6 +981,7 @@ async function submitUpdateGraph() {
   }
   var file = fileInput.files[0];
   try {
+    validateUploadFiles([file]);
     var res = await API.uploadFile(file);
     if (res.code !== 200 || !res.data || !res.data.url) {
       throw new Error(res.msg || '文件上传失败');

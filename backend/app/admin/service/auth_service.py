@@ -7,6 +7,7 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 from fastapi import HTTPException, Request, Response
 from fastapi.security import HTTPBasicCredentials
+from sqlalchemy.exc import IntegrityError
 from starlette.background import BackgroundTask, BackgroundTasks
 
 from backend.app.admin.conf import admin_settings
@@ -17,9 +18,7 @@ from backend.app.admin.schema.user import (
     AuthLoginParam,
     AuthRegisterParam,
     AuthResetPasswordParam,
-    AuthSSOLoginParam,
     RegisterUserParam,
-    SSORegisterUserParam,
 )
 from backend.app.admin.service.login_log_service import LoginLogService
 from backend.common.enums import LoginLogStatusType
@@ -40,7 +39,12 @@ from backend.database.db_redis import redis_client
 from backend.utils.timezone import timezone
 
 # 设置密钥，前端和后端需要一致
-SECRET_KEY = base64.b64decode('G8ZyYyZ0Xf5x5f6uZrwf6ft4gD0pniYAkHp/Y6f4Pv4=')  # 从 Base64 解码
+try:
+    SECRET_KEY = base64.b64decode(settings.AUTH_AES_SECRET_KEY, validate=True)
+except ValueError as exc:
+    raise RuntimeError('AUTH_AES_SECRET_KEY must be valid Base64') from exc
+if len(SECRET_KEY) != 32:
+    raise RuntimeError('AUTH_AES_SECRET_KEY must decode to exactly 32 bytes')
 
 BLOCK_SIZE = AES.block_size
 
@@ -58,8 +62,8 @@ def decrypt_data(encrypted_data: str, iv_base64: str) -> str:
         decrypted_data = unpad(cipher.decrypt(ciphertext), BLOCK_SIZE).decode('utf-8')
 
         return decrypted_data
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f'Decryption failed: {str(e)}')
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail='Invalid encrypted request data') from exc
 
 
 class AuthService:
@@ -82,6 +86,8 @@ class AuthService:
         *, request: Request, response: Response, obj: AuthLoginParam, background_tasks: BackgroundTasks
     ) -> GetLoginToken:
         async with async_db_session.begin() as db:
+            user_uuid = None
+            username = ''
             try:
                 # 解密前端加密的字段
                 obj.username = decrypt_data(obj.username, obj.username_iv)  # 使用传来的 IV 和密文解密
@@ -111,7 +117,6 @@ class AuthService:
                 task = BackgroundTask(
                     LoginLogService.create,
                     **dict(
-                        db=db,
                         request=request,
                         user_uuid=user_uuid,
                         username=username,
@@ -127,7 +132,6 @@ class AuthService:
                 background_tasks.add_task(
                     LoginLogService.create,
                     **dict(
-                        db=db,
                         request=request,
                         user_uuid=user_uuid,
                         username=username,
@@ -144,79 +148,10 @@ class AuthService:
                     max_age=settings.COOKIE_REFRESH_TOKEN_EXPIRE_SECONDS,
                     expires=timezone.f_utc(refresh_token.refresh_token_expire_time),
                     httponly=True,
+                    secure=settings.COOKIE_SECURE,
+                    samesite='lax',
                 )
                 await db.refresh(current_user)
-                data = GetLoginToken(
-                    access_token=access_token.access_token,
-                    access_token_expire_time=access_token.access_token_expire_time,
-                    user=current_user,  # type: ignore
-                )
-                return data
-
-    @staticmethod
-    async def sso_login(
-        request: Request, response: Response, obj: AuthSSOLoginParam, background_tasks: BackgroundTasks
-    ) -> GetLoginToken:
-        async with async_db_session.begin() as db:
-            try:
-                # 解密前端加密的用户名
-                obj.username = decrypt_data(obj.username, obj.username_iv)
-
-                # 获取用户信息
-                current_user = await user_dao.get_by_username(db, obj.username)
-                if not current_user:
-                    raise errors.NotFoundError(msg='用户不存在')
-                if not current_user.status:
-                    raise errors.AuthorizationError(msg='用户已被锁定, 请联系系统管理员')
-
-                # 生成令牌
-                current_user_id = current_user.id
-                access_token = await create_access_token(str(current_user_id), current_user.is_multi_login)
-                refresh_token = await create_refresh_token(str(current_user_id), current_user.is_multi_login)
-
-            except errors.NotFoundError as e:
-                raise errors.NotFoundError(msg=e.msg)
-            except errors.AuthorizationError as e:
-                background_tasks.add_task(
-                    LoginLogService.create,
-                    db=db,
-                    request=request,
-                    user_uuid=current_user.uuid if current_user else None,
-                    username=obj.username,
-                    login_time=timezone.now(),
-                    status=LoginLogStatusType.fail.value,
-                    msg=e.msg,
-                )
-                raise errors.AuthorizationError(msg=e.msg)
-            except Exception as e:
-                raise e
-            else:
-                # 记录登录日志
-                background_tasks.add_task(
-                    LoginLogService.create,
-                    db=db,
-                    request=request,
-                    user_uuid=current_user.uuid,
-                    username=current_user.username,
-                    login_time=timezone.now(),
-                    status=LoginLogStatusType.success.value,
-                    msg='SSO 登录成功',
-                )
-
-                # 设置 Refresh Token 到 Cookie
-                response.set_cookie(
-                    key=settings.COOKIE_REFRESH_TOKEN_KEY,
-                    value=refresh_token.refresh_token,
-                    max_age=settings.COOKIE_REFRESH_TOKEN_EXPIRE_SECONDS,
-                    expires=timezone.f_utc(refresh_token.refresh_token_expire_time),
-                    httponly=True,
-                )
-
-                # 更新用户登录时间
-                await user_dao.update_login_time(db, obj.username)
-                await db.refresh(current_user)
-
-                # 返回登录凭证
                 data = GetLoginToken(
                     access_token=access_token.access_token,
                     access_token_expire_time=access_token.access_token_expire_time,
@@ -243,11 +178,15 @@ class AuthService:
                 username = await user_dao.get_by_username(db, obj.username)
                 if username:
                     raise errors.ForbiddenError(msg='用户已注册')
-                obj.nickname = obj.nickname if obj.nickname else f'#{random.randrange(10000, 88888)}'
-
-                # nickname = await user_dao.get_by_nickname(db, obj.nickname)
-                # if nickname:
-                #     raise errors.ForbiddenError(msg='昵称已注册')
+                obj.nickname = obj.nickname or obj.username
+                if await user_dao.get_by_nickname(db, obj.nickname):
+                    for _ in range(10):
+                        candidate = f'{obj.username[:14]}#{random.randrange(10000, 100000)}'
+                        if not await user_dao.get_by_nickname(db, candidate):
+                            obj.nickname = candidate
+                            break
+                    else:
+                        raise errors.ForbiddenError(msg='无法生成可用昵称，请重试')
                 email = await user_dao.check_email(db, obj.email)
                 if email:
                     raise errors.ForbiddenError(msg='邮箱已注册')
@@ -260,45 +199,10 @@ class AuthService:
                 # 临时增加超级管理员权限
                 user_param = RegisterUserParam(**obj_dict)
                 await user_dao.create(db, user_param)
+                await db.flush()
 
-            except errors.NotFoundError as e:
-                raise errors.NotFoundError(msg=e.msg)
-
-    @staticmethod
-    async def sso_register(
-        request: Request,
-        obj: SSORegisterUserParam,
-    ):
-        async with async_db_session.begin() as db:
-            try:
-                # 解密用户名和昵称
-                obj.username = decrypt_data(obj.username, obj.username_iv)
-                obj.nickname = decrypt_data(obj.nickname, obj.nickname_iv)
-
-                # 设置密码与用户名相同
-                obj.password = obj.username[-6:].zfill(6)
-
-                # 设置邮箱为 username + @jxnu.edu.cn
-                obj.email = f'{obj.username}@jxnu.edu.cn'
-                email = await user_dao.check_email(db, obj.email)
-                if email:
-                    raise errors.ForbiddenError(msg='邮箱已注册')
-
-                # 检查用户名是否已注册
-                existing_user = await user_dao.get_by_username(db, obj.username)
-                if existing_user:
-                    raise errors.ForbiddenError(msg='用户已注册')
-                # 构造注册用户参数（去掉验证码和邮箱的 IV 字段）
-                obj_dict = obj.dict(exclude={'captcha', 'captcha_iv', 'email_iv'})
-                obj_dict['password'] = obj.password
-                obj_dict['email'] = obj.email
-                user_param = RegisterUserParam(**obj_dict)
-
-                # 创建用户
-                await user_dao.create(db, user_param)
-
-                return {'message': '注册成功'}
-
+            except IntegrityError as exc:
+                raise errors.ForbiddenError(msg='用户名、邮箱或昵称已存在') from exc
             except errors.NotFoundError as e:
                 raise errors.NotFoundError(msg=e.msg)
 
@@ -364,6 +268,8 @@ class AuthService:
                 max_age=settings.COOKIE_REFRESH_TOKEN_EXPIRE_SECONDS,
                 expires=timezone.f_utc(new_token.new_refresh_token_expire_time),
                 httponly=True,
+                secure=settings.COOKIE_SECURE,
+                samesite='lax',
             )
             data = GetNewToken(
                 access_token=new_token.new_access_token,

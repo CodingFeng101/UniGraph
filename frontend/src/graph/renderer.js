@@ -146,13 +146,13 @@ export const GraphRenderer = window.GraphRenderer = {
       };
     } else {
       return {
-        name: 'dagre',
-        nodeSep: 80,
-        edgeSep: 20,
-        rankSep: 120,
-        rankDir: 'TB',
-        ranker: 'longest-path',
-        animate: true,
+        name: 'fcose',
+        quality: 'draft',
+        randomize: true,
+        idealEdgeLength: 120,
+        nodeRepulsion: 7000,
+        avoidOverlap: true,
+        animate: false,
         fit: true,
         padding: 50,
         nodeDimensionsIncludeLabels: true,

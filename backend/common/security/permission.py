@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from fastapi import Request
 
-from backend.common.exception.errors import ServerError
+from backend.common.exception.errors import ServerError, TokenError
 from backend.core.conf import settings
 
 
@@ -19,6 +19,8 @@ class RequestPermission:
         self.value = value
 
     async def __call__(self, request: Request):
+        if not request.auth.scopes:
+            raise TokenError
         if settings.PERMISSION_MODE == 'role-menu':
             if not isinstance(self.value, str):
                 raise ServerError

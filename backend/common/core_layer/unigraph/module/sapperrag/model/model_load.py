@@ -1,10 +1,13 @@
 import json
+import logging
 
 import pandas as pd
 
 from ..model.community import Community
 from ..model.entity import Entity
 from ..model.relationship import Relationship
+
+logger = logging.getLogger(__name__)
 
 
 def load_entities(csv_file_path: str = None, communities=None, entities=None, df: pd.DataFrame = None) -> list:
@@ -38,8 +41,8 @@ def load_entities(csv_file_path: str = None, communities=None, entities=None, df
                         else row.get('attributes_embedding', []),
                     )
                 )
-        except json.JSONDecodeError as e:
-            print(f'JSONDecodeError: {e}')
+        except json.JSONDecodeError:
+            logger.warning('Skipped entity rows with invalid JSON', exc_info=True)
 
         return dataclass_list
     # 这种情况主要是为了存入社区与社区内实体的对应关系

@@ -66,7 +66,6 @@ class OAuth2Service:
             await user_dao.update_login_time(db, sys_user.username)
             await db.refresh(sys_user)
             login_log = dict(
-                db=db,
                 request=request,
                 user_uuid=sys_user.uuid,
                 username=sys_user.username,
@@ -82,6 +81,8 @@ class OAuth2Service:
                 max_age=settings.COOKIE_REFRESH_TOKEN_EXPIRE_SECONDS,
                 expires=timezone.f_utc(refresh_token.refresh_token_expire_time),
                 httponly=True,
+                secure=settings.COOKIE_SECURE,
+                samesite='lax',
             )
             data = GetLoginToken(
                 access_token=access_token.access_token,

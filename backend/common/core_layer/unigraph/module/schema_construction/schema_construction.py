@@ -1,6 +1,3 @@
-import asyncio
-import json
-import os
 from pathlib import Path
 
 from jinja2 import Template
@@ -64,6 +61,9 @@ class SchemaConstruction:
         api_key: str,
         base_url: str,
         model: str,
+        embedding_api_key: str,
+        embedding_base_url: str,
+        embedding_model: str,
         progress_callback=None,
     ) -> object:
         # 输入参数
@@ -72,7 +72,6 @@ class SchemaConstruction:
         # 3. info:字典形式为{"add_entity": [], "del_entity": []}，每个列表中填相应的增删类别
         # 将新的增删信息添加到总的增删信息中
         chunks = SchemaConstruction.file_load(file_path_list)
-        print(chunks)
         # 过滤掉空的文本块
         filter_chunks = [chunk for chunk in chunks if chunk]
         # 判断输入文本是中文还是英文
@@ -81,7 +80,18 @@ class SchemaConstruction:
         processed_texts = 0
         for chunk in filter_chunks:
             for text in chunk:
-                await self.extract_kg_schema(text, aim, directional_suggestion, language, api_key, base_url, model)
+                await self.extract_kg_schema(
+                    text,
+                    aim,
+                    directional_suggestion,
+                    language,
+                    api_key,
+                    base_url,
+                    model,
+                    embedding_api_key,
+                    embedding_base_url,
+                    embedding_model,
+                )
                 processed_texts += 1
                 if progress_callback:
                     progress_callback('extract', processed_texts, total_texts, len(self.kg_schema))
@@ -89,7 +99,7 @@ class SchemaConstruction:
         self.kg_schema = deduplicate_schema(self.kg_schema)
         # 过滤掉 source 为空字典的元素
         self.kg_schema = [i for i in self.kg_schema if i.get('source') != {}]
-        definition_total = len(self.entity_type_dict) + len(self.relationship_type_list)
+        definition_total = len(self.entity_type_dict) + len(self.relation_type_dict)
         if progress_callback:
             progress_callback('definitions', 0, definition_total, len(self.kg_schema))
         await self.type_definition(language, api_key=api_key, base_url=base_url, model=model)
@@ -150,7 +160,19 @@ class SchemaConstruction:
             # 解析响应并更新定义
             self.definition.update(extract_definition(relation_type_define_response))
 
-    async def extract_kg_schema(self, text, aim, directional_suggestion, language, api_key, base_url, model: str):
+    async def extract_kg_schema(
+        self,
+        text,
+        aim,
+        directional_suggestion,
+        language,
+        api_key,
+        base_url,
+        model: str,
+        embedding_api_key: str,
+        embedding_base_url: str,
+        embedding_model: str,
+    ):
         extract_triples_from_text_prompt = Template(self.load_prompt('extract_triples_from_text_agent.txt'))
 
         # 第一次调用大模型
@@ -178,7 +200,13 @@ class SchemaConstruction:
             self.entity_type_dict = get_new_entity_types_from_response(response=entity_classify_response)
         else:
             temp_entity_type_dict = get_new_entity_types_from_response(response=entity_classify_response)
-            self.entity_type_dict = await merge_type_dicts_with_semantic(self.entity_type_dict, temp_entity_type_dict)
+            self.entity_type_dict = await merge_type_dicts_with_semantic(
+                self.entity_type_dict,
+                temp_entity_type_dict,
+                embedding_api_key=embedding_api_key,
+                embedding_base_url=embedding_base_url,
+                embedding_model=embedding_model,
+            )
 
         relation_classify_prompt = Template(self.load_prompt('relation_classify_agent.txt'))
         relation_classify_prompt = relation_classify_prompt.render(relation_string=relation_string, language=language)
@@ -190,7 +218,11 @@ class SchemaConstruction:
         else:
             temp_relation_type_dict = get_new_relationship_types_from_response(response=relation_classify_response)
             self.relation_type_dict = await merge_type_dicts_with_semantic(
-                self.relation_type_dict, temp_relation_type_dict
+                self.relation_type_dict,
+                temp_relation_type_dict,
+                embedding_api_key=embedding_api_key,
+                embedding_base_url=embedding_base_url,
+                embedding_model=embedding_model,
             )
         entity_type_string = '，'.join(self.entity_type_dict.keys())
         attribute_reasoning_prompt = Template(self.load_prompt('attribute_reasoning.txt'))
@@ -206,43 +238,3 @@ class SchemaConstruction:
             Triple_source_dict, self.entity_type_dict, self.relation_type_dict, entity_type_attribute_dict
         )
         self.kg_schema.extend(kg_schema)
-
-
-if __name__ == '__main__':
-    # 创建SchemaConstruction实例（需确保已正确导入该类）
-    extractor = SchemaConstruction(kg_schema=[], definition={})
-
-    # 定义异步测试函数
-    async def run_extraction():
-        # 调用异步提取函数
-        kg_schema, definition = await extractor.extract_from_path(
-            api_key=os.getenv('OPENAI_API_KEY', ''),
-            base_url='https://api.rcouyi.com/v1',
-            file_path_list=[r'test_input\text1.txt'],
-            aim='提取实体',
-            info={'add_entity': [], 'del_entity': []},
-            directional_suggestion='重点关注硬件相关实体',
-            model='gpt-4.1',
-        )
-
-        # 打印结果
-        print('-----------------------------------------')
-        print(f'kgschema:{kg_schema}')
-        print(f'definition:{definition}')
-
-        # 保存结果到JSON文件
-        with open(
-            r'backend\common\core_layer\unigraph\module\schema_construction\test_output\kg_schema.json',
-            'w',
-            encoding='utf-8',
-        ) as file:
-            json.dump(kg_schema, file, ensure_ascii=False, indent=4)
-        with open(
-            r'backend\common\core_layer\unigraph\module\schema_construction\test_output\definition.json',
-            'w',
-            encoding='utf-8',
-        ) as file:
-            json.dump(definition, file, ensure_ascii=False, indent=4)
-
-    # 运行异步测试函数
-    asyncio.run(run_extraction())

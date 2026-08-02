@@ -1,4 +1,6 @@
 /* Generated from pages/kb-list.html; keep behavior changes in the source controller during migration. */
+import { MAX_IMAGE_SIZE, validateUploadSize } from '@/utils/upload';
+
 export function createKnowledgeBaseListViewController() {
   const { API, AppConfig, Auth, KgBaseAPI } = window;
 
@@ -52,8 +54,10 @@ export function createKnowledgeBaseListViewController() {
       input.value = '';
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('封面图片不能超过 5 MB');
+    try {
+      validateUploadSize(file, MAX_IMAGE_SIZE);
+    } catch (error) {
+      showToast(error.message);
       input.value = '';
       return;
     }

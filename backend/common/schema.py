@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, validate_email
+from pydantic import BaseModel, ConfigDict, EmailStr, validate_email
 from pydantic_extra_types.phone_numbers import PhoneNumber
 
 # 自定义验证错误信息不包含验证预期内容（也就是输入内容），受支持的预期内容字段参考以下链接
@@ -151,17 +151,12 @@ class CustomEmailStr(EmailStr):
 
 
 class SchemaBase(BaseModel):
-    class Config:
-        orm_model = True
-        from_attributes = True
-        use_enum_values = True
-
-    # model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
     # 定义一个方法来处理 datetime 类型的字段
     def to_dict(self):
         # 将所有 datetime 字段转换为字符串格式（可以使用 ISO 8601 格式）
-        data = self.dict()  # 将 Pydantic 模型转化为字典
+        data = self.model_dump()
         if isinstance(data['created_time'], datetime):
             data['created_time'] = data['created_time'].isoformat()  # 转换为 ISO 格式
         if isinstance(data['updated_time'], datetime):

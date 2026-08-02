@@ -5,13 +5,19 @@ x-app-environment: &app-environment
   MYSQL_USER: ${MYSQL_USER:-root}
   MYSQL_PASSWORD: ${MYSQL_PASSWORD}
   MYSQL_DATABASE: ${MYSQL_DATABASE}
+  MYSQL_POOL_SIZE: ${MYSQL_POOL_SIZE:-10}
+  MYSQL_MAX_OVERFLOW: ${MYSQL_MAX_OVERFLOW:-20}
+  MYSQL_POOL_TIMEOUT: ${MYSQL_POOL_TIMEOUT:-30}
   REDIS_HOST: redis
   REDIS_PORT: 6379
   REDIS_PASSWORD: ${REDIS_PASSWORD:-}
   REDIS_DATABASE: ${REDIS_DATABASE:-0}
   TOKEN_SECRET_KEY: ${TOKEN_SECRET_KEY}
+  AUTH_AES_SECRET_KEY: ${AUTH_AES_SECRET_KEY}
+  LLM_API_KEY_ENCRYPTION_KEY: ${LLM_API_KEY_ENCRYPTION_KEY:-}
   OPERA_LOG_ENCRYPT_SECRET_KEY: ${OPERA_LOG_ENCRYPT_SECRET_KEY}
   JXNU_AES_SECRET_KEY: ${JXNU_AES_SECRET_KEY:-}
+  JXNU_USER_INFO_URL: ${JXNU_USER_INFO_URL:-https://ai.jxselab.com/tsp/v1/sys/users/me}
   OAUTH2_GITHUB_CLIENT_ID: ${OAUTH2_GITHUB_CLIENT_ID:-test}
   OAUTH2_GITHUB_CLIENT_SECRET: ${OAUTH2_GITHUB_CLIENT_SECRET:-test}
   OAUTH2_LINUX_DO_CLIENT_ID: ${OAUTH2_LINUX_DO_CLIENT_ID:-test}
@@ -20,8 +26,17 @@ x-app-environment: &app-environment
   CELERY_BACKEND_REDIS_DATABASE: ${CELERY_BACKEND_REDIS_DATABASE:-2}
   EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
   OPENAI_API_KEY: ${OPENAI_API_KEY}
-  SSO_USER_INFO_URL: ${SSO_USER_INFO_URL:-http://backend:8000/knowg/v1/sys/users/me}
   INDEX_EXPORT_URL_ROOT: ${INDEX_EXPORT_URL_ROOT:-http://backend:8000/knowg/v1/knowledge/ask}
+  CHAT_CONTEXT_RECENT_TURNS: ${CHAT_CONTEXT_RECENT_TURNS:-8}
+  CHAT_CONTEXT_COMPRESSION_THRESHOLD_TOKENS: ${CHAT_CONTEXT_COMPRESSION_THRESHOLD_TOKENS:-6000}
+  CHAT_CONTEXT_TRIGGER_RATIO: ${CHAT_CONTEXT_TRIGGER_RATIO:-0.7}
+  CHAT_CONTEXT_SUMMARY_MAX_TOKENS: ${CHAT_CONTEXT_SUMMARY_MAX_TOKENS:-1500}
+  CHAT_CONTEXT_DEFAULT_MODEL_LIMIT: ${CHAT_CONTEXT_DEFAULT_MODEL_LIMIT:-128000}
+  CHAT_CONTEXT_MODEL_LIMITS: '${CHAT_CONTEXT_MODEL_LIMITS:-{"gpt-5":400000,"gpt-4.1":1000000,"gpt-4o":128000,"o1":200000,"o3":200000,"claude":200000,"deepseek":128000,"gemini":1000000}}'
+  LLM_MAX_CONCURRENCY: ${LLM_MAX_CONCURRENCY:-8}
+  ALLOW_PRIVATE_LLM_ENDPOINTS: ${ALLOW_PRIVATE_LLM_ENDPOINTS:-false}
+  ENABLE_PUBLIC_PASSWORD_RESET: ${ENABLE_PUBLIC_PASSWORD_RESET:-false}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
   UNIGRAPH_RUNTIME_DIR: /app/var
 
 x-app-volumes: &app-volumes
@@ -84,6 +99,19 @@ services:
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes: *app-volumes
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/knowg/v1/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 30s
 
   celery:
     build:
@@ -97,13 +125,15 @@ services:
         condition: service_healthy
     environment: *app-environment
     volumes: *app-volumes
+    stop_grace_period: 60s
 
   frontend:
     build:
       context: .
       dockerfile: deploy/docker/frontend.Dockerfile
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       NGINX_BACKEND_HOST: backend
       NGINX_BACKEND_PORT: 8000
@@ -111,8 +141,15 @@ services:
       VITE_API_BASE_URL: ${FRONTEND_VITE_API_BASE_URL:-/knowg}
       VITE_SHOW_IMAGE_API: ${FRONTEND_VITE_SHOW_IMAGE_API:-/knowg/v1/image/}
       VITE_USER_INFO_SSO_URL: ${FRONTEND_VITE_USER_INFO_SSO_URL:-/knowg/v1/sys/users/me}
+      VITE_AUTH_AES_SECRET_KEY: ${AUTH_AES_SECRET_KEY}
     ports:
       - "${FRONTEND_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
 volumes:
   mysql_data:

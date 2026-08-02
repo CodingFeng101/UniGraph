@@ -16,7 +16,7 @@ from backend.app.kgbase.crud.crud_schema_graph import schema_graph_dao
 from backend.app.kgbase.model import SchemaGraph
 from backend.app.kgbase.schema import GetSchemaGraphDetail
 from backend.app.kgbase.schema.schema_graph import SchemaGraphBase, UpdateSchemaGraphBase
-from backend.app.kgbase.service.llm_info_service import get_user_llm_info
+from backend.app.kgbase.service.llm_info_service import get_user_embedding_info, get_user_llm_info
 from backend.common.core_layer.interface.kgschema_service import (
     create_schema,
     suggestion_generation,
@@ -25,7 +25,7 @@ from backend.common.core_layer.interface.kgschema_service import (
 from backend.common.exception import errors
 from backend.common.security.jwt import superuser_verify
 from backend.core.conf import settings
-from backend.core.path_conf import STATIC_DIR, TEMP_DIR, BasePath
+from backend.core.path_conf import FILES_DIR, STATIC_DIR, TEMP_DIR
 from backend.database.db_mysql import async_db_session
 from backend.database.db_redis import redis_client
 
@@ -34,22 +34,26 @@ os.makedirs(PERMANENT_TEMP_DIR, exist_ok=True)
 
 
 def resolve_local_file_path(file_path: str) -> str:
-    normalized = file_path[2:] if file_path.startswith('./') else file_path
-    normalized_path = Path(os.path.normpath(normalized))
-
-    candidates = [normalized_path, Path(BasePath) / normalized_path]
-    if normalized_path.parts and normalized_path.parts[0] == 'static':
-        candidates.append(Path(STATIC_DIR) / Path(*normalized_path.parts[1:]))
-
-    for candidate in candidates:
-        if candidate.exists():
-            return str(candidate)
-
-    return str(candidates[0])
+    normalized = Path(file_path[2:] if file_path.startswith('./') else file_path)
+    if normalized.is_absolute():
+        candidate = normalized
+    elif normalized.parts and normalized.parts[0] == 'static':
+        candidate = Path(STATIC_DIR) / Path(*normalized.parts[1:])
+    elif normalized.parts and normalized.parts[0] == 'files':
+        candidate = Path(FILES_DIR) / Path(*normalized.parts[1:])
+    else:
+        raise FileNotFoundError('Uploaded file path is invalid')
+    resolved = candidate.resolve()
+    allowed_roots = (Path(STATIC_DIR).resolve(), Path(FILES_DIR).resolve())
+    if not any(resolved == root or root in resolved.parents for root in allowed_roots):
+        raise FileNotFoundError('Uploaded file is outside the managed upload directory')
+    if not resolved.is_file():
+        raise FileNotFoundError('Uploaded file does not exist')
+    return str(resolved)
 
 
 class SchemaGraphService:
-    _lock = asyncio.Lock()
+    _llm_slots = asyncio.Semaphore(settings.LLM_MAX_CONCURRENCY)
 
     @staticmethod
     async def add(*, obj: SchemaGraphBase) -> str:
@@ -121,9 +125,12 @@ class SchemaGraphService:
         api_key: str,
         base_url: str,
         model: str,
+        embedding_api_key: str,
+        embedding_base_url: str,
+        embedding_model: str,
         progress_callback=None,
     ):
-        async with SchemaGraphService._lock:
+        async with SchemaGraphService._llm_slots:
             file_locations: list[str] = []
             request_temp_dir = os.path.join(PERMANENT_TEMP_DIR, str(uuid4()))
             os.makedirs(request_temp_dir, exist_ok=True)
@@ -141,6 +148,9 @@ class SchemaGraphService:
                     api_key=api_key,
                     base_url=base_url,
                     model=model,
+                    embedding_api_key=embedding_api_key,
+                    embedding_base_url=embedding_base_url,
+                    embedding_model=embedding_model,
                     progress_callback=progress_callback,
                 )
             finally:
@@ -156,9 +166,12 @@ class SchemaGraphService:
         api_key: str,
         base_url: str,
         model: str,
+        embedding_api_key: str,
+        embedding_base_url: str,
+        embedding_model: str,
         progress_callback=None,
     ):
-        async with SchemaGraphService._lock:
+        async with SchemaGraphService._llm_slots:
             entities = [
                 {
                     'name': entity.name,
@@ -235,6 +248,9 @@ class SchemaGraphService:
                     api_key=api_key,
                     base_url=base_url,
                     model=model,
+                    embedding_api_key=embedding_api_key,
+                    embedding_base_url=embedding_base_url,
+                    embedding_model=embedding_model,
                     progress_callback=progress_callback,
                 )
             finally:
@@ -251,13 +267,17 @@ class SchemaGraphService:
         base_url: str,
         model: str,
     ):
-        async with SchemaGraphService._lock:
+        async with SchemaGraphService._llm_slots:
             info = json.loads(modify_info)
             return await suggestion_generation(info, pre_suggestion, api_key, base_url, model)
 
     @staticmethod
     async def get_user_llm_info(user_token: str):
         return await get_user_llm_info(user_token=user_token)
+
+    @staticmethod
+    async def get_user_embedding_info(user_token: str):
+        return await get_user_embedding_info(user_token=user_token)
 
 
 schema_graph_service = SchemaGraphService()

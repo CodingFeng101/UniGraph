@@ -1,571 +1,394 @@
 <template>
-  <div class="h-screen overflow-hidden min-h-0">
-<AppSidebar active="app" />
+  <div class="docs-page min-h-[100dvh] overflow-hidden">
+    <AppSidebar active="app" />
+    <AppSearchDialog />
 
-<AppSearchDialog />
+    <div id="app-main" class="docs-layout transition-all duration-300" style="margin-left:260px;">
+      <aside class="docs-nav" aria-label="技术文档章节">
+        <div class="docs-nav__head">
+          <span class="docs-nav__eyebrow">Architecture</span>
+          <strong>技术架构</strong>
+          <span>从资料到可引用答案</span>
+        </div>
+        <nav>
+          <a
+            v-for="heading in navigationHeadings"
+            :key="heading.id"
+            :href="`#${heading.id}`"
+            :class="[
+              'docs-nav__link',
+              `docs-nav__link--level-${heading.level}`,
+              { 'is-active': heading.level === 2 ? activeModuleId === heading.id : activeHeading === heading.id },
+            ]"
+            @click="handleNavigation($event, heading)"
+          >
+            {{ heading.text }}
+          </a>
+        </nav>
+      </aside>
 
-<!-- MAIN CONTENT AREA -->
-<div id="app-main" class="flex h-screen min-h-0 transition-all duration-300" style="margin-left:260px;">
+      <main ref="scrollRegion" class="docs-main" data-scroll-region="primary">
+        <header class="docs-hero">
+          <div class="docs-hero__copy">
+            <span class="docs-hero__eyebrow">技术文档 · 系统架构</span>
+            <h1>UniGraph 技术架构</h1>
+            <p>说明资料接入、知识建模、图谱构建、混合检索和可引用问答的实现链路，并对应到当前代码模块。</p>
+          </div>
+          <div class="docs-hero__meta" aria-label="技术栈">
+            <span>Vue 3</span><span>FastAPI</span><span>Celery</span><span>GraphRAG</span>
+          </div>
+          <div class="runtime-path" aria-label="运行链路">
+            <div><small>01</small><strong>资料接入</strong><span>文档与结构化数据</span></div>
+            <i aria-hidden="true"></i>
+            <div><small>02</small><strong>知识建模</strong><span>Schema 与图谱</span></div>
+            <i aria-hidden="true"></i>
+            <div><small>03</small><strong>混合检索</strong><span>实体、关系与社区</span></div>
+            <i aria-hidden="true"></i>
+            <div><small>04</small><strong>引用回答</strong><span>索引定位证据</span></div>
+          </div>
+        </header>
 
-  <!-- Zone 1: Doc Navigation Sidebar (220px) -->
-  <nav class="w-[220px] shrink-0 border-r flex flex-col h-full overflow-hidden" style="background:var(--claude-card);border-color:var(--claude-border);">
-    <!-- Search -->
-    <div class="p-3 pb-2">
-      <div class="relative">
-        <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--claude-muted-foreground);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" placeholder="搜索文档..." class="w-full pl-8 pr-3 py-[7px] rounded-lg text-[13px] outline-none transition-colors" style="background:var(--claude-background);border:1px solid var(--claude-border);color:var(--claude-foreground);font-family:var(--claude-font-sans);" onfocus="this.style.borderColor='var(--claude-ring)'" onblur="this.style.borderColor='var(--claude-border)'">
-      </div>
+        <label class="docs-mobile-module">
+          <span>当前模块</span>
+          <select v-model="activeModuleId" @change="selectModule(activeModuleId)">
+            <option v-for="module in modules" :key="module.id" :value="module.id">{{ module.text }}</option>
+          </select>
+        </label>
+
+        <article ref="article" class="technical-doc" v-html="renderedDocument"></article>
+        <TaskCenter />
+      </main>
     </div>
 
-    <!-- Doc categories -->
-    <div class="flex-1 overflow-y-auto px-2 py-1" style="scrollbar-width:thin;">
-      <!-- 快速开始 -->
-      <div class="mb-4">
-        <button @click="$event.currentTarget.nextElementSibling.classList.toggle('hidden');$event.currentTarget.querySelector('.chevron').classList.toggle('rotate-90')" class="flex items-center gap-1.5 w-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] cursor-pointer" style="color:var(--claude-muted-foreground);background:none;border:none;font-family:var(--claude-font-sans);">
-          <svg class="chevron transition-transform rotate-90" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg>
-          快速开始
-        </button>
-        <div class="mt-0.5 space-y-0.5">
-          <a href="#" @click="selectDocNav($event.currentTarget)" class="doc-nav-item flex items-center gap-2 px-2 py-[5px] rounded-md text-[13px] transition-colors cursor-pointer hover:opacity-80" style="color:var(--claude-muted-foreground);">
-            安装与部署指南
-          </a>
-          <a href="#" @click="selectDocNav($event.currentTarget)" class="doc-nav-item flex items-center gap-2 px-2 py-[5px] rounded-md text-[13px] transition-colors cursor-pointer hover:opacity-80" style="color:var(--claude-muted-foreground);">
-            第一个知识图谱
-          </a>
-          <a href="#" @click="selectDocNav($event.currentTarget)" class="doc-nav-item flex items-center gap-2 px-2 py-[5px] rounded-md text-[13px] transition-colors cursor-pointer hover:opacity-80" style="color:var(--claude-muted-foreground);">
-            API 快速上手
-          </a>
-        </div>
-      </div>
-
-      <!-- API 参考 -->
-      <div class="mb-4">
-        <button @click="$event.currentTarget.nextElementSibling.classList.toggle('hidden');$event.currentTarget.querySelector('.chevron').classList.toggle('rotate-90')" class="flex items-center gap-1.5 w-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] cursor-pointer" style="color:var(--claude-muted-foreground);background:none;border:none;font-family:var(--claude-font-sans);">
-          <svg class="chevron transition-transform rotate-90" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg>
-          API 参考
-        </button>
-        <div class="mt-0.5 space-y-0.5">
-          <a href="#" @click="selectDocNav($event.currentTarget)" class="doc-nav-item flex items-center gap-2 px-2 py-[5px] rounded-md text-[13px] transition-colors cursor-pointer font-medium" style="background:var(--claude-accent);color:var(--claude-foreground);">
-            知识架构 API
-          </a>
-          <a href="#" @click="selectDocNav($event.currentTarget)" class="doc-nav-item flex items-center gap-2 px-2 py-[5px] rounded-md text-[13px] transition-colors cursor-pointer hover:opacity-80" style="color:var(--claude-muted-foreground);">
-            知识图谱 API
-          </a>
-          <a href="#" @click="selectDocNav($event.currentTarget)" class="doc-nav-item flex items-center gap-2 px-2 py-[5px] rounded-md text-[13px] transition-colors cursor-pointer hover:opacity-80" style="color:var(--claude-muted-foreground);">
-            问答检索 API
-          </a>
-          <a href="#" @click="selectDocNav($event.currentTarget)" class="doc-nav-item flex items-center gap-2 px-2 py-[5px] rounded-md text-[13px] transition-colors cursor-pointer hover:opacity-80" style="color:var(--claude-muted-foreground);">
-            任务队列 API
-          </a>
-        </div>
-      </div>
-
-      <!-- 使用指南 -->
-      <div class="mb-4">
-        <button @click="$event.currentTarget.nextElementSibling.classList.toggle('hidden');$event.currentTarget.querySelector('.chevron').classList.toggle('rotate-90')" class="flex items-center gap-1.5 w-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] cursor-pointer" style="color:var(--claude-muted-foreground);background:none;border:none;font-family:var(--claude-font-sans);">
-          <svg class="chevron transition-transform rotate-90" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg>
-          使用指南
-        </button>
-        <div class="mt-0.5 space-y-0.5">
-          <a href="#" @click="selectDocNav($event.currentTarget)" class="doc-nav-item flex items-center gap-2 px-2 py-[5px] rounded-md text-[13px] transition-colors cursor-pointer hover:opacity-80" style="color:var(--claude-muted-foreground);">
-            架构设计最佳实践
-          </a>
-          <a href="#" @click="selectDocNav($event.currentTarget)" class="doc-nav-item flex items-center gap-2 px-2 py-[5px] rounded-md text-[13px] transition-colors cursor-pointer hover:opacity-80" style="color:var(--claude-muted-foreground);">
-            知识推理配置指南
-          </a>
-          <a href="#" @click="selectDocNav($event.currentTarget)" class="doc-nav-item flex items-center gap-2 px-2 py-[5px] rounded-md text-[13px] transition-colors cursor-pointer hover:opacity-80" style="color:var(--claude-muted-foreground);">
-            索引优化指南
-          </a>
-        </div>
-      </div>
-    </div>
-  </nav>
-
-  <!-- Zone 2: Content Area (flex-1) -->
-  <main class="flex-1 min-w-0 h-full overflow-y-auto" style="background:var(--claude-background);" data-scroll-region="primary">
-    <div class="flex min-h-full">
-
-      <!-- Content + inline TOC wrapper -->
-      <div class="flex-1 min-w-0">
-        <div class="max-w-[820px] mx-auto px-10 py-8">
-
-          <!-- Breadcrumb -->
-          <nav class="flex items-center gap-1.5 text-[13px] mb-6" style="color:var(--claude-muted-foreground);font-family:var(--claude-font-sans);">
-            <a href="#" class="hover:underline" style="color:var(--claude-muted-foreground);">技术文档</a>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.5;"><polyline points="9 6 15 12 9 18"/></svg>
-            <a href="#" class="hover:underline" style="color:var(--claude-muted-foreground);">API 参考</a>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.5;"><polyline points="9 6 15 12 9 18"/></svg>
-            <span style="color:var(--claude-foreground);">知识架构 API</span>
-          </nav>
-
-          <!-- Document Title -->
-          <h1 class="text-[24px] font-normal leading-tight mb-2" style="font-family:var(--claude-font-display);color:var(--claude-foreground);">知识架构 API</h1>
-          <p class="text-sm leading-relaxed mb-8" style="color:var(--claude-muted-foreground);max-width:640px;">管理知识架构的创建、查询、更新和删除。知识架构是知识图谱的骨架定义，描述了图谱的结构和语义模型。</p>
-
-          <!-- 概述 -->
-          <section class="mb-10" id="overview">
-            <h2 class="text-[18px] font-semibold mb-4" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">概述</h2>
-            <p class="text-sm leading-relaxed mb-4" style="color:var(--claude-muted-foreground);">
-              知识架构 API 提供了对知识架构的完整 CRUD 操作。每个架构定义了一组实体类型、关系类型及其属性约束，作为知识图谱的数据模型基础。
-            </p>
-            <div class="rounded-lg p-4 text-sm leading-relaxed" style="background:var(--claude-accent);color:var(--claude-accent-foreground);">
-              <strong>Base URL</strong>
-              <code class="block mt-1 text-[13px]" style="font-family:var(--claude-font-mono);color:var(--claude-foreground);">https://api.unigraph.ai/v1/schemas</code>
-            </div>
-
-            <!-- Auth note -->
-            <div class="mt-4 rounded-lg p-4 text-sm leading-relaxed flex items-start gap-3" style="background:var(--claude-card);border:1px solid var(--claude-border);">
-              <svg class="shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--claude-primary);"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              <div>
-                <p class="font-medium text-[13px] mb-1" style="color:var(--claude-foreground);">认证方式</p>
-                <p class="text-[13px] leading-relaxed" style="color:var(--claude-muted-foreground);">所有 API 请求需要在 Header 中携带 <code style="font-family:var(--claude-font-mono);background:var(--claude-muted);padding:1px 5px;border-radius:4px;font-size:12px;">Authorization: Bearer &lt;API_KEY&gt;</code></p>
-              </div>
-            </div>
-          </section>
-
-          <!-- 创建架构 -->
-          <section class="mb-10" id="create">
-            <div class="flex items-center gap-3 mb-4">
-              <h2 class="text-[18px] font-semibold" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">创建架构</h2>
-              <span class="px-2 py-0.5 rounded text-[11px] font-medium" style="background:var(--claude-success-500);color:var(--claude-primary-foreground);">POST</span>
-            </div>
-            <p class="text-sm leading-relaxed mb-4" style="color:var(--claude-muted-foreground);">创建一个新的知识架构。请求体需包含架构名称、描述和 Schema 定义。</p>
-
-            <!-- Code block -->
-            <div class="relative rounded-lg overflow-hidden mb-3" style="background:var(--claude-foreground);">
-              <div class="flex items-center justify-between px-4 py-2 border-b" style="border-color:rgba(255,255,255,0.1);">
-                <span class="text-[11px] font-medium" style="color:rgba(255,255,255,0.5);font-family:var(--claude-font-mono);">cURL</span>
-                <button @click="copyCode($event.currentTarget)" class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors cursor-pointer hover:opacity-80" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;font-family:var(--claude-font-sans);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  <span>复制</span>
-                </button>
-              </div>
-              <pre class="px-4 py-3 overflow-x-auto text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.85);font-family:var(--claude-font-mono);margin:0;"><code>curl -X POST https://api.unigraph.ai/v1/schemas \
-  -H "Authorization: Bearer ${API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "enterprise_knowledge",
-    "description": "企业知识管理架构",
-    "entities": [
-      {
-        "type": "Department",
-        "properties": {
-          "name": "string",
-          "code": "string",
-          "head_count": "integer"
-        }
-      },
-      {
-        "type": "Employee",
-        "properties": {
-          "name": "string",
-          "role": "string",
-          "department_id": "reference"
-        }
-      }
-    ],
-    "relations": [
-      {
-        "type": "belongs_to",
-        "source": "Employee",
-        "target": "Department",
-        "properties": {
-          "since": "date",
-          "position": "string"
-        }
-      }
-    ]
-  }'</code></pre>
-            </div>
-
-            <!-- Response -->
-            <p class="text-[13px] font-medium mb-2" style="color:var(--claude-foreground);">响应示例</p>
-            <div class="relative rounded-lg overflow-hidden" style="background:var(--claude-foreground);">
-              <div class="flex items-center justify-between px-4 py-2 border-b" style="border-color:rgba(255,255,255,0.1);">
-                <span class="text-[11px] font-medium" style="color:rgba(255,255,255,0.5);font-family:var(--claude-font-mono);">JSON &middot; 200</span>
-                <button @click="copyCode($event.currentTarget)" class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors cursor-pointer hover:opacity-80" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;font-family:var(--claude-font-sans);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  <span>复制</span>
-                </button>
-              </div>
-              <pre class="px-4 py-3 overflow-x-auto text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.85);font-family:var(--claude-font-mono);margin:0;"><code>{
-  "id": "schema_abc123",
-  "name": "enterprise_knowledge",
-  "description": "企业知识管理架构",
-  "version": 1,
-  "status": "active",
-  "entity_count": 2,
-  "relation_count": 1,
-  "created_at": "2025-12-20T08:30:00Z",
-  "updated_at": "2025-12-20T08:30:00Z"
-}</code></pre>
-            </div>
-          </section>
-
-          <!-- 获取架构详情 -->
-          <section class="mb-10" id="retrieve">
-            <div class="flex items-center gap-3 mb-4">
-              <h2 class="text-[18px] font-semibold" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">获取架构详情</h2>
-              <span class="px-2 py-0.5 rounded text-[11px] font-medium" style="background:var(--claude-brand-300);color:var(--claude-foreground);">GET</span>
-            </div>
-            <p class="text-sm leading-relaxed mb-4" style="color:var(--claude-muted-foreground);">根据架构 ID 获取完整的架构定义，包括所有实体类型和关系类型的详细配置。</p>
-
-            <div class="relative rounded-lg overflow-hidden mb-3" style="background:var(--claude-foreground);">
-              <div class="flex items-center justify-between px-4 py-2 border-b" style="border-color:rgba(255,255,255,0.1);">
-                <span class="text-[11px] font-medium" style="color:rgba(255,255,255,0.5);font-family:var(--claude-font-mono);">cURL</span>
-                <button @click="copyCode($event.currentTarget)" class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors cursor-pointer hover:opacity-80" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;font-family:var(--claude-font-sans);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  <span>复制</span>
-                </button>
-              </div>
-              <pre class="px-4 py-3 overflow-x-auto text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.85);font-family:var(--claude-font-mono);margin:0;"><code>curl -X GET https://api.unigraph.ai/v1/schemas/schema_abc123 \
-  -H "Authorization: Bearer ${API_KEY}"</code></pre>
-            </div>
-
-            <p class="text-[13px] font-medium mb-2" style="color:var(--claude-foreground);">响应示例</p>
-            <div class="relative rounded-lg overflow-hidden" style="background:var(--claude-foreground);">
-              <div class="flex items-center justify-between px-4 py-2 border-b" style="border-color:rgba(255,255,255,0.1);">
-                <span class="text-[11px] font-medium" style="color:rgba(255,255,255,0.5);font-family:var(--claude-font-mono);">JSON &middot; 200</span>
-                <button @click="copyCode($event.currentTarget)" class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors cursor-pointer hover:opacity-80" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;font-family:var(--claude-font-sans);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  <span>复制</span>
-                </button>
-              </div>
-              <pre class="px-4 py-3 overflow-x-auto text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.85);font-family:var(--claude-font-mono);margin:0;"><code>{
-  "id": "schema_abc123",
-  "name": "enterprise_knowledge",
-  "description": "企业知识管理架构",
-  "version": 1,
-  "status": "active",
-  "entities": [
-    {
-      "type": "Department",
-      "properties": {
-        "name": { "type": "string", "required": true },
-        "code": { "type": "string", "required": true },
-        "head_count": { "type": "integer", "required": false }
-      }
-    },
-    {
-      "type": "Employee",
-      "properties": {
-        "name": { "type": "string", "required": true },
-        "role": { "type": "string", "required": true },
-        "department_id": { "type": "reference", "target": "Department" }
-      }
-    }
-  ],
-  "relations": [
-    {
-      "type": "belongs_to",
-      "source": "Employee",
-      "target": "Department",
-      "properties": {
-        "since": { "type": "date" },
-        "position": { "type": "string" }
-      }
-    }
-  ],
-  "created_at": "2025-12-20T08:30:00Z",
-  "updated_at": "2025-12-20T08:30:00Z"
-}</code></pre>
-            </div>
-          </section>
-
-          <!-- 更新架构 -->
-          <section class="mb-10" id="update">
-            <div class="flex items-center gap-3 mb-4">
-              <h2 class="text-[18px] font-semibold" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">更新架构</h2>
-              <span class="px-2 py-0.5 rounded text-[11px] font-medium" style="background:var(--claude-primary);color:var(--claude-primary-foreground);">PUT</span>
-            </div>
-            <p class="text-sm leading-relaxed mb-4" style="color:var(--claude-muted-foreground);">更新已有架构的定义。支持增量更新，仅需传递需要变更的字段。架构版本号将自动递增。</p>
-
-            <div class="relative rounded-lg overflow-hidden mb-3" style="background:var(--claude-foreground);">
-              <div class="flex items-center justify-between px-4 py-2 border-b" style="border-color:rgba(255,255,255,0.1);">
-                <span class="text-[11px] font-medium" style="color:rgba(255,255,255,0.5);font-family:var(--claude-font-mono);">cURL</span>
-                <button @click="copyCode($event.currentTarget)" class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors cursor-pointer hover:opacity-80" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;font-family:var(--claude-font-sans);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  <span>复制</span>
-                </button>
-              </div>
-              <pre class="px-4 py-3 overflow-x-auto text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.85);font-family:var(--claude-font-mono);margin:0;"><code>curl -X PUT https://api.unigraph.ai/v1/schemas/schema_abc123 \
-  -H "Authorization: Bearer ${API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "description": "企业知识管理架构 v2",
-    "entities": [
-      {
-        "type": "Project",
-        "properties": {
-          "name": "string",
-          "status": "string",
-          "owner": "reference"
-        }
-      }
-    ]
-  }'</code></pre>
-            </div>
-
-            <p class="text-[13px] font-medium mb-2" style="color:var(--claude-foreground);">响应示例</p>
-            <div class="relative rounded-lg overflow-hidden" style="background:var(--claude-foreground);">
-              <div class="flex items-center justify-between px-4 py-2 border-b" style="border-color:rgba(255,255,255,0.1);">
-                <span class="text-[11px] font-medium" style="color:rgba(255,255,255,0.5);font-family:var(--claude-font-mono);">JSON &middot; 200</span>
-                <button @click="copyCode($event.currentTarget)" class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors cursor-pointer hover:opacity-80" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;font-family:var(--claude-font-sans);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  <span>复制</span>
-                </button>
-              </div>
-              <pre class="px-4 py-3 overflow-x-auto text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.85);font-family:var(--claude-font-mono);margin:0;"><code>{
-  "id": "schema_abc123",
-  "name": "enterprise_knowledge",
-  "description": "企业知识管理架构 v2",
-  "version": 2,
-  "status": "active",
-  "entity_count": 3,
-  "relation_count": 1,
-  "created_at": "2025-12-20T08:30:00Z",
-  "updated_at": "2025-12-20T10:15:00Z"
-}</code></pre>
-            </div>
-          </section>
-
-          <!-- 删除架构 -->
-          <section class="mb-16" id="delete">
-            <div class="flex items-center gap-3 mb-4">
-              <h2 class="text-[18px] font-semibold" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">删除架构</h2>
-              <span class="px-2 py-0.5 rounded text-[11px] font-medium" style="background:var(--claude-destructive);color:var(--claude-destructive-foreground);">DELETE</span>
-            </div>
-            <p class="text-sm leading-relaxed mb-4" style="color:var(--claude-muted-foreground);">删除指定的知识架构。已关联图谱的架构无法直接删除，需先解除关联。</p>
-
-            <div class="rounded-lg p-4 text-[13px] leading-relaxed flex items-start gap-3 mb-4" style="background:var(--claude-card);border:1px solid var(--claude-destructive);border-left:3px solid var(--claude-destructive);">
-              <svg class="shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--claude-destructive);"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              <div>
-                <p class="font-medium mb-0.5" style="color:var(--claude-destructive);">危险操作</p>
-                <p style="color:var(--claude-muted-foreground);">此操作不可逆。删除架构后，基于该架构的知识图谱将无法继续使用 Schema 校验功能。</p>
-              </div>
-            </div>
-
-            <div class="relative rounded-lg overflow-hidden mb-3" style="background:var(--claude-foreground);">
-              <div class="flex items-center justify-between px-4 py-2 border-b" style="border-color:rgba(255,255,255,0.1);">
-                <span class="text-[11px] font-medium" style="color:rgba(255,255,255,0.5);font-family:var(--claude-font-mono);">cURL</span>
-                <button @click="copyCode($event.currentTarget)" class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors cursor-pointer hover:opacity-80" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;font-family:var(--claude-font-sans);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  <span>复制</span>
-                </button>
-              </div>
-              <pre class="px-4 py-3 overflow-x-auto text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.85);font-family:var(--claude-font-mono);margin:0;"><code>curl -X DELETE https://api.unigraph.ai/v1/schemas/schema_abc123 \
-  -H "Authorization: Bearer ${API_KEY}"</code></pre>
-            </div>
-
-            <p class="text-[13px] font-medium mb-2" style="color:var(--claude-foreground);">响应示例</p>
-            <div class="relative rounded-lg overflow-hidden" style="background:var(--claude-foreground);">
-              <div class="flex items-center justify-between px-4 py-2 border-b" style="border-color:rgba(255,255,255,0.1);">
-                <span class="text-[11px] font-medium" style="color:rgba(255,255,255,0.5);font-family:var(--claude-font-mono);">JSON &middot; 204</span>
-                <button @click="copyCode($event.currentTarget)" class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors cursor-pointer hover:opacity-80" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;font-family:var(--claude-font-sans);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  <span>复制</span>
-                </button>
-              </div>
-              <pre class="px-4 py-3 overflow-x-auto text-[13px] leading-relaxed" style="color:rgba(255,255,255,0.85);font-family:var(--claude-font-mono);margin:0;"><code>{
-  "success": true,
-  "message": "架构已成功删除",
-  "deleted_id": "schema_abc123"
-}</code></pre>
-            </div>
-          </section>
-
-        </div>
-      </div>
-
-      <!-- Right-side TOC (desktop only, like Anthropic docs) -->
-      <div class="hidden xl:block w-[160px] shrink-0">
-        <div class="sticky top-8 pl-6 pr-4 py-8">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.08em] mb-3" style="color:var(--claude-muted-foreground);font-family:var(--claude-font-sans);">目录</p>
-          <nav class="space-y-1.5">
-            <a href="#overview" class="toc-link block text-[12px] py-0.5 transition-colors hover:opacity-80" style="color:var(--claude-muted-foreground);text-decoration:none;">概述</a>
-            <a href="#create" class="toc-link block text-[12px] py-0.5 transition-colors hover:opacity-80" style="color:var(--claude-muted-foreground);text-decoration:none;">创建架构</a>
-            <a href="#retrieve" class="toc-link block text-[12px] py-0.5 transition-colors hover:opacity-80" style="color:var(--claude-muted-foreground);text-decoration:none;">获取架构详情</a>
-            <a href="#update" class="toc-link block text-[12px] py-0.5 transition-colors hover:opacity-80" style="color:var(--claude-muted-foreground);text-decoration:none;">更新架构</a>
-            <a href="#delete" class="toc-link block text-[12px] py-0.5 transition-colors hover:opacity-80" style="color:var(--claude-muted-foreground);text-decoration:none;">删除架构</a>
-          </nav>
-        </div>
-      </div>
-
-    </div>
-
-    <TaskCenter />
-
-
-  </main>
-
-</div>
-
+    <button
+      v-if="previewImage"
+      type="button"
+      class="docs-preview"
+      aria-label="关闭架构图预览"
+      @click="previewImage = ''"
+    >
+      <img :src="previewImage" alt="架构图大图预览" />
+      <span>点击任意位置关闭</span>
+    </button>
   </div>
 </template>
 
 <script>
-import { createDocsViewController } from '@/controllers/DocsView.js';
+import DOMPurify from 'dompurify';
+import hljs from 'highlight.js/lib/core';
+import bash from 'highlight.js/lib/languages/bash';
+import css from 'highlight.js/lib/languages/css';
+import javascript from 'highlight.js/lib/languages/javascript';
+import json from 'highlight.js/lib/languages/json';
+import MarkdownIt from 'markdown-it';
+import python from 'highlight.js/lib/languages/python';
+import xml from 'highlight.js/lib/languages/xml';
+import technicalArchitecture from '../../../../docs/TECHNICAL_ARCHITECTURE.md?raw';
 import AppSidebar from '@/components/layout/AppSidebar.vue';
 import AppSearchDialog from '@/components/layout/AppSearchDialog.vue';
 import TaskCenter from '@/components/task/TaskCenter.vue';
 
+const architectureBase = `${import.meta.env.BASE_URL}docs/architecture/`;
+
+hljs.registerLanguage('bash', bash);
+hljs.registerLanguage('css', css);
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('json', json);
+hljs.registerLanguage('python', python);
+hljs.registerLanguage('xml', xml);
+
+function headingId(text) {
+  return String(text)
+    .replace(/[`*_]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function documentSource() {
+  return technicalArchitecture
+    .replace(/\]\(assets\/architecture\/([^)]+)\)/g, `](${architectureBase}$1)`)
+    .replace(/^#\s+.+\r?\n+/, '');
+}
+
+function splitDocumentModules(source) {
+  const matches = [...source.matchAll(/^##\s+(.+)$/gm)];
+  return matches.map((match, index) => {
+    const sectionStart = match.index;
+    const contentStart = index === 0 ? 0 : sectionStart;
+    const contentEnd = matches[index + 1]?.index ?? source.length;
+    const text = match[1].trim();
+    const moduleSource = source.slice(contentStart, contentEnd).trim();
+    const headings = moduleSource.split('\n').flatMap((line) => {
+      const heading = line.match(/^(##|###)\s+(.+)$/);
+      if (!heading) return [];
+      return [{ level: heading[1].length, text: heading[2], id: headingId(heading[2]) }];
+    });
+    return { id: headingId(text), text, source: moduleSource, headings };
+  });
+}
+
+function createMarkdownRenderer() {
+  const markdown = new MarkdownIt({ breaks: false, linkify: true, html: false });
+  markdown.renderer.rules.heading_open = (tokens, index) => {
+    const level = tokens[index].tag;
+    const title = tokens[index + 1]?.content || '';
+    return `<${level} id="${headingId(title)}">`;
+  };
+  const defaultImage = markdown.renderer.rules.image;
+  markdown.renderer.rules.image = (tokens, index, options, env, self) => {
+    const token = tokens[index];
+    token.attrSet('loading', 'lazy');
+    token.attrSet('decoding', 'async');
+    const image = defaultImage
+      ? defaultImage(tokens, index, options, env, self)
+      : self.renderToken(tokens, index, options);
+    const caption = markdown.utils.escapeHtml(token.content || '架构图');
+    return `<figure class="architecture-figure"><div class="architecture-figure__canvas">${image}</div><figcaption>${caption}<span>点击查看大图</span></figcaption></figure>`;
+  };
+  markdown.renderer.rules.fence = (tokens, index) => {
+    const token = tokens[index];
+    const language = String(token.info || 'text').trim().split(/\s+/)[0];
+    const pathMatch = token.content.match(/^(?:#|\/\/)\s+([^\n]+)\n/);
+    const path = pathMatch?.[1] || language;
+    const code = pathMatch ? token.content.slice(pathMatch[0].length) : token.content;
+    const languageAliases = { js: 'javascript', py: 'python', html: 'xml', shell: 'bash', sh: 'bash' };
+    const highlightLanguage = languageAliases[language] || language;
+    const highlightedCode = hljs.getLanguage(highlightLanguage)
+      ? hljs.highlight(code, { language: highlightLanguage }).value
+      : markdown.utils.escapeHtml(code);
+    return `<section class="code-sample"><header><span class="code-sample__path">${markdown.utils.escapeHtml(path)}</span><span class="code-sample__actions"><span class="code-sample__language">${markdown.utils.escapeHtml(language)}</span><button type="button" data-copy-code>复制</button></span></header><pre><code class="hljs language-${markdown.utils.escapeHtml(language)}">${highlightedCode}</code></pre></section>`;
+  };
+  markdown.renderer.rules.table_open = () => '<div class="markdown-table-wrap"><table>';
+  markdown.renderer.rules.table_close = () => '</table></div>';
+  return markdown;
+}
+
+const markdown = createMarkdownRenderer();
+
 export default {
   name: 'DocsView',
   components: { AppSidebar, AppSearchDialog, TaskCenter },
-  data: () => ({ controller: null }),
+  data: () => ({
+    source: documentSource(),
+    activeModuleId: '',
+    activeHeading: '',
+    previewImage: '',
+    headingObserver: null,
+  }),
+  computed: {
+    modules() {
+      return splitDocumentModules(this.source);
+    },
+    activeModule() {
+      return this.modules.find((module) => module.id === this.activeModuleId) || this.modules[0];
+    },
+    navigationHeadings() {
+      return this.modules.flatMap((module) => [
+        module.headings[0],
+        ...(module.id === this.activeModuleId ? module.headings.slice(1) : []),
+      ].filter(Boolean));
+    },
+    renderedDocument() {
+      return DOMPurify.sanitize(markdown.render(this.activeModule?.source || ''));
+    },
+  },
   mounted() {
-    document.title = "文档";
-    document.body.className = "h-screen overflow-hidden min-h-0";
-    this.controller = createDocsViewController();
+    document.title = '技术架构 · UniGraph';
+    document.body.className = 'overflow-hidden min-h-0';
+    this.activeModuleId = this.modules[0]?.id || '';
+    this.activeHeading = this.activeModuleId;
+    this.$refs.article?.addEventListener('click', this.handleArticleClick);
+    this.$nextTick(this.observeHeadings);
+    window.addEventListener('keydown', this.handleKeydown);
+  },
+  beforeUnmount() {
+    this.$refs.article?.removeEventListener('click', this.handleArticleClick);
+    this.headingObserver?.disconnect();
+    window.removeEventListener('keydown', this.handleKeydown);
   },
   methods: {
-    copyCode(...args) {
-      return this.controller?.copyCode(...args);
+    observeHeadings() {
+      this.headingObserver?.disconnect();
+      this.headingObserver = new IntersectionObserver(this.handleHeadingVisibility, {
+        root: this.$refs.scrollRegion,
+        rootMargin: '-16% 0px -72% 0px',
+        threshold: 0,
+      });
+      this.$refs.article?.querySelectorAll('h2, h3').forEach((heading) => this.headingObserver.observe(heading));
     },
-    selectDocNav(...args) {
-      return this.controller?.selectDocNav(...args);
+    selectModule(moduleId) {
+      this.activeModuleId = moduleId;
+      this.activeHeading = moduleId;
+      this.$nextTick(() => {
+        this.observeHeadings();
+        this.$refs.scrollRegion?.scrollTo({ top: this.$refs.article?.offsetTop - 24, behavior: 'smooth' });
+      });
+    },
+    handleNavigation(event, heading) {
+      if (heading.level !== 2) return;
+      event.preventDefault();
+      this.selectModule(heading.id);
+    },
+    async handleArticleClick(event) {
+      const copyButton = event.target.closest('[data-copy-code]');
+      if (copyButton) {
+        const code = copyButton.closest('.code-sample')?.querySelector('code')?.textContent || '';
+        await navigator.clipboard.writeText(code);
+        copyButton.textContent = '已复制';
+        window.setTimeout(() => { copyButton.textContent = '复制'; }, 1200);
+        return;
+      }
+      const image = event.target.closest('.architecture-figure img');
+      if (image) this.previewImage = image.currentSrc || image.src;
+    },
+    handleHeadingVisibility(entries) {
+      const visible = entries.find((entry) => entry.isIntersecting);
+      if (visible) this.activeHeading = visible.target.id;
+    },
+    handleKeydown(event) {
+      if (event.key === 'Escape') this.previewImage = '';
     },
   },
 };
 </script>
 
 <style>
-
-@layer base { body { background: var(--claude-background); color: var(--claude-foreground); font-family: var(--claude-font-sans); -webkit-font-smoothing: antialiased; } *, *::before, *::after { box-sizing: border-box; } }
-
-
-
-:root {
-  --claude-background: #FDFBF7;--claude-foreground: #1C1917;--claude-card: #FFFFFF;--claude-card-foreground: #1C1917;
-  --claude-popover: #FFFFFF;--claude-popover-foreground: #1C1917;--claude-primary: #C96442;--claude-primary-foreground: #FFFFFF;
-  --claude-secondary: #F0EAE0;--claude-secondary-foreground: #3D3530;--claude-muted: #E8E0D4;--claude-muted-foreground: #78716C;
-  --claude-accent: #FAF0E4;--claude-accent-foreground: #5C3A1E;--claude-destructive: #B91C1C;--claude-destructive-foreground: #FFFFFF;
-  --claude-border: #D6CEC4;--claude-ring: #C96442;--claude-input: #D6CEC4;
-  --claude-brand-500: #C96442;--claude-brand-300: #E8A88C;--claude-brand-700: #A0502F;--claude-success-500: #22C55E;
-  --claude-shadow-xs: 0 1px 2px rgba(0,0,0,0.05);--claude-shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --claude-shadow-md: 0 4px 6px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);--claude-shadow-lg: 0 10px 15px rgba(0,0,0,0.06), 0 4px 6px rgba(0,0,0,0.03);
-  --claude-radius-sm: 8px;--claude-radius-md: 12px;--claude-radius: 16px;--claude-radius-xl: 20px;--claude-radius-2xl: 24px;
-  --claude-radius-full: 9999px;--claude-radius-lg: 16px;--claude-spacing: 0.25rem;
-  --claude-font-display: Newsreader, Georgia, ui-serif, serif;--claude-font-sans: Poppins, ui-sans-serif, system-ui, sans-serif;
-  --claude-font-serif: Lora, Georgia, ui-serif, serif;--claude-font-mono: Geist Mono, ui-monospace, monospace;
+.docs-page { background: var(--claude-background); color: var(--claude-foreground); }
+.docs-layout { display: grid; grid-template-columns: 248px minmax(0, 1fr); height: 100dvh; min-height: 0; }
+.docs-nav { min-height: 0; overflow-y: auto; padding: 30px 18px 40px; border-right: 1px solid var(--claude-border); background: color-mix(in srgb, var(--claude-background) 92%, var(--claude-card)); }
+.docs-nav__head { display: grid; gap: 4px; margin: 0 8px 20px; padding-bottom: 18px; border-bottom: 1px solid var(--claude-border); }
+.docs-nav__head strong { font-size: 16px; font-weight: 620; letter-spacing: -.01em; }
+.docs-nav__head > span:last-child { color: var(--claude-muted-foreground); font-size: 11px; }
+.docs-nav__eyebrow { color: var(--claude-primary); font-family: var(--claude-font-mono); font-size: 9px; letter-spacing: .14em; }
+.docs-nav nav { display: grid; gap: 1px; }
+.docs-nav__link { position: relative; padding: 7px 10px 7px 14px; color: var(--claude-muted-foreground); font-size: 12px; line-height: 1.45; text-decoration: none; transition: color .18s ease, transform .18s ease; }
+.docs-nav__link::before { content: ''; position: absolute; left: 0; top: 9px; bottom: 9px; width: 2px; border-radius: 2px; background: transparent; }
+.docs-nav__link:hover,
+.docs-nav__link:focus-visible,
+.docs-nav__link.is-active { color: var(--claude-foreground); transform: translateX(2px); outline: none; }
+.docs-nav__link.is-active::before { background: var(--claude-primary); }
+.docs-nav__link--level-3 { padding-left: 26px; font-size: 11px; }
+.docs-main { min-width: 0; min-height: 0; overflow-y: auto; scroll-behavior: smooth; }
+.docs-hero { width: min(1060px, calc(100% - 72px)); margin: 0 auto; padding: 36px 0 28px; border-bottom: 1px solid var(--claude-border); }
+.docs-hero__copy { max-width: 770px; }
+.docs-hero__eyebrow { display: block; margin-bottom: 10px; color: var(--claude-primary); font-family: var(--claude-font-sans); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+.docs-hero h1 { max-width: 720px; margin: 0; font-family: var(--claude-font-sans); font-size: clamp(27px, 2.6vw, 34px); font-weight: 650; letter-spacing: -.025em; line-height: 1.2; }
+.docs-hero__copy p { max-width: 680px; margin: 12px 0 0; color: var(--claude-muted-foreground); font-size: 14px; line-height: 1.7; }
+.docs-hero__meta { display: flex; flex-wrap: wrap; gap: 7px 18px; margin-top: 18px; color: var(--claude-muted-foreground); font-family: var(--claude-font-mono); font-size: 10px; }
+.docs-hero__meta span::before { content: '/'; margin-right: 7px; color: var(--claude-primary); }
+.runtime-path { display: grid; grid-template-columns: minmax(0,1fr) 28px minmax(0,1fr) 28px minmax(0,1fr) 28px minmax(0,1fr); align-items: center; margin-top: 32px; }
+.runtime-path > div { min-width: 0; padding-top: 12px; border-top: 2px solid var(--claude-foreground); }
+.runtime-path small { display: block; margin-bottom: 11px; color: var(--claude-primary); font-family: var(--claude-font-mono); font-size: 9px; }
+.runtime-path strong,
+.runtime-path span { display: block; }
+.runtime-path strong { font-size: 13px; font-weight: 600; }
+.runtime-path span { margin-top: 4px; color: var(--claude-muted-foreground); font-size: 10px; }
+.runtime-path i { height: 1px; background: var(--claude-border); }
+.technical-doc { width: min(940px, calc(100% - 72px)); margin: 0 auto; padding: 28px 0 110px; color: var(--claude-muted-foreground); font-family: var(--claude-font-sans); }
+.docs-mobile-module { display: none; }
+.technical-doc > p:first-child { max-width: 760px; margin: 0 0 18px; color: var(--claude-foreground); font-size: 14px; line-height: 1.75; }
+.technical-doc h2,
+.technical-doc h3,
+.technical-doc h4 { color: var(--claude-foreground); font-family: var(--claude-font-sans); }
+.technical-doc h2 { scroll-margin-top: 28px; margin: 36px 0 18px; font-size: 23px; font-weight: 650; letter-spacing: -.018em; line-height: 1.35; }
+.technical-doc > h2:first-child { margin-top: 0; }
+.technical-doc h3 { scroll-margin-top: 28px; margin: 32px 0 13px; font-size: 17px; font-weight: 620; letter-spacing: -.01em; line-height: 1.45; }
+.technical-doc h4 { margin: 24px 0 10px; font-size: 14px; font-weight: 620; line-height: 1.5; }
+.technical-doc p,
+.technical-doc li { color: var(--claude-muted-foreground); font-size: 14px; line-height: 1.85; }
+.technical-doc p { max-width: 78ch; margin: 0 0 17px; }
+.technical-doc strong { color: var(--claude-foreground); font-weight: 620; }
+.technical-doc em { color: var(--claude-foreground); }
+.technical-doc a { color: var(--claude-brand-700); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.technical-doc a:hover { text-decoration-thickness: 2px; }
+.technical-doc ul,
+.technical-doc ol { margin: 12px 0 24px; padding-left: 1.45rem; }
+.technical-doc ul { list-style: disc; }
+.technical-doc ol { list-style: decimal; }
+.technical-doc li { padding-left: 5px; }
+.technical-doc li + li { margin-top: 7px; }
+.technical-doc li::marker { color: var(--claude-primary); font-weight: 600; }
+.technical-doc li > p { margin-bottom: 8px; }
+.technical-doc blockquote { margin: 28px 0 36px; padding: 15px 18px; border-left: 3px solid var(--claude-primary); background: color-mix(in srgb, var(--claude-accent) 62%, transparent); }
+.technical-doc blockquote p { max-width: none; margin: 0; color: var(--claude-accent-foreground); }
+.technical-doc hr { height: 1px; margin: 42px 0; border: 0; background: var(--claude-border); }
+.architecture-figure { margin: 24px 0 34px; }
+.architecture-figure__canvas { overflow: hidden; border: 1px solid var(--claude-border); border-radius: 10px; background: #fff; cursor: zoom-in; }
+.technical-doc .architecture-figure img { display: block; width: 100%; height: auto; padding: 16px; transition: transform .28s ease; }
+.architecture-figure__canvas:hover img { transform: scale(1.012); }
+.architecture-figure figcaption { display: flex; justify-content: space-between; gap: 16px; padding-top: 9px; color: var(--claude-muted-foreground); font-size: 11px; line-height: 1.5; }
+.architecture-figure figcaption span { flex: none; color: var(--claude-primary); }
+.markdown-table-wrap { width: 100%; overflow-x: auto; margin: 24px 0 34px; border: 1px solid var(--claude-border); border-radius: 9px; }
+.technical-doc table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 12px; }
+.technical-doc th,
+.technical-doc td { padding: 11px 13px; border-right: 1px solid var(--claude-border); border-bottom: 1px solid var(--claude-border); text-align: left; vertical-align: top; line-height: 1.65; }
+.technical-doc th { padding: 10px 13px; border-right: 1px solid var(--claude-border); border-bottom: 1px solid var(--claude-border); color: var(--claude-foreground); font-weight: 620; text-align: left; background: var(--claude-secondary); }
+.technical-doc tr:last-child td { border-bottom: 0; }
+.technical-doc th:last-child,
+.technical-doc td:last-child { border-right: 0; }
+.technical-doc tbody tr:nth-child(even) { background: color-mix(in srgb, var(--claude-secondary) 34%, transparent); }
+.technical-doc td { color: var(--claude-muted-foreground); }
+.technical-doc code { padding: .14em .4em; border: 1px solid color-mix(in srgb, var(--claude-border) 80%, transparent); border-radius: 4px; background: var(--claude-secondary); color: var(--claude-foreground); font-family: var(--claude-font-mono); font-size: .86em; }
+.code-sample { overflow: hidden; margin: 22px 0 30px; border: 1px solid color-mix(in srgb, var(--claude-foreground) 14%, var(--claude-border)); border-radius: 10px; background: #242321; box-shadow: 0 14px 34px rgb(28 26 23 / 8%); }
+.code-sample header { display: flex; align-items: center; justify-content: space-between; min-height: 38px; padding: 0 12px 0 15px; border-bottom: 1px solid rgb(255 255 255 / 9%); color: #bdb8b0; font-family: var(--claude-font-mono); font-size: 10px; }
+.code-sample__path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.code-sample__actions { display: flex; flex: none; align-items: center; gap: 7px; margin-left: 14px; }
+.code-sample__language { padding: 2px 5px; border: 1px solid rgb(255 255 255 / 10%); border-radius: 4px; color: #918d86; text-transform: uppercase; letter-spacing: .05em; }
+.code-sample header button { flex: none; padding: 4px 7px; border: 0; border-radius: 5px; background: transparent; color: #d9d4cb; font: inherit; cursor: pointer; transition: background-color .16s ease, color .16s ease; }
+.code-sample header button:hover,
+.code-sample header button:focus-visible { background: rgb(255 255 255 / 9%); color: #fff; outline: none; }
+.technical-doc .code-sample pre { overflow-x: auto; margin: 0; padding: 18px 20px 20px; background: transparent; tab-size: 2; }
+.technical-doc .code-sample code { padding: 0; border: 0; border-radius: 0; background: transparent; color: #eee9e1; font-size: 11px; line-height: 1.78; white-space: pre; }
+.code-sample .hljs-comment,
+.code-sample .hljs-quote { color: #8c8882; font-style: italic; }
+.code-sample .hljs-keyword,
+.code-sample .hljs-selector-tag,
+.code-sample .hljs-literal { color: #ff9d76; }
+.code-sample .hljs-string,
+.code-sample .hljs-doctag,
+.code-sample .hljs-regexp { color: #a8d1a2; }
+.code-sample .hljs-number,
+.code-sample .hljs-symbol,
+.code-sample .hljs-bullet { color: #8ec5e8; }
+.code-sample .hljs-title,
+.code-sample .hljs-title.function_,
+.code-sample .hljs-section { color: #d9b8ff; }
+.code-sample .hljs-built_in,
+.code-sample .hljs-type,
+.code-sample .hljs-class .hljs-title { color: #f2cc8f; }
+.code-sample .hljs-attr,
+.code-sample .hljs-attribute,
+.code-sample .hljs-variable,
+.code-sample .hljs-template-variable { color: #b8d7ee; }
+.code-sample .hljs-meta { color: #c6a0f6; }
+.code-sample .hljs-params,
+.code-sample .hljs-subst { color: #eee9e1; }
+.docs-preview { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; padding: 50px; border: 0; background: rgb(20 19 18 / 88%); cursor: zoom-out; animation: docs-preview-in .18s ease-out both; }
+.docs-preview img { display: block; max-width: min(1320px, 94vw); max-height: 86vh; padding: 16px; border-radius: 10px; background: #fff; box-shadow: 0 24px 80px rgb(0 0 0 / 35%); }
+.docs-preview span { position: absolute; bottom: 20px; color: rgb(255 255 255 / 72%); font-size: 11px; }
+@keyframes docs-preview-in { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 900px) {
+  .docs-layout { display: block; }
+  .docs-nav { display: none; }
+  .docs-hero,
+  .technical-doc { width: calc(100% - 32px); }
+  .docs-hero { padding: 28px 0 24px; }
+  .docs-hero h1 { font-size: clamp(25px, 7vw, 30px); }
+  .docs-mobile-module { display: grid; gap: 7px; width: calc(100% - 32px); margin: 20px auto 4px; color: var(--claude-muted-foreground); font-size: 11px; }
+  .docs-mobile-module select { width: 100%; min-height: 40px; padding: 0 34px 0 12px; border: 1px solid var(--claude-border); border-radius: 8px; background: var(--claude-card); color: var(--claude-foreground); font: inherit; font-size: 13px; }
+  .runtime-path { grid-template-columns: 1fr 1fr; gap: 22px; }
+  .runtime-path i { display: none; }
+  .technical-doc { padding-bottom: 72px; }
+  .technical-doc h2 { margin-top: 32px; }
+  .technical-doc > h2:first-child { margin-top: 0; }
+  .technical-doc .architecture-figure img { padding: 8px; }
+  .architecture-figure figcaption span { display: none; }
+  .technical-doc .code-sample pre { padding: 14px; }
 }
-
-
-
-.bg-background{background-color:var(--claude-background)}.bg-foreground{background-color:var(--claude-foreground)}
-.bg-card{background-color:var(--claude-card)}.bg-card-foreground{background-color:var(--claude-card-foreground)}
-.bg-popover{background-color:var(--claude-popover)}.bg-popover-foreground{background-color:var(--claude-popover-foreground)}
-.bg-primary{background-color:var(--claude-primary)}.bg-primary-foreground{background-color:var(--claude-primary-foreground)}
-.bg-secondary{background-color:var(--claude-secondary)}.bg-secondary-foreground{background-color:var(--claude-secondary-foreground)}
-.bg-muted{background-color:var(--claude-muted)}.bg-muted-foreground{background-color:var(--claude-muted-foreground)}
-.bg-accent{background-color:var(--claude-accent)}.bg-accent-foreground{background-color:var(--claude-accent-foreground)}
-.bg-destructive{background-color:var(--claude-destructive)}.bg-destructive-foreground{background-color:var(--claude-destructive-foreground)}
-.bg-border{background-color:var(--claude-border)}.bg-ring{background-color:var(--claude-ring)}.bg-input{background-color:var(--claude-input)}
-.text-background{color:var(--claude-background)}.text-foreground{color:var(--claude-foreground)}
-.text-card{color:var(--claude-card)}.text-card-foreground{color:var(--claude-card-foreground)}
-.text-popover{color:var(--claude-popover)}.text-popover-foreground{color:var(--claude-popover-foreground)}
-.text-primary{color:var(--claude-primary)}.text-primary-foreground{color:var(--claude-primary-foreground)}
-.text-secondary{color:var(--claude-secondary)}.text-secondary-foreground{color:var(--claude-secondary-foreground)}
-.text-muted{color:var(--claude-muted)}.text-muted-foreground{color:var(--claude-muted-foreground)}
-.text-accent{color:var(--claude-accent)}.text-accent-foreground{color:var(--claude-accent-foreground)}
-.text-destructive{color:var(--claude-destructive)}.text-destructive-foreground{color:var(--claude-destructive-foreground)}
-.text-border{color:var(--claude-border)}.text-ring{color:var(--claude-ring)}.text-input{color:var(--claude-input)}
-.border-border{border-color:var(--claude-border)}
-
-
-
-/* Copy button feedback */
-.copy-done span { color: rgba(34,197,94,1) !important; }
-.copy-done span::after { content: ' 已复制'; }
-
-/* Active doc nav item hover effect */
-.doc-nav-item:hover {
-  background: var(--claude-secondary);
+@media (prefers-reduced-motion: reduce) {
+  .docs-main { scroll-behavior: auto; }
+  .architecture-figure__canvas:hover img { transform: none; }
 }
-
-/* Custom scrollbar for doc nav */
-nav::-webkit-scrollbar { width: 4px; }
-nav::-webkit-scrollbar-track { background: transparent; }
-nav::-webkit-scrollbar-thumb { background: var(--claude-border); border-radius: 4px; }
-
-/* Smooth scroll */
-html { scroll-behavior: smooth; }
-
-
-
-.sidebar-logo { display: flex; }
-#app-sidebar.sidebar-collapsed { width: 48px; }
-#app-sidebar.sidebar-collapsed .sidebar-text { display: none; }
-#app-sidebar.sidebar-collapsed .sidebar-logo { display: none; }
-#app-sidebar.sidebar-collapsed nav a span { display: none; }
-#app-sidebar.sidebar-collapsed .sidebar-content { display: none; }
-#app-sidebar.sidebar-collapsed .sidebar-collapsed-hide,
-#app-sidebar.sidebar-collapsed ~ #app-main .sidebar-collapsed-hide { display: none; }
-#app-sidebar.sidebar-collapsed .h-12 { justify-content: center; }
-#app-sidebar.sidebar-collapsed .sidebar-toggle-btn {
-  position: relative;
-  margin: 0;
-}
-#app-sidebar.sidebar-collapsed .sidebar-toggle-btn::after {
-  content: attr(data-title);
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  white-space: nowrap;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: 6px;
-  background: var(--claude-card);
-  color: var(--claude-foreground);
-  border: 1px solid var(--claude-border);
-  box-shadow: var(--claude-shadow-lg);
-  z-index: 100;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s;
-}
-#app-sidebar.sidebar-collapsed .sidebar-toggle-btn:hover::after {
-  opacity: 1;
-}
-#app-sidebar.sidebar-collapsed nav a {
-  position: relative;
-}
-#app-sidebar.sidebar-collapsed nav a:hover::after {
-  content: attr(data-title);
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  white-space: nowrap;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: 6px;
-  background: var(--claude-card);
-  color: var(--claude-foreground);
-  border: 1px solid var(--claude-border);
-  box-shadow: var(--claude-shadow-lg);
-  z-index: 100;
-}
-#app-sidebar.sidebar-collapsed button[data-title]:hover::after {
-  content: attr(data-title);
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  white-space: nowrap;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: 6px;
-  background: var(--claude-card);
-  color: var(--claude-foreground);
-  border: 1px solid var(--claude-border);
-  box-shadow: var(--claude-shadow-lg);
-  z-index: 100;
-}
-@keyframes trace-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-
 </style>

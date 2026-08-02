@@ -1,148 +1,69 @@
 <template>
   <div class="h-screen overflow-hidden min-h-0">
-<AppSidebar active="app" />
+    <AppSidebar active="app" />
+    <AppSearchDialog />
 
-<AppSearchDialog />
+    <main id="app-main" class="min-h-0 overflow-y-auto relative transition-all duration-300" style="margin-left:260px;" data-scroll-region="primary">
+      <div class="max-w-[900px] w-full mx-auto px-8 py-10 flex flex-col gap-8 min-w-0">
+        <header class="min-w-0">
+          <h1 class="text-[28px] font-normal leading-tight mb-2" style="font-family:var(--claude-font-display);color:var(--claude-foreground);">视频教程</h1>
+          <p class="text-sm leading-relaxed" style="font-family:var(--claude-font-serif);color:var(--claude-muted-foreground);">从知识架构设计到图谱构建、检索与智能体集成</p>
+        </header>
 
-<!-- MAIN CONTENT -->
-<main id="app-main" class="min-h-0 overflow-y-auto relative transition-all duration-300" style="margin-left:260px;" data-scroll-region="primary">
-  <div class="max-w-[900px] w-full mx-auto px-8 py-10 flex flex-col gap-8 min-w-0">
-
-    <!-- Page Header -->
-    <header class="min-w-0">
-      <h1 class="text-[28px] font-normal leading-tight mb-2" style="font-family:var(--claude-font-display);color:var(--claude-foreground);">视频教程</h1>
-      <p class="text-sm leading-relaxed" style="font-family:var(--claude-font-serif);color:var(--claude-muted-foreground);">学习如何使用 UniGraph 构建和管理知识图谱</p>
-    </header>
-
-    <!-- Category Tabs -->
-    <div class="flex items-center gap-0 min-w-0" style="border-bottom:1px solid var(--claude-border);">
-      <button @click="filterVideos('all', $event.currentTarget)" class="tab-btn px-4 pb-2.5 text-sm font-medium transition-colors cursor-pointer" style="color:var(--claude-primary);border-bottom:2px solid var(--claude-primary);margin-bottom:-1px;">全部</button>
-      <button @click="filterVideos('入门', $event.currentTarget)" class="tab-btn px-4 pb-2.5 text-sm font-medium transition-colors hover:opacity-70 cursor-pointer" style="color:var(--claude-muted-foreground);border-bottom:2px solid transparent;margin-bottom:-1px;">快速入门</button>
-      <button @click="filterVideos('进阶', $event.currentTarget)" class="tab-btn px-4 pb-2.5 text-sm font-medium transition-colors hover:opacity-70 cursor-pointer" style="color:var(--claude-muted-foreground);border-bottom:2px solid transparent;margin-bottom:-1px;">图谱设计</button>
-      <button @click="filterVideos('高级', $event.currentTarget)" class="tab-btn px-4 pb-2.5 text-sm font-medium transition-colors hover:opacity-70 cursor-pointer" style="color:var(--claude-muted-foreground);border-bottom:2px solid transparent;margin-bottom:-1px;">知识推理</button>
-      <button @click="filterVideos('入门', $event.currentTarget)" class="tab-btn px-4 pb-2.5 text-sm font-medium transition-colors hover:opacity-70 cursor-pointer" style="color:var(--claude-muted-foreground);border-bottom:2px solid transparent;margin-bottom:-1px;">数据导入</button>
-    </div>
-
-    <!-- Video Grid (2 columns) -->
-    <section id="video-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-
-      <!-- Video 1 -->
-      <article data-level="入门" class="video-item flex flex-col gap-2.5 cursor-pointer group" @click="showToast('播放：快速入门')">
-        <div class="relative aspect-video flex items-center justify-center rounded-lg" style="background:var(--claude-accent);">
-          <div class="w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover:scale-110" style="background:var(--claude-primary);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--claude-primary-foreground)"><polygon points="9 6 19 12 9 18 9 6"/></svg>
-          </div>
+        <div class="flex items-center gap-0 min-w-0 overflow-x-auto" style="border-bottom:1px solid var(--claude-border);">
+          <button
+            v-for="category in categories"
+            :key="category.value"
+            type="button"
+            class="tab-btn px-4 pb-2.5 text-sm font-medium transition-colors hover:opacity-70 cursor-pointer whitespace-nowrap"
+            :style="categoryStyle(category.value)"
+            @click="selectedCategory = category.value"
+          >
+            {{ category.label }}
+          </button>
         </div>
-        <div class="flex flex-col gap-1">
-          <h3 class="text-sm font-medium leading-snug" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">快速入门: 5分钟创建你的第一个知识图谱</h3>
-          <div class="flex items-center gap-2">
-            <span class="text-xs" style="color:var(--claude-muted-foreground);">12:30</span>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);">入门</span>
-          </div>
-          <p class="text-xs leading-relaxed line-clamp-2" style="color:var(--claude-muted-foreground);">从零开始学习 UniGraph 的基本操作，包括创建项目、导入数据和生成知识图谱的完整流程。</p>
-        </div>
-      </article>
 
-      <!-- Video 2 -->
-      <article data-level="进阶" class="video-item flex flex-col gap-2.5 cursor-pointer group" @click="showToast('播放：图谱设计进阶')">
-        <div class="relative aspect-video flex items-center justify-center rounded-lg" style="background:var(--claude-accent);">
-          <div class="w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover:scale-110" style="background:var(--claude-primary);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--claude-primary-foreground)"><polygon points="9 6 19 12 9 18 9 6"/></svg>
-          </div>
-        </div>
-        <div class="flex flex-col gap-1">
-          <h3 class="text-sm font-medium leading-snug" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">图谱设计进阶: 实体关系建模技巧</h3>
-          <div class="flex items-center gap-2">
-            <span class="text-xs" style="color:var(--claude-muted-foreground);">18:45</span>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);">进阶</span>
-          </div>
-          <p class="text-xs leading-relaxed line-clamp-2" style="color:var(--claude-muted-foreground);">深入讲解图谱设计模式，包括实体类型定义、关系边建模以及本体设计的最佳实践。</p>
-        </div>
-      </article>
+        <section id="video-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
+          <a
+            v-for="video in filteredVideos"
+            :key="video.url"
+            :href="video.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="video-item flex flex-col gap-2.5 cursor-pointer group no-underline"
+          >
+            <div class="video-cover relative aspect-video flex items-center justify-center rounded-lg overflow-hidden" style="background:var(--claude-accent);">
+              <img
+                :src="video.cover"
+                :alt="`${video.title} 视频封面`"
+                class="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.025]"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                @error="$event.currentTarget.style.display = 'none'"
+              />
+              <div class="video-cover__shade absolute inset-0" aria-hidden="true"></div>
+              <div class="relative w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover:scale-110" style="background:var(--claude-primary);box-shadow:var(--claude-shadow-lg);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--claude-primary-foreground)" aria-hidden="true"><polygon points="9 6 19 12 9 18 9 6"/></svg>
+              </div>
+            </div>
+            <div class="flex flex-col gap-1">
+              <h3 class="text-sm font-medium leading-snug" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">{{ video.title }}</h3>
+              <div class="flex items-center gap-2">
+                <span class="text-xs" style="color:var(--claude-muted-foreground);">哔哩哔哩</span>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);">{{ video.category }}</span>
+              </div>
+              <p class="text-xs leading-relaxed line-clamp-2" style="color:var(--claude-muted-foreground);">{{ video.description }}</p>
+            </div>
+          </a>
+        </section>
+      </div>
 
-      <!-- Video 3 -->
-      <article data-level="高级" class="video-item flex flex-col gap-2.5 cursor-pointer group" @click="showToast('播放：知识推理详解')">
-        <div class="relative aspect-video flex items-center justify-center rounded-lg" style="background:var(--claude-accent);">
-          <div class="w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover:scale-110" style="background:var(--claude-primary);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--claude-primary-foreground)"><polygon points="9 6 19 12 9 18 9 6"/></svg>
-          </div>
-        </div>
-        <div class="flex flex-col gap-1">
-          <h3 class="text-sm font-medium leading-snug" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">知识推理详解: 图谱推理引擎工作原理</h3>
-          <div class="flex items-center gap-2">
-            <span class="text-xs" style="color:var(--claude-muted-foreground);">24:10</span>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);">高级</span>
-          </div>
-          <p class="text-xs leading-relaxed line-clamp-2" style="color:var(--claude-muted-foreground);">了解 UniGraph 的推理引擎如何进行知识推理，包括路径推理、关系预测和实体链接。</p>
-        </div>
-      </article>
-
-      <!-- Video 4 -->
-      <article data-level="入门" class="video-item flex flex-col gap-2.5 cursor-pointer group" @click="showToast('播放：数据导入指南')">
-        <div class="relative aspect-video flex items-center justify-center rounded-lg" style="background:var(--claude-accent);">
-          <div class="w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover:scale-110" style="background:var(--claude-primary);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--claude-primary-foreground)"><polygon points="9 6 19 12 9 18 9 6"/></svg>
-          </div>
-        </div>
-        <div class="flex flex-col gap-1">
-          <h3 class="text-sm font-medium leading-snug" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">数据导入指南: 批量导入与格式转换</h3>
-          <div class="flex items-center gap-2">
-            <span class="text-xs" style="color:var(--claude-muted-foreground);">15:20</span>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);">入门</span>
-          </div>
-          <p class="text-xs leading-relaxed line-clamp-2" style="color:var(--claude-muted-foreground);">学习如何将 CSV、JSON 和 RDF 等格式数据批量导入 UniGraph，并进行格式转换与清洗。</p>
-        </div>
-      </article>
-
-      <!-- Video 5 -->
-      <article data-level="进阶" class="video-item flex flex-col gap-2.5 cursor-pointer group" @click="showToast('播放：可视化分析')">
-        <div class="relative aspect-video flex items-center justify-center rounded-lg" style="background:var(--claude-accent);">
-          <div class="w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover:scale-110" style="background:var(--claude-primary);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--claude-primary-foreground)"><polygon points="9 6 19 12 9 18 9 6"/></svg>
-          </div>
-        </div>
-        <div class="flex flex-col gap-1">
-          <h3 class="text-sm font-medium leading-snug" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">可视化分析: 图谱探索与查询技巧</h3>
-          <div class="flex items-center gap-2">
-            <span class="text-xs" style="color:var(--claude-muted-foreground);">20:55</span>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);">进阶</span>
-          </div>
-          <p class="text-xs leading-relaxed line-clamp-2" style="color:var(--claude-muted-foreground);">掌握 UniGraph 可视化工具的使用方法，包括节点搜索、路径查询和图谱布局调整。</p>
-        </div>
-      </article>
-
-      <!-- Video 6 -->
-      <article data-level="高级" class="video-item flex flex-col gap-2.5 cursor-pointer group" @click="showToast('播放：API集成开发')">
-        <div class="relative aspect-video flex items-center justify-center rounded-lg" style="background:var(--claude-accent);">
-          <div class="w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover:scale-110" style="background:var(--claude-primary);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--claude-primary-foreground)"><polygon points="9 6 19 12 9 18 9 6"/></svg>
-          </div>
-        </div>
-        <div class="flex flex-col gap-1">
-          <h3 class="text-sm font-medium leading-snug" style="font-family:var(--claude-font-sans);color:var(--claude-foreground);">API 集成开发: 调用图谱服务接口</h3>
-          <div class="flex items-center gap-2">
-            <span class="text-xs" style="color:var(--claude-muted-foreground);">28:40</span>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);">高级</span>
-          </div>
-          <p class="text-xs leading-relaxed line-clamp-2" style="color:var(--claude-muted-foreground);">学习如何通过 REST API 和 SDK 调用 UniGraph 服务，实现知识图谱的程序化访问与集成。</p>
-        </div>
-      </article>
-
-    </section>
-
-  </div>
-
-  <TaskCenter />
-
-
-
-</main>
-
+      <TaskCenter />
+    </main>
   </div>
 </template>
 
 <script>
-import { createTutorialsViewController } from '@/controllers/TutorialsView.js';
 import AppSidebar from '@/components/layout/AppSidebar.vue';
 import AppSearchDialog from '@/components/layout/AppSearchDialog.vue';
 import TaskCenter from '@/components/task/TaskCenter.vue';
@@ -150,18 +71,72 @@ import TaskCenter from '@/components/task/TaskCenter.vue';
 export default {
   name: 'TutorialsView',
   components: { AppSidebar, AppSearchDialog, TaskCenter },
-  data: () => ({ controller: null }),
+  data: () => ({
+    selectedCategory: 'all',
+    categories: [
+      { value: 'all', label: '全部' },
+      { value: '总览', label: '总览' },
+      { value: '设计', label: '图谱设计' },
+      { value: '构建', label: '图谱构建' },
+      { value: '检索', label: '图谱检索' },
+      { value: '集成', label: '智能体集成' },
+    ],
+    videos: [
+      {
+        category: '总览',
+        title: '一站式知识图谱智造平台',
+        description: '系统了解 UniGraph 的完整工作流与核心能力。',
+        url: 'https://www.bilibili.com/video/BV1jkivYZEyB',
+        cover: 'https://i1.hdslb.com/bfs/archive/28a393a50a1dcbbe1792d64750cfbe838d4c2b53.jpg',
+      },
+      {
+        category: '设计',
+        title: '知识架构设计解说',
+        description: '讲解实体类型、关系类型、属性与知识架构设计流程。',
+        url: 'https://www.bilibili.com/video/BV1weR8YeEPh',
+        cover: 'https://i0.hdslb.com/bfs/archive/a1ea3888aa76832689fb230764844ecd2afe7b9a.jpg',
+      },
+      {
+        category: '构建',
+        title: '知识图谱构建解说',
+        description: '演示从文件上传、知识抽取到图谱生成的完整过程。',
+        url: 'https://www.bilibili.com/video/BV1ceR8YeEhD',
+        cover: 'https://i2.hdslb.com/bfs/archive/6dd89c00275b733dfdb50ad7949eef22cd7a9b09.jpg',
+      },
+      {
+        category: '检索',
+        title: '知识图谱检索解说',
+        description: '介绍图谱索引、上下文检索与知识问答能力。',
+        url: 'https://www.bilibili.com/video/BV1weR8YeEjv',
+        cover: 'https://i0.hdslb.com/bfs/archive/2a2641bbc602b0516db8af5d4790cf67c2ed7006.jpg',
+      },
+      {
+        category: '集成',
+        title: 'UniGraph & Sapper',
+        description: '将 UniGraph 生成的知识能力接入智能体平台。',
+        url: 'https://www.bilibili.com/video/BV1kcZuYjEuM',
+        cover: 'https://i1.hdslb.com/bfs/archive/73262ab4fae706faed1c8f479650fd07a08cd794.jpg',
+      },
+    ],
+  }),
+  computed: {
+    filteredVideos() {
+      if (this.selectedCategory === 'all') return this.videos;
+      return this.videos.filter((video) => video.category === this.selectedCategory);
+    },
+  },
   mounted() {
-    document.title = "教程";
-    document.body.className = "h-screen overflow-hidden min-h-0";
-    this.controller = createTutorialsViewController();
+    document.title = '教程';
+    document.body.className = 'h-screen overflow-hidden min-h-0';
   },
   methods: {
-    filterVideos(...args) {
-      return this.controller?.filterVideos(...args);
-    },
-    showToast(...args) {
-      return this.controller?.showToast(...args);
+    categoryStyle(value) {
+      const active = this.selectedCategory === value;
+      return {
+        color: active ? 'var(--claude-primary)' : 'var(--claude-muted-foreground)',
+        borderBottom: active ? '2px solid var(--claude-primary)' : '2px solid transparent',
+        marginBottom: '-1px',
+      };
     },
   },
 };
@@ -213,6 +188,13 @@ export default {
 
 
 .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.video-cover__shade {
+  background: linear-gradient(180deg, rgba(28,25,23,0.04), rgba(28,25,23,0.22));
+}
+.video-item:focus-visible .video-cover {
+  outline: 2px solid var(--claude-ring);
+  outline-offset: 3px;
+}
 
 
 

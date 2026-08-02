@@ -29,11 +29,11 @@ export const KgBaseAPI = window.KgBaseAPI = {
       });
     },
     /** 注册 */
-    register({ username, password, nickname, email, captcha }) {
+    register({ username, password, email, captcha }) {
       const values = {
         username: Auth.encryptData(username),
         password: Auth.encryptData(password),
-        nickname: Auth.encryptData(nickname),
+        nickname: Auth.encryptData(username),
         email: Auth.encryptData(email),
         captcha: Auth.encryptData(captcha),
       };
@@ -234,7 +234,7 @@ export const KgBaseAPI = window.KgBaseAPI = {
     /**
      * 基于索引的问答（NDJSON 流式响应）
      * @param {string} uuid - 知识图谱 UUID
-     * @param {object} params - { message, infer, depth }
+     * @param {object} params - { message, infer, depth, chat_library_uuid, current_message_uuid, llm_model_uuid }
      * @param {function} onEvent - 事件回调
      */
     ask(uuid, params, onEvent) {
@@ -361,13 +361,16 @@ export const KgBaseAPI = window.KgBaseAPI = {
       const query = providerUuid ? `?llm_provider_uuid=${encodeURIComponent(providerUuid)}` : '';
       return API.get(`/v1/llm/model/all${query}`);
     },
-    createProvider(name) {
+    testModel(data) {
+      return API.post('/v1/llm/model/test', data);
+    },
+    createProvider(name, config = {}) {
       const user = Auth.getUserInfo() || {};
       return API.post('/v1/llm/provider', {
         name,
         user_uuid: user.uuid || user.user_uuid,
-        api_key: '',
-        api_url: '',
+        api_key: config.api_key || '',
+        api_url: config.api_url || '',
         document_url: '',
         llm_model_url: '',
       });

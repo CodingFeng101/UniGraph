@@ -49,11 +49,7 @@ class SuggestionGeneration:
             need_modify_prompt = need_modify_prompt.render(
                 actual_modify_entity_string=actual_modify_entity_string, language=language
             )
-            print(need_modify_prompt)
-
             directional_suggestion = await self.chatresponse(need_modify_prompt, api_key, base_url, model)
-            print(directional_suggestion)
-
             return directional_suggestion, self.info
         else:
             return '', self.info

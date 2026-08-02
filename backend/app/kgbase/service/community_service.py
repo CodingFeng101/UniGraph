@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import asyncio
-
 from fastapi import Request
 
 from backend.app.kgbase.crud.crud_community import community_dao
@@ -19,8 +17,6 @@ from backend.database.db_redis import redis_client
 
 
 class CommunityService:
-    _lock = asyncio.Lock()  # 创建一个类级别的异步锁
-
     @staticmethod
     async def add(*, obj: CommunityBase) -> str:
         async with async_db_session.begin() as db:

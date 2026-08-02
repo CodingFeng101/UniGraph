@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from backend.core.path_conf import STATIC_DIR
 
 router = APIRouter()
+IMAGE_EXTENSIONS = {'.gif', '.jpeg', '.jpg', '.png', '.webp'}
 
 
 @router.get(
@@ -21,6 +22,8 @@ async def get_image(unique_id: str, filename: str) -> FileResponse:
     try:
         if filename in {'.', '..'} or '/' in filename or '\\' in filename:
             raise HTTPException(status_code=400, detail='Invalid filename')
+        if Path(filename).suffix.lower() not in IMAGE_EXTENSIONS:
+            raise HTTPException(status_code=404, detail='Image does not exist')
 
         if unique_id != 'default':
             try:

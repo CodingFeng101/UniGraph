@@ -100,8 +100,7 @@ def get_new_entity_types_from_response(response):
                 # Add to dictionary
                 entity_type_dict[type] = entities
 
-    except Exception as e:
-        print('Error processing entities: ', e)
+    except Exception:
         raise
     return entity_type_dict
 
@@ -137,8 +136,7 @@ def get_new_relationship_types_from_response(response):
                 # Add to dictionary
                 relation_type_dict[type] = relationships
 
-    except Exception as e:
-        print('get_new_relationship_categories Error: ', e)
+    except Exception:
         raise  # Re-raise the caught exception
 
     return relation_type_dict
@@ -206,8 +204,7 @@ def convert_to_type_triples(instance_triples, entity_type_dict, relation_type_di
 
         return typed_triples
 
-    except Exception as e:
-        print(f'Error in convert_to_type_triples: {e}')
+    except Exception:
         raise
 
 
@@ -234,7 +231,14 @@ def extract_unique_entities_and_relations(triples):
     return {'entities': sorted(list(entities)), 'relations': sorted(list(relations))}
 
 
-async def merge_type_dicts_with_semantic(dict1, dict2):
+async def merge_type_dicts_with_semantic(
+    dict1,
+    dict2,
+    *,
+    embedding_api_key: str,
+    embedding_base_url: str,
+    embedding_model: str,
+):
     """
     Merge two type dictionaries using semantic similarity between keys
 
@@ -249,7 +253,12 @@ async def merge_type_dicts_with_semantic(dict1, dict2):
     all_words = list(dict1.keys()) + list(dict2.keys())
 
     # Batch get vector representations for all words to minimize API calls
-    word_vectors = await batch_get_vectors(all_words)
+    word_vectors = await batch_get_vectors(
+        all_words,
+        api_key=embedding_api_key,
+        base_url=embedding_base_url,
+        model=embedding_model,
+    )
 
     # Pre-compute vectors for dict1 keys
     dict1_vectors = {k: word_vectors[k] for k in dict1.keys()}

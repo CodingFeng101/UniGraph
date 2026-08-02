@@ -16,7 +16,15 @@ from backend.core.conf import settings
 def create_engine_and_session(url: str | URL):
     try:
         # 数据库引擎
-        engine = create_async_engine(url, echo=settings.MYSQL_ECHO, future=True, pool_pre_ping=True)
+        engine = create_async_engine(
+            url,
+            echo=settings.MYSQL_ECHO,
+            future=True,
+            pool_pre_ping=True,
+            pool_size=settings.MYSQL_POOL_SIZE,
+            max_overflow=settings.MYSQL_MAX_OVERFLOW,
+            pool_timeout=settings.MYSQL_POOL_TIMEOUT,
+        )
         # log.success('数据库连接成功')
     except Exception as e:
         log.error('❌ 数据库链接失败 {}', e)

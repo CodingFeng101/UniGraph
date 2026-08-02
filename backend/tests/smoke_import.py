@@ -44,7 +44,6 @@ TEST_ENV = {
     'CELERY_BACKEND_REDIS_DATABASE': '2',
     'EMBEDDING_MODEL': 'text-embedding-3-small',
     'OPENAI_API_KEY': 'test-key',
-    'SSO_USER_INFO_URL': 'http://127.0.0.1:8000/knowg/v1/sys/users/me',
     'INDEX_EXPORT_URL_ROOT': 'http://127.0.0.1:8000/knowg/v1/knowledge/ask',
     'CORS_ALLOWED_ORIGINS': '["http://localhost:5173"]',
 }
@@ -63,5 +62,6 @@ assert type(FileContentGetterFactory.create('document.pdf')).__name__ == 'PdfCon
 assert LangChainSplitter(20, 2).split('hello world')
 assert os.path.isfile(IP2REGION_XDB)
 assert any(getattr(route, 'path', None) == '/knowg/v1/docs' for route in app.routes)
+assert any(getattr(route, 'path', None) == '/knowg/v1/health' for route in app.routes)
 
 print('Backend runtime import smoke test passed.')

@@ -89,10 +89,11 @@
 
           <div class="flex flex-col gap-2">
             <label class="text-[12px] font-medium" style="color:var(--claude-muted-foreground);">封面</label>
-            <div class="h-24 rounded-lg flex items-center justify-center transition-colors cursor-pointer" style="border:2px dashed var(--claude-border);background:var(--claude-card);" @click="triggerCoverUpload()">
+            <div class="rounded-lg flex items-center justify-center py-6 px-3 transition-colors cursor-pointer" style="border:1.5px dashed var(--claude-border);background:var(--claude-accent);" @click="triggerCoverUpload()">
               <div class="flex flex-col items-center gap-1.5">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--claude-muted-foreground);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <span class="text-[12px]" style="color:var(--claude-muted-foreground);">点击或拖拽上传</span>
+                <span class="text-[12px]" style="color:var(--claude-muted-foreground);">点击上传封面</span>
+                <span class="text-[10px]" style="color:var(--claude-muted-foreground);opacity:0.75;">支持 JPG、PNG、WebP，最大 5 MB</span>
               </div>
             </div>
           </div>
@@ -136,7 +137,7 @@
   </div>
 </main>
 
-<input id="kb-cover-file" type="file" accept="image/*" class="hidden" @change="uploadCover($event.currentTarget)">
+<input id="kb-cover-file" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="uploadCover($event.currentTarget)">
 
 <TaskCenter />
 

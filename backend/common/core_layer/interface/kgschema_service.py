@@ -8,6 +8,9 @@ async def create_schema(
     api_key,
     base_url,
     model: str,
+    embedding_api_key: str,
+    embedding_base_url: str,
+    embedding_model: str,
     progress_callback=None,
 ):
     construction = SchemaConstruction(kg_schema=[], definition={})
@@ -20,6 +23,9 @@ async def create_schema(
         api_key=api_key,
         base_url=base_url,
         model=model,
+        embedding_api_key=embedding_api_key,
+        embedding_base_url=embedding_base_url,
+        embedding_model=embedding_model,
         progress_callback=progress_callback,
     )
     return schema, definition
@@ -35,6 +41,9 @@ async def update_schema(
     api_key,
     base_url,
     model: str,
+    embedding_api_key: str,
+    embedding_base_url: str,
+    embedding_model: str,
     progress_callback=None,
 ):
     construction = SchemaConstruction(kg_schema=kg_schema, definition=definition)
@@ -47,6 +56,9 @@ async def update_schema(
         api_key=api_key,
         base_url=base_url,
         model=model,
+        embedding_api_key=embedding_api_key,
+        embedding_base_url=embedding_base_url,
+        embedding_model=embedding_model,
         progress_callback=progress_callback,
     )
 

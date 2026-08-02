@@ -13,6 +13,7 @@ from backend.app.kgbase.schema.knowledge_entity import (
     UpdateKnowledgeEntityParam,
 )
 from backend.app.kgbase.service.knowledge_entity_service import knowledge_entity_service
+from backend.app.kgbase.service.ownership_service import ownership_service
 from backend.common.pagination import DependsPagination, paging_data
 from backend.common.response.response_schema import ResponseModel, response_base
 from backend.common.security.jwt import DependsJwtAuth
@@ -24,14 +25,18 @@ router = APIRouter()
 
 
 @router.get('/all/{knowledge_graph_uuid}', summary='获取实体类型下所有实体', dependencies=[DependsJwtAuth])
-async def get_all_knowledge_entities(knowledge_graph_uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_all_knowledge_entities(
+    request: Request, knowledge_graph_uuid: Annotated[str, Path(...)]
+) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=knowledge_graph_uuid)
     knowledge_entities = await knowledge_entity_service.get_all(knowledge_graph_uuid=knowledge_graph_uuid)
     data = [KnowledgeEntityResponse(**select_as_dict(knowledge_entity)) for knowledge_entity in knowledge_entities]
     return response_base.success(data=data)
 
 
 @router.get('/{uuid}', summary='获取实体详情', dependencies=[DependsJwtAuth])
-async def get_knowledge_entity(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_knowledge_entity(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_entity(user_uuid=request.user.uuid, uuid=uuid)
     knowledge_entity = await knowledge_entity_service.get_knowledge_entity(uuid=uuid)
     data = GetKnowledgeEntityDetail(**select_as_dict(knowledge_entity))
     return response_base.success(data=data)
@@ -63,7 +68,8 @@ async def get_pagination_knowledge_entities(
     summary='创建实体',
     dependencies=[DependsJwtAuth, Depends(RequestPermission('sys:knowledge_entity:add'))],
 )
-async def create_knowledge_entity(obj: AddKnowledgeEntityParam) -> ResponseModel:
+async def create_knowledge_entity(request: Request, obj: AddKnowledgeEntityParam) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=obj.knowledge_graph_uuid)
     await knowledge_entity_service.add(obj=obj)
     return response_base.success()
 
@@ -73,7 +79,10 @@ async def create_knowledge_entity(obj: AddKnowledgeEntityParam) -> ResponseModel
     summary='更新实体',
     dependencies=[Depends(RequestPermission('sys:knowledge_entity:edit'))],
 )
-async def update_knowledge_entity(uuid: Annotated[str, Path(...)], obj: UpdateKnowledgeEntityParam) -> ResponseModel:
+async def update_knowledge_entity(
+    request: Request, uuid: Annotated[str, Path(...)], obj: UpdateKnowledgeEntityParam
+) -> ResponseModel:
+    await ownership_service.require_knowledge_entity(user_uuid=request.user.uuid, uuid=uuid)
     count = await knowledge_entity_service.update(uuid=uuid, obj=obj)
     if count > 0:
         return response_base.success()
@@ -85,7 +94,8 @@ async def update_knowledge_entity(uuid: Annotated[str, Path(...)], obj: UpdateKn
     summary='删除实体',
     dependencies=[Depends(RequestPermission('sys:knowledge_entity:del'))],
 )
-async def delete_knowledge_entity(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def delete_knowledge_entity(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_entity(user_uuid=request.user.uuid, uuid=uuid)
     count = await knowledge_entity_service.delete(uuid=uuid)
     if count > 0:
         return response_base.success()
@@ -98,7 +108,8 @@ async def delete_knowledge_entity(uuid: Annotated[str, Path(...)]) -> ResponseMo
     summary='更新实体状态',
     dependencies=[Depends(RequestPermission('sys:knowledge_entity:status'))],
 )
-async def update_knowledge_entity_status(pk: Annotated[int, Path(...)]) -> ResponseModel:
+async def update_knowledge_entity_status(request: Request, pk: Annotated[int, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_entity(user_uuid=request.user.uuid, pk=pk)
     count = await knowledge_entity_service.update_status(pk=pk)
     if count > 0:
         return response_base.success()

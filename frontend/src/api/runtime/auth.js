@@ -20,6 +20,12 @@ export const Auth = window.Auth = {
     return localStorage.getItem(TOKEN_KEY);
   },
 
+  /** 获取认证请求头 */
+  getAuthHeader() {
+    const token = this.getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  },
+
   /** 设置 token */
   setToken(token) {
     localStorage.setItem(TOKEN_KEY, token);
@@ -38,7 +44,13 @@ export const Auth = window.Auth = {
   /** 获取用户信息 */
   getUserInfo() {
     const info = localStorage.getItem(USER_KEY);
-    return info ? JSON.parse(info) : null;
+    if (!info) return null;
+    try {
+      return JSON.parse(info);
+    } catch {
+      this.clearUserInfo();
+      return null;
+    }
   },
 
   /** 清除用户信息 */
@@ -80,6 +92,9 @@ export const Auth = window.Auth = {
    * @returns {{ciphertext: string, iv: string}} Base64 编码的密文和 IV
    */
   encryptData(data) {
+    if (!AppConfig.ENCRYPT_SECRET_KEY) {
+      throw new Error('缺少 VITE_AUTH_AES_SECRET_KEY，请先完成前后端登录加密配置');
+    }
     const key = CryptoJS.enc.Base64.parse(AppConfig.ENCRYPT_SECRET_KEY);
     const iv = CryptoJS.lib.WordArray.random(16);
     const encrypted = CryptoJS.AES.encrypt(data, key, { iv });

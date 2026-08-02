@@ -153,7 +153,6 @@ export default {
 }
 
 .setting-row + .setting-row { margin-top: 4px; }
-
 .setting-row > span {
   display: flex;
   flex-direction: column;
@@ -186,7 +185,6 @@ export default {
 
 .depth-trigger:hover { background: var(--claude-secondary); }
 .depth-trigger:active { transform: scale(.98); }
-
 .depth-menu {
   position: absolute;
   z-index: 100;

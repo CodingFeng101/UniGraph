@@ -1,4 +1,8 @@
+import logging
+
 from .base_parser import ResponseParser
+
+logger = logging.getLogger(__name__)
 
 
 class EntityExtractionResponseParser(ResponseParser):
@@ -26,10 +30,8 @@ class EntityExtractionResponseParser(ResponseParser):
                     entity = entity.strip()
                     entity_type = entity_type.strip()
                     entity_type_dict[entity] = entity_type
-            except ValueError:
-                pass
-            except Exception:
-                pass
+            except (TypeError, ValueError):
+                continue
 
         return entity_type_dict
 
@@ -104,9 +106,8 @@ class RelationExtractionResponseParser(ResponseParser):
                         key = f'{entity1_name}-{relation}-{entity2_name}'
                         source_text_dict[key] = source_text
 
-            except Exception as e:
-                print(f"Error parsing entry '{entry}': {e}")
-                pass
+            except Exception:
+                logger.warning('Skipped an invalid extraction entry', exc_info=True)
         return triples_dict, list(set(extracted_entities)), source_text_dict
 
 
@@ -142,9 +143,7 @@ class AttributeExtractionResponseParser(ResponseParser):
                             key, value = attr.split(':', 1)
                             attr_dict[key.strip()] = value.strip()
                     entity_dict[entity_name] = attr_dict
-            except ValueError:
-                pass
-            except Exception:
-                pass
+            except (TypeError, ValueError):
+                continue
 
         return entity_dict

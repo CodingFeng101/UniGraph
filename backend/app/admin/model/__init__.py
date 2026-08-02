@@ -1,5 +1,7 @@
 #!/usr/bin/.env python3
 # -*- coding: utf-8 -*-
+from backend.app.admin.model.llm_model import LlmModel
+from backend.app.admin.model.llm_provider_model import LlmProvider
 from backend.app.admin.model.sys_api import Api
 from backend.app.admin.model.sys_casbin_rule import CasbinRule
 from backend.app.admin.model.sys_config import Config

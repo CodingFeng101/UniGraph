@@ -68,7 +68,7 @@ class RBAC:
         if not any(len(role.menus) > 0 for role in user_roles):
             raise AuthorizationError(msg='用户所属角色未分配菜单，授权失败')
         method = request.method
-        if method != MethodType.GET or method != MethodType.OPTIONS:
+        if method not in (MethodType.GET, MethodType.OPTIONS):
             if not request.user.is_staff:
                 raise AuthorizationError(msg='此用户已被禁止后台管理操作')
         # 数据权限范围

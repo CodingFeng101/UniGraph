@@ -12,6 +12,7 @@ from backend.app.kgbase.schema.knowledge_relationship import (
     UpdateKnowledgeRelationshipParam,
 )
 from backend.app.kgbase.service.knowledge_relationship_service import knowledge_relationship_service
+from backend.app.kgbase.service.ownership_service import ownership_service
 from backend.common.pagination import DependsPagination, paging_data
 from backend.common.response.response_schema import ResponseModel, response_base
 from backend.common.security.jwt import DependsJwtAuth
@@ -23,7 +24,10 @@ router = APIRouter()
 
 
 @router.get('/all/{knowledge_graph_uuid}', summary='获取关系类型下所有实体', dependencies=[DependsJwtAuth])
-async def get_all_knowledge_relationships(knowledge_graph_uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_all_knowledge_relationships(
+    request: Request, knowledge_graph_uuid: Annotated[str, Path(...)]
+) -> ResponseModel:
+    await ownership_service.require_knowledge_graph(user_uuid=request.user.uuid, uuid=knowledge_graph_uuid)
     knowledge_relationships = await knowledge_relationship_service.get_all(knowledge_graph_uuid=knowledge_graph_uuid)
     data = [
         KnowledgeRelationshipResponse(**select_as_dict(knowledge_relationship))
@@ -33,7 +37,8 @@ async def get_all_knowledge_relationships(knowledge_graph_uuid: Annotated[str, P
 
 
 @router.get('/{uuid}', summary='获取关系类型详情', dependencies=[DependsJwtAuth])
-async def get_knowledge_relationship(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_knowledge_relationship(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_relationship(user_uuid=request.user.uuid, uuid=uuid)
     knowledge_relationship = await knowledge_relationship_service.get_knowledge_relationship(uuid=uuid)
     data = KnowledgeRelationshipResponse(**select_as_dict(knowledge_relationship))
     return response_base.success(data=data)
@@ -66,6 +71,16 @@ async def get_pagination_knowledge_relationships(
     dependencies=[DependsJwtAuth, Depends(RequestPermission('sys:knowledge_relationship:add'))],
 )
 async def create_knowledge_relationship(request: Request, obj: AddKnowledgeRelationshipParam) -> ResponseModel:
+    await ownership_service.require_knowledge_entity_in_graph(
+        user_uuid=request.user.uuid,
+        entity_uuid=obj.source_entity_uuid,
+        knowledge_graph_uuid=obj.knowledge_graph_uuid,
+    )
+    await ownership_service.require_knowledge_entity_in_graph(
+        user_uuid=request.user.uuid,
+        entity_uuid=obj.target_entity_uuid,
+        knowledge_graph_uuid=obj.knowledge_graph_uuid,
+    )
     await knowledge_relationship_service.add(obj=obj)
     return response_base.success()
 
@@ -76,8 +91,9 @@ async def create_knowledge_relationship(request: Request, obj: AddKnowledgeRelat
     dependencies=[Depends(RequestPermission('sys:knowledge_relationship:edit'))],
 )
 async def update_knowledge_relationship(
-    uuid: Annotated[str, Path(...)], obj: UpdateKnowledgeRelationshipParam
+    request: Request, uuid: Annotated[str, Path(...)], obj: UpdateKnowledgeRelationshipParam
 ) -> ResponseModel:
+    await ownership_service.require_knowledge_relationship(user_uuid=request.user.uuid, uuid=uuid)
     count = await knowledge_relationship_service.update(uuid=uuid, obj=obj)
     if count > 0:
         return response_base.success()
@@ -89,7 +105,8 @@ async def update_knowledge_relationship(
     summary='（批量）删除关系',
     dependencies=[Depends(RequestPermission('sys:knowledge_relationship:del'))],
 )
-async def delete_knowledge_relationship(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def delete_knowledge_relationship(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_relationship(user_uuid=request.user.uuid, uuid=uuid)
     count = await knowledge_relationship_service.delete(uuid=uuid)
     if count > 0:
         return response_base.success()
@@ -101,7 +118,8 @@ async def delete_knowledge_relationship(uuid: Annotated[str, Path(...)]) -> Resp
     summary='更新关系状态',
     dependencies=[Depends(RequestPermission('sys:knowledge_relationship:status'))],
 )
-async def update_knowledge_relationship_status(pk: Annotated[int, Path(...)]) -> ResponseModel:
+async def update_knowledge_relationship_status(request: Request, pk: Annotated[int, Path(...)]) -> ResponseModel:
+    await ownership_service.require_knowledge_relationship(user_uuid=request.user.uuid, pk=pk)
     count = await knowledge_relationship_service.update_status(pk=pk)
     if count > 0:
         return response_base.success()

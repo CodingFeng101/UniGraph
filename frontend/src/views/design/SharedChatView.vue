@@ -1,5 +1,5 @@
 <template>
-  <main class="shared-chat-page">
+  <main class="shared-chat-page" @click="handlePageClick" @pointerout="handleCitationPointerOut">
     <header class="shared-chat-header">
       <a class="shared-chat-brand" href="/unigraph/login" aria-label="返回 UniGraph">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -40,13 +40,19 @@
           class="shared-chat-message"
           :class="`shared-chat-message--${message.role}`"
         >
-          <div class="shared-chat-message__role">{{ message.role === 'user' ? '用户' : 'UniGraph' }}</div>
-          <div class="shared-chat-message__body" v-html="renderContent(message.content)"></div>
-          <div v-if="message.role === 'assistant' && message.sources?.length" class="shared-chat-sources">
-            <details v-for="source in message.sources" :key="source.source_type" class="shared-chat-source">
-              <summary>{{ sourceLabel(source.source_type) }}</summary>
-              <pre>{{ formatSource(source.content) }}</pre>
-            </details>
+          <template v-if="message.role === 'user'">
+            <div class="shared-chat-user-row">
+              <div class="shared-chat-user-shell">
+                <div class="shared-chat-user-bubble" v-html="renderChatMarkdown(message.content)"></div>
+              </div>
+            </div>
+            <span class="shared-chat-message__time">{{ formatMessageTime(message.created_time) }}</span>
+          </template>
+          <div v-else class="shared-chat-assistant-shell">
+            <div
+              class="shared-chat-answer ai-answer text-[15px] leading-[1.75] space-y-3"
+              v-html="renderAnswerWithCitations(message.content, message.sources)"
+            ></div>
           </div>
         </section>
       </div>
@@ -61,39 +67,54 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import DOMPurify from 'dompurify';
-import MarkdownIt from 'markdown-it';
 import { KgBaseAPI } from '@/api';
+import { renderAnswerWithCitations, renderChatMarkdown } from '@/utils/chat-content';
 
 const route = useRoute();
-const markdown = new MarkdownIt({ html: false, linkify: true, breaks: true });
 const loading = ref(true);
 const error = ref('');
 const share = ref({ conversation: [] });
 const originalTitle = document.title;
 let robotsMeta = null;
 
-function renderContent(content) {
-  return DOMPurify.sanitize(markdown.render(String(content || '')));
-}
-
-function sourceLabel(type) {
-  return ({
-    Sources: '原文来源',
-    Entities: '相关实体',
-    Relationships: '相关关系',
-    Communities: '相关社区',
-  })[type] || type;
-}
-
-function formatSource(content) {
-  if (typeof content === 'string') return content;
-  return JSON.stringify(content, null, 2);
-}
-
 function formatDate(value) {
   if (!value) return '未知时间';
   return new Date(value).toLocaleString('zh-CN', { hour12: false });
+}
+
+function formatMessageTime(value) {
+  if (!value) return '';
+  return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function closeCitations(except) {
+  document.querySelectorAll('[data-citation].is-open').forEach((citation) => {
+    if (citation === except) return;
+    citation.classList.remove('is-open');
+    citation.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function handlePageClick(event) {
+  const citation = event.target.closest('[data-citation]');
+  if (citation && !event.target.closest('.source-popup')) {
+    const shouldOpen = !citation.classList.contains('is-open');
+    closeCitations();
+    if (shouldOpen) {
+      citation.classList.add('is-open');
+      citation.setAttribute('aria-expanded', 'true');
+    }
+    return;
+  }
+  if (!event.target.closest('.source-popup')) closeCitations();
+}
+
+function handleCitationPointerOut(event) {
+  const citation = event.target.closest('[data-citation]');
+  if (!citation || citation.contains(event.relatedTarget)) return;
+  citation.classList.remove('is-open');
+  citation.setAttribute('aria-expanded', 'false');
+  citation.blur();
 }
 
 onMounted(async () => {
@@ -165,6 +186,8 @@ onUnmounted(() => {
 }
 
 .shared-chat-title {
+  width: min(680px, 100%);
+  margin: 0 auto;
   padding-bottom: 34px;
   border-bottom: 1px solid var(--claude-border);
 }
@@ -190,64 +213,37 @@ onUnmounted(() => {
   font-size: 12px;
 }
 
-.shared-chat-transcript { padding-top: 10px; }
-
-.shared-chat-message {
-  padding: 30px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--claude-border) 76%, transparent);
-}
-
-.shared-chat-message__role {
-  margin-bottom: 10px;
-  color: var(--claude-muted-foreground);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.shared-chat-message--user .shared-chat-message__body {
-  padding: 14px 17px;
-  border-radius: 13px;
-  background: var(--claude-muted);
-}
-
-.shared-chat-message__body {
-  font-size: 15px;
-  line-height: 1.75;
-}
-
-.shared-chat-message__body :deep(p) { margin: 0 0 12px; }
-.shared-chat-message__body :deep(p:last-child) { margin-bottom: 0; }
-.shared-chat-message__body :deep(pre) { overflow: auto; padding: 14px; border-radius: 9px; background: var(--claude-muted); }
-.shared-chat-message__body :deep(code) { font-family: var(--claude-font-mono); font-size: .9em; }
-
-.shared-chat-sources {
-  margin-top: 18px;
+.shared-chat-transcript {
   display: grid;
-  gap: 6px;
+  gap: 24px;
+  width: min(680px, 100%);
+  margin: 0 auto;
+  padding-top: 28px;
 }
 
-.shared-chat-source {
-  border-top: 1px solid var(--claude-border);
+.shared-chat-message { min-width: 0; }
+
+.shared-chat-user-row { display: flex; justify-content: flex-end; }
+.shared-chat-user-shell { width: fit-content; max-width: 520px; }
+.shared-chat-user-bubble {
+  padding: 12px 20px;
+  border-radius: 16px;
+  background: var(--claude-secondary);
+  color: var(--claude-foreground);
+  font-size: 15px;
+  line-height: 1.625;
+}
+.shared-chat-user-bubble :deep(p) { margin: 0; white-space: pre-wrap; }
+.shared-chat-message__time {
+  display: block;
+  margin-top: 6px;
+  padding-right: 6px;
   color: var(--claude-muted-foreground);
-  font-size: 12px;
-}
-
-.shared-chat-source summary {
-  padding: 9px 2px;
-  cursor: pointer;
-}
-
-.shared-chat-source pre {
-  max-height: 220px;
-  margin: 0 0 10px;
-  padding: 10px 12px;
-  overflow: auto;
-  border-radius: 8px;
-  background: var(--claude-muted);
-  white-space: pre-wrap;
-  font-family: var(--claude-font-mono);
   font-size: 11px;
+  text-align: right;
 }
+.shared-chat-assistant-shell { width: 100%; max-width: 680px; }
+.shared-chat-answer { color: var(--claude-card-foreground); font-family: var(--claude-font-serif); }
 
 .shared-chat-footer {
   padding-top: 28px;

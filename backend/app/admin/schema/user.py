@@ -24,24 +24,9 @@ class AuthLoginParam(AuthSchemaBase):
     captcha_iv: str  # 添加 iv 字段
 
 
-class AuthSSOLoginParam(SchemaBase):
-    username: str
-    username_iv: str  # 添加 iv 字段
-
-
 class RegisterUserParam(AuthSchemaBase):
     nickname: str
     email: str
-
-
-class SSORegisterUserParam(SchemaBase):
-    username: str
-    username_iv: str  # 添加 iv 字段
-    nickname: str
-    nickname_iv: str
-    password: Optional[str] = None
-    captcha: Optional[str] = None
-    email: Optional[str] = None
 
 
 class AuthRegisterParam(SchemaBase):
@@ -89,9 +74,6 @@ class UpdateUserParam(SchemaBase):
     email: str
     nickname: str
     username: str
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
-    model: Optional[str] = None
 
 
 class UpdateUserPwdParam(UserInfoSchemaBase):
@@ -137,9 +119,6 @@ class GetCurrentUserInfoDetail(GetUserInfoListDetails):
     depts: Optional[List[GetDeptListDetails] | List[str]] = None
     roles: Optional[List[GetRoleListDetails] | List[str]] = None
     text_generation_model: Optional[str] = None
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
-    model: Optional[str] = None
 
     @model_validator(mode='after')
     def handel(self) -> Self:

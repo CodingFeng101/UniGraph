@@ -16,12 +16,12 @@ class AdminSettings(BaseSettings):
     # GitHub
     OAUTH2_GITHUB_CLIENT_ID: str
     OAUTH2_GITHUB_CLIENT_SECRET: str
-    OAUTH2_GITHUB_REDIRECT_URI: str = 'http://127.0.0.1:8000/tsp/v1/oauth2/github/callback'
+    OAUTH2_GITHUB_REDIRECT_URI: str = 'http://127.0.0.1:8000/knowg/v1/oauth2/github/callback'
 
     # Linux Do
     OAUTH2_LINUX_DO_CLIENT_ID: str
     OAUTH2_LINUX_DO_CLIENT_SECRET: str
-    OAUTH2_LINUX_DO_REDIRECT_URI: str = 'http://127.0.0.1:8000/tsp/v1/oauth2/linux-do/callback'
+    OAUTH2_LINUX_DO_REDIRECT_URI: str = 'http://127.0.0.1:8000/knowg/v1/oauth2/linux-do/callback'
 
     # Front-end redirect address
     OAUTH2_FRONTEND_REDIRECT_URI: str = 'http://localhost:5173/oauth2/callback'

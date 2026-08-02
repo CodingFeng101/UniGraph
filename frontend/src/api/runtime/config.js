@@ -19,5 +19,5 @@ export const AppConfig = window.AppConfig = {
   // kgbase 模块前缀
   KG_PREFIX: '/v1/kg',
   // 登录加密密钥（AES-256-CBC，与后端一致）
-  ENCRYPT_SECRET_KEY: 'G8ZyYyZ0Xf5x5f6uZrwf6ft4gD0pniYAkHp/Y6f4Pv4=',
+  ENCRYPT_SECRET_KEY: runtimeConfig.VITE_AUTH_AES_SECRET_KEY || import.meta.env.VITE_AUTH_AES_SECRET_KEY || '',
 };

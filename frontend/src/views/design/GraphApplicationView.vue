@@ -13,7 +13,7 @@
     </button>
   </div>
 
-  <div class="flex-1 overflow-y-auto" id="chat-container">
+  <div class="flex-1 overflow-y-auto overflow-x-hidden" id="chat-container">
     <div id="chat-message-list" class="max-w-[680px] mx-auto px-8 py-6 space-y-6" style="visibility:hidden;">
       <div class="group">
         <div class="flex justify-end">
@@ -43,20 +43,6 @@
               <span class="text-[10px] ml-auto shrink-0 px-1.5 py-0.5 rounded-full" style="background:var(--claude-muted);color:var(--claude-muted-foreground);font-family:var(--claude-font-mono);">7/8</span>
             </button>
             <div class="trace-body pl-0 pr-0 pb-1 pt-1" style="max-height:800px;opacity:1;">
-              <div class="flex gap-3">
-                <div class="flex flex-col items-center">
-                  <div class="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5" style="background:var(--claude-success-500);">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary-foreground)" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                  </div>
-                  <div class="w-px flex-1 mt-1" style="background:var(--claude-border);"></div>
-                </div>
-                <div class="pb-3 flex-1 min-w-0">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs" style="color:var(--claude-foreground);">接收问题</span>
-                    <span class="text-[10px] shrink-0" style="color:var(--claude-muted-foreground);font-family:var(--claude-font-mono);">09:45:12</span>
-                  </div>
-                </div>
-              </div>
               <div class="flex gap-3">
                 <div class="flex flex-col items-center">
                   <div class="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5" style="background:var(--claude-success-500);">
@@ -180,11 +166,11 @@
 
           <div class="text-[15px] leading-[1.75] space-y-3" style="font-family:var(--claude-font-serif);color:var(--claude-card-foreground);">
             <p>根据知识图谱数据，张磊（Person_001）目前负责 <strong style="font-weight:600;">2 个核心项目</strong>。
-              <span class="source-tag inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium align-middle whitespace-nowrap ml-1 cursor-pointer relative" style="background:var(--claude-accent);color:var(--claude-brand-700);" data-source-type="细节重点" data-source-title="细节重点" data-source-entities="Person_001" data-source-desc="从实体 Person_001 的属性中提取，确认该人员负责的项目数量为 2 个核心项目。">细节重点
+              <span class="source-tag inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium align-middle whitespace-nowrap ml-1 cursor-pointer relative" style="background:var(--claude-accent);color:var(--claude-brand-700);" data-source-type="重点知识细节" data-source-title="重点知识细节" data-source-entities="Person_001" data-source-desc="从实体 Person_001 的属性中提取，确认该人员负责的项目数量为 2 个核心项目。">重点知识细节
                 <div class="source-popup">
                   <div class="source-popup-title">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    细节重点
+                    重点知识细节
                   </div>
                   <div class="source-popup-row"><b>来源实体：</b></div>
                   <div><span class="source-popup-entity">Person_001</span></div>
@@ -194,11 +180,11 @@
             </p>
             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] border whitespace-nowrap" style="border-color:var(--claude-border);color:var(--claude-brand-700);font-family:var(--claude-font-mono);background:var(--claude-background);">Person_001</span>
             <p>他主要负责的项目包括"智能制造平台"（Project_012）和"供应链优化系统"（Project_045），其中"智能制造平台"为公司级战略项目。
-              <span class="source-tag inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium align-middle whitespace-nowrap ml-1 cursor-pointer relative" style="background:var(--claude-accent);color:var(--claude-brand-700);" data-source-type="具体来源" data-source-title="具体来源" data-source-entities="Project_012, Project_045" data-source-desc="通过 Person_001 → 负责 → Project_012/Project_045 的关系路径检索，确认具体项目名称及属性。">具体来源
+              <span class="source-tag inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium align-middle whitespace-nowrap ml-1 cursor-pointer relative" style="background:var(--claude-accent);color:var(--claude-brand-700);" data-source-type="具体信息来源" data-source-title="具体信息来源" data-source-entities="Project_012, Project_045" data-source-desc="通过 Person_001 → 负责 → Project_012/Project_045 的关系路径检索，确认具体项目名称及属性。">具体信息来源
                 <div class="source-popup">
                   <div class="source-popup-title">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    具体来源
+                    具体信息来源
                   </div>
                   <div class="source-popup-row"><b>来源实体：</b></div>
                   <div><span class="source-popup-entity">Project_012</span><span class="source-popup-entity">Project_045</span></div>
@@ -208,11 +194,11 @@
             </p>
             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] border whitespace-nowrap" style="border-color:var(--claude-border);color:var(--claude-brand-700);font-family:var(--claude-font-mono);background:var(--claude-background);">Project_012</span>
             <p>在部门关联方面，张磊隶属于技术研发部（Department_003），同时因跨部门协作项目与产品部、运维部存在协作关系。
-              <span class="source-tag inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium align-middle whitespace-nowrap ml-1 cursor-pointer relative" style="background:var(--claude-accent);color:var(--claude-brand-700);" data-source-type="知识关联" data-source-title="知识关联" data-source-entities="Department_003" data-source-desc="通过 Person_001 → 属于 → Department_003 以及 Department_003 → 协作 → 产品部/运维部 的多跳关系推理得出。">知识关联
+              <span class="source-tag inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium align-middle whitespace-nowrap ml-1 cursor-pointer relative" style="background:var(--claude-accent);color:var(--claude-brand-700);" data-source-type="相关知识关联" data-source-title="相关知识关联" data-source-entities="Department_003" data-source-desc="通过 Person_001 → 属于 → Department_003 以及 Department_003 → 协作 → 产品部/运维部 的多跳关系推理得出。">相关知识关联
                 <div class="source-popup">
                   <div class="source-popup-title">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    知识关联
+                    相关知识关联
                   </div>
                   <div class="source-popup-row"><b>来源实体：</b></div>
                   <div><span class="source-popup-entity">Department_003</span></div>
@@ -296,30 +282,29 @@
         <div class="flex items-center gap-2 pt-2">
           <button type="button" @click="triggerChatAttachments()" class="group relative w-8 h-8 inline-flex items-center justify-center transition-opacity hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-foreground);" aria-label="上传附件">
             <i data-lucide="plus" style="width:17px;height:17px;stroke-width:1.8;"></i>
-            <span class="pointer-events-none absolute left-1/2 bottom-full mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100" style="background:var(--claude-foreground);color:var(--claude-background);box-shadow:var(--claude-shadow-md);">上传附件</span>
+            <span class="pointer-events-none absolute left-1/2 bottom-full mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100" style="background:var(--claude-foreground);color:var(--claude-background);box-shadow:var(--claude-shadow-md);">上传附件（单个最大 50 MB）</span>
           </button>
 
-          <div class="relative">
-            <button type="button" data-role="kg-trigger" @click="selectKnowledgeGraph()" class="h-8 flex items-center gap-1.5 px-2 text-[13px] transition-opacity hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-foreground);" title="选择知识图谱索引">
-              <span id="kg-status-dot" class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-success-500);"></span>
-              <span id="kg-selector-label">选择知识图谱</span>
+          <div class="relative min-w-[190px]">
+            <button type="button" data-role="kg-trigger" disabled @click="selectKnowledgeGraph()" class="h-8 w-[190px] flex items-center justify-between gap-2 px-2 text-[13px] transition-opacity disabled:cursor-not-allowed disabled:opacity-60" style="background:transparent;border:none;color:var(--claude-muted-foreground);" title="暂无可用索引">
+              <span id="kg-selector-label" class="truncate">暂无可用索引</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
-            <div id="kg-selector-menu" class="hidden absolute left-0 bottom-full mb-2 w-48 max-h-56 overflow-y-auto rounded-xl p-1 z-50" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
+            <div id="kg-selector-menu" class="hidden absolute left-0 bottom-full mb-2 w-[240px] max-h-56 overflow-y-auto rounded-xl p-1 z-50" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
           </div>
 
           <div class="flex-1"></div>
 
           <div class="relative">
-            <button type="button" data-role="model-trigger" @click="toggleModelDropdown()" class="h-8 inline-flex items-center gap-1.5 px-2 text-[13px] cursor-pointer transition-opacity hover:opacity-70" style="background:transparent;border:none;color:var(--claude-foreground);">
-              <span id="model-value">UG-4o</span>
+            <button type="button" data-role="model-trigger" disabled @click="toggleModelDropdown()" class="h-8 inline-flex items-center gap-1.5 px-2 text-[13px] transition-opacity disabled:cursor-not-allowed disabled:opacity-60" style="background:transparent;border:none;color:var(--claude-muted-foreground);">
+              <span id="model-value">暂无可用模型</span>
               <span id="effort-value" class="text-[12px]" style="color:var(--claude-muted-foreground);">Low</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div id="model-dropdown" class="hidden absolute bottom-full right-0 mb-2 w-56 rounded-xl z-50 p-1" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-              <div id="current-model-item" class="px-3 py-2 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]" @click="selectModel($event.currentTarget,'UG-4o')">
+              <div id="current-model-item" class="px-3 py-2 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]">
                 <div class="flex items-center justify-between">
-                  <span class="text-[13px] font-medium" style="color:var(--claude-foreground);">UG-4o</span>
+                  <span class="text-[13px] font-medium" style="color:var(--claude-muted-foreground);">暂无可用模型</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
               </div>
@@ -327,26 +312,26 @@
               <div class="relative">
                 <div id="effort-panel" class="hidden absolute left-full bottom-0 ml-2 w-72 rounded-xl p-2" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
                   <div class="px-3 py-1.5">
-                    <p class="text-[11px] leading-snug" style="color:var(--claude-muted-foreground);">Higher effort means more thorough responses, but takes longer</p>
+                    <p class="text-[11px] leading-snug" style="color:var(--claude-muted-foreground);">档位越高，知识图谱检索层级越深，回答耗时也会增加</p>
                   </div>
                   <div class="px-2 space-y-0.5">
                     <div class="px-2.5 py-1.5 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]" @click="selectEffort('Low')">
                       <div class="flex items-center justify-between">
                         <div class="flex items-center gap-1.5">
-                          <span class="text-[13px]" style="color:var(--claude-foreground);">Low</span>
+                          <span class="text-[13px]" style="color:var(--claude-foreground);">Low · 1 跳</span>
                           <span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:var(--claude-accent);color:var(--claude-muted-foreground);">Default</span>
                         </div>
                         <svg class="effort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                       </div>
                     </div>
                     <div class="px-2.5 py-1.5 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]" @click="selectEffort('Medium')">
-                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">Medium</span>
+                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">Medium · 2 跳</span>
                     </div>
                     <div class="px-2.5 py-1.5 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]" @click="selectEffort('High')">
-                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">High</span>
+                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">High · 3 跳</span>
                     </div>
                     <div class="px-2.5 py-1.5 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]" @click="selectEffort('Max')">
-                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">Max</span>
+                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">Max · 4 跳</span>
                     </div>
                   </div>
                 </div>
@@ -516,7 +501,8 @@ export default {
 
 @keyframes trace-pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
 @keyframes dot-blink { 0%,80%,100%{opacity:0.3;} 40%{opacity:1;} }
-@keyframes thinking-log-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes thinking-log-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes thinking-spin { to { transform: rotate(360deg); } }
 #app-main { position: relative; }
 .chat-composer-shell { position: relative; z-index: 35; }
 .chat-composer { box-shadow: var(--claude-shadow-sm); will-change: transform, opacity; }
@@ -677,51 +663,114 @@ export default {
 .chat-inline-edit__save:hover { background: color-mix(in srgb, var(--claude-foreground) 88%, transparent); }
 .chat-inline-edit__save:disabled { opacity: .55; cursor: wait; }
 @media (max-width: 900px) { .chat-outline { display: none !important; } }
-.ai-thinking-log { margin: 8px 0 0 22px; display: grid; gap: 5px; }
-.ai-thinking-log__item { display: grid; grid-template-columns: 8px auto; align-items: center; column-gap: 7px; color: var(--claude-muted-foreground); font-size: 12px; line-height: 1.35; transition: opacity .18s ease; animation: thinking-log-enter .22s ease-out both; }
-.ai-thinking-log__dot { width: 5px; height: 5px; border-radius: 50%; background: var(--claude-accent); }
-.ai-thinking-log__detail { grid-column: 2; color: color-mix(in srgb, var(--claude-muted-foreground) 78%, transparent); font-size: 11px; }
-.source-popup {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  min-width: 240px;
-  max-width: 300px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  z-index: 100;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.18s ease;
-  background: var(--claude-card);
-  border: 1px solid var(--claude-border);
-  box-shadow: var(--claude-shadow-lg);
-}
-.source-tag:hover .source-popup { opacity: 1; }
-.source-popup::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: var(--claude-border);
-}
-.source-popup-title {
-  font-size: 11px;
-  font-weight: 600;
-  margin-bottom: 6px;
+.ai-thinking { width: min(100%, 680px); }
+.ai-thinking-summary {
+  width: fit-content;
+  max-width: 100%;
   display: flex;
   align-items: center;
-  gap: 5px;
-  color: var(--claude-brand-700);
+  gap: 7px;
+  list-style: none;
+  color: var(--claude-muted-foreground);
+  font-family: var(--claude-font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+  user-select: none;
+}
+.ai-thinking-summary::-webkit-details-marker { display: none; }
+.ai-thinking-summary__status { width: 15px; height: 15px; display: grid; flex: none; place-items: center; }
+.ai-thinking-summary__status svg { width: 14px; height: 14px; stroke-width: 1.7; }
+.ai-thinking[data-state="running"] .ai-thinking-summary__status svg { animation: thinking-spin 1.35s linear infinite; }
+.ai-thinking[data-state="error"] .ai-thinking-summary__status { color: var(--claude-destructive); }
+.ai-thinking-summary__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-thinking-summary__chevron { width: 13px; height: 13px; flex: none; transition: transform .16s ease; }
+.ai-thinking[open] .ai-thinking-summary__chevron { transform: rotate(90deg); }
+.ai-thinking-body { padding: 15px 0 2px 5px; }
+.ai-thinking-log { width: 100%; display: grid; }
+.ai-thinking-log__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  column-gap: 12px;
+  padding: 0 0 18px;
+  color: var(--claude-muted-foreground);
+  font-family: var(--claude-font-sans);
+  font-size: 13px;
+  line-height: 1.55;
+  animation: thinking-log-enter .18s ease-out both;
+}
+.ai-thinking-log__item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 18px;
+  bottom: 0;
+  width: 1px;
+  background: var(--claude-border);
+}
+.ai-thinking-log__marker {
+  position: relative;
+  z-index: 1;
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  color: var(--claude-muted-foreground);
+}
+.ai-thinking-log__marker svg { width: 14px; height: 14px; stroke-width: 1.7; }
+.ai-thinking-log__item.is-current .ai-thinking-log__marker { color: var(--claude-primary); }
+.ai-thinking-log__item.is-current .ai-thinking-log__marker svg { animation: thinking-pulse 1.2s ease-in-out infinite; }
+.ai-thinking-log__item.is-complete .ai-thinking-log__marker { color: color-mix(in srgb, var(--claude-primary) 68%, var(--claude-muted-foreground)); }
+.ai-thinking-log__item.is-error .ai-thinking-log__marker { color: var(--claude-destructive); }
+.ai-thinking-log__content { min-width: 0; }
+.ai-thinking-log__label { color: var(--claude-foreground); font-size: 13px; font-weight: 400; }
+.ai-thinking-log__item.is-error .ai-thinking-log__label { color: var(--claude-destructive); }
+.ai-thinking-log__detail {
+  margin-top: 7px;
+  color: var(--claude-muted-foreground);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+.ai-thinking-log__item.is-context .ai-thinking-log__detail {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--claude-secondary);
+  color: var(--claude-foreground);
+  font-family: var(--claude-font-sans);
+}
+.ai-thinking-log__item.is-error .ai-thinking-log__detail { color: var(--claude-destructive); }
+.ai-answer-error {
+  width: fit-content;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--claude-destructive) 28%, var(--claude-border));
+  border-radius: 10px;
+  color: var(--claude-destructive);
+  background: color-mix(in srgb, var(--claude-destructive) 5%, var(--claude-card));
+  font-family: var(--claude-font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ai-answer-error svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .ai-thinking[data-state="running"] .ai-thinking-summary__status svg { animation: none; }
 }
 .source-popup-row {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-size: 11px;
   line-height: 1.6;
   color: var(--claude-muted-foreground);
 }
+.streaming-caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -.12em; border-radius: 2px; background: var(--claude-primary); animation: streaming-caret-blink .8s steps(1) infinite; }
+@keyframes thinking-pulse { 0%, 100% { opacity: .48; transform: scale(.94); } 50% { opacity: 1; transform: scale(1); } }
+@keyframes streaming-caret-blink { 0%, 52% { opacity: 1; } 53%, 100% { opacity: .18; } }
 .source-popup-row b {
   font-weight: 500;
   color: var(--claude-foreground);

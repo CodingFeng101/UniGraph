@@ -36,18 +36,52 @@ class LocalSearch(BaseSearch):
         """
         llm = GenericResponseGetter()
         extracted_entities = await extract_entities_from_query(query, llm, api_key, base_url, model)
-        logger.info(f'实体{extracted_entities}抽取成功😊')
+        logger.info('Query entity extraction completed (%d entities)', len(extracted_entities))
         context_text, context_data = await self.context_builder.build_context(
-            extracted_entities, level, infer, api_key, base_url, **kwargs
+            extracted_entities,
+            level,
+            infer,
+            kwargs.get('embedding_api_key', ''),
+            kwargs.get('embedding_base_url', ''),
+            **kwargs,
         )
-        logger.info(f'上下文{context_text}构建成功😊')
+        logger.info('Knowledge context built (%d characters)', len(context_text))
 
         # 执行搜索操作
         self.context_text = context_text
         self.context_data = {key: value.to_dict() for key, value in context_data.items()}
-        search_prompt = self.system_prompt.format(context_data=context_text, query=query, response_type='plain')
-        results = await llm.get_response(query=search_prompt, api_key=api_key, base_url=base_url, model=model)
-        logger.info(f'搜索结果{results}获取成功😊')
+        conversation_context = None
+        context_provider = kwargs.get('context_provider')
+        if context_provider:
+            conversation_context = await context_provider(context_text)
+        answer_context = (
+            conversation_context.get('knowledge_context', context_text) if conversation_context else context_text
+        )
+        search_prompt = self.system_prompt.format(context_data=answer_context, query=query, response_type='plain')
+        response_kwargs = {'api_key': api_key, 'base_url': base_url, 'model': model}
+        if conversation_context:
+            messages = [{'role': 'system', 'content': '你是知识图谱领域专家。'}]
+            summary = conversation_context.get('summary')
+            if summary:
+                messages.append({
+                    'role': 'system',
+                    'content': f'历史对话滚动摘要（仅作交流上下文，不得替代知识图谱证据）：\n{summary}',
+                })
+            messages.extend(conversation_context.get('messages', []))
+            messages.append({'role': 'user', 'content': search_prompt})
+            response_kwargs['messages'] = messages
+        else:
+            response_kwargs['query'] = search_prompt
+        token_callback = kwargs.get('token_callback')
+        if token_callback:
+            chunks = []
+            async for chunk in llm.stream_response(**response_kwargs):
+                chunks.append(chunk)
+                await token_callback(chunk)
+            results = ''.join(chunks)
+        else:
+            results = await llm.get_response(**response_kwargs)
+        logger.info('Answer generation completed (%d characters)', len(results))
         return results
 
     async def asearch(self, query: str, level: int, infer: bool, **kwargs: Any) -> List[Any]:

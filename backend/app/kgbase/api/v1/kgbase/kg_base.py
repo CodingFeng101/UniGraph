@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 
 from backend.app.kgbase.schema.kg_base import AddKgBaseParam, GetKgBaseDetail, KgBaseResponse, UpdateKgBaseParam
 from backend.app.kgbase.service.kg_base_service import kg_base_service
+from backend.app.kgbase.service.ownership_service import ownership_service
 from backend.common.pagination import DependsPagination, paging_data
 from backend.common.response.response_schema import ResponseModel, response_base
 from backend.common.security.jwt import DependsJwtAuth
@@ -27,7 +28,8 @@ async def get_all_kg_bases(request: Request) -> ResponseModel:
 
 
 @router.get('/{uuid}', summary='获取图谱库详情', dependencies=[DependsJwtAuth])
-async def get_kg_base(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def get_kg_base(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_kg_base(user_uuid=request.user.uuid, uuid=uuid)
     kg_base = await kg_base_service.get_kg_base(uuid=uuid)
     data = GetKgBaseDetail(**select_as_dict(kg_base))
     return response_base.success(data=data)
@@ -69,7 +71,8 @@ async def create_kg_base(request: Request, obj: AddKgBaseParam) -> ResponseModel
     summary='更新图谱库',
     dependencies=[Depends(RequestPermission('sys:kg_base:edit'))],
 )
-async def update_kg_base(uuid: Annotated[str, Path(...)], obj: UpdateKgBaseParam) -> ResponseModel:
+async def update_kg_base(request: Request, uuid: Annotated[str, Path(...)], obj: UpdateKgBaseParam) -> ResponseModel:
+    await ownership_service.require_kg_base(user_uuid=request.user.uuid, uuid=uuid)
     count = await kg_base_service.update(uuid=uuid, obj=obj)
     if count > 0:
         return response_base.success()
@@ -81,7 +84,8 @@ async def update_kg_base(uuid: Annotated[str, Path(...)], obj: UpdateKgBaseParam
     summary='（批量）删除图谱库',
     dependencies=[Depends(RequestPermission('sys:kg_base:del'))],
 )
-async def delete_kg_base(uuid: Annotated[str, Path(...)]) -> ResponseModel:
+async def delete_kg_base(request: Request, uuid: Annotated[str, Path(...)]) -> ResponseModel:
+    await ownership_service.require_kg_base(user_uuid=request.user.uuid, uuid=uuid)
     count = await kg_base_service.delete(uuid=uuid)
     if count > 0:
         return response_base.success()
@@ -93,7 +97,8 @@ async def delete_kg_base(uuid: Annotated[str, Path(...)]) -> ResponseModel:
     summary='更新图谱库状态',
     dependencies=[Depends(RequestPermission('sys:kg_base:status'))],
 )
-async def update_kg_base_status(pk: Annotated[int, Path(...)]) -> ResponseModel:
+async def update_kg_base_status(request: Request, pk: Annotated[int, Path(...)]) -> ResponseModel:
+    await ownership_service.require_kg_base(user_uuid=request.user.uuid, pk=pk)
     count = await kg_base_service.update_status(pk=pk)
     if count > 0:
         return response_base.success()

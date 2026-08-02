@@ -95,12 +95,8 @@ def register_static_file(app: FastAPI):
     :return:
     """
     if settings.FASTAPI_STATIC_FILES:
-        from fastapi.staticfiles import StaticFiles
-
         Path(STATIC_DIR).mkdir(parents=True, exist_ok=True)
         Path(FILES_DIR).mkdir(parents=True, exist_ok=True)
-        app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')
-        app.mount('/files', StaticFiles(directory=FILES_DIR), name='files')
 
 
 def register_middleware(app: FastAPI):

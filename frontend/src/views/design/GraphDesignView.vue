@@ -8,31 +8,12 @@
   <header class="h-14 flex items-center justify-between px-5 shrink-0 min-w-0" style="background:var(--claude-card);">
     <div class="flex items-center gap-2">
       <div class="relative" id="arch-dropdown-wrapper-top">
-        <button type="button" @click="toggleArchDropdown('arch-dropdown-top')" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors w-[240px]" style="background:var(--claude-accent);border:1px solid var(--claude-brand-500);">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-success-500);"></span>
-          <span class="text-xs font-medium truncate flex-1 text-left" style="color:var(--claude-foreground);">企业架构 v2</span>
+        <button id="arch-dropdown-trigger" type="button" disabled @click="toggleArchDropdown('arch-dropdown-top')" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors w-[240px] disabled:cursor-not-allowed disabled:opacity-60" style="background:var(--claude-accent);border:1px solid var(--claude-border);">
+          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-muted-foreground);opacity:0.4;"></span>
+          <span class="text-xs font-medium truncate flex-1 text-left" style="color:var(--claude-muted-foreground);">暂无知识架构</span>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="2.5" class="shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
-        <div id="arch-dropdown-top" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-[240px]" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-          <div class="px-3 py-2 transition-colors hover:opacity-80 cursor-pointer flex items-center justify-between group" style="background:var(--claude-accent);">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-success-500);"></span>
-              <span class="text-xs font-medium truncate" style="color:var(--claude-foreground);">企业架构 v2</span>
-            </div>
-            <button type="button" @click="$event.stopPropagation();deleteCurrentArch()" class="shrink-0 w-5 h-5 rounded flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--claude-destructive)]" style="background:transparent;border:none;color:var(--claude-muted-foreground);" aria-label="删除架构">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </div>
-          <div class="px-3 py-2 flex items-center justify-between transition-colors hover:opacity-80 cursor-pointer group">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-muted-foreground);opacity:0.4;"></span>
-              <span class="text-xs truncate" style="color:var(--claude-muted-foreground);">基础实体模型</span>
-            </div>
-            <button type="button" @click="$event.stopPropagation();deleteCurrentArch()" class="shrink-0 w-5 h-5 rounded flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--claude-destructive)]" style="background:transparent;border:none;color:var(--claude-muted-foreground);" aria-label="删除架构">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </div>
-        </div>
+        <div id="arch-dropdown-top" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-[240px]" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
       </div>
     </div>
     <div class="flex items-center gap-2">
@@ -322,15 +303,17 @@
           <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">需求</label>
           <textarea id="create-arch-aim" rows="3" placeholder="描述需要抽取的实体类型、关系和目标" class="w-full px-3 py-2 text-sm rounded-lg border outline-none resize-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);"></textarea>
         </div>
-        <button type="button" @click="triggerCreateArchFiles()" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg cursor-pointer transition-colors hover:opacity-80" style="background:var(--claude-secondary);border:1px dashed var(--claude-border);color:var(--claude-foreground);">
+        <button type="button" @click="triggerCreateArchFiles()" class="w-full flex flex-col items-center justify-center gap-1.5 px-3 py-6 rounded-lg cursor-pointer transition-colors hover:opacity-80" style="background:var(--claude-accent);border:1.5px dashed var(--claude-border);color:var(--claude-foreground);">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--claude-brand-500)" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span id="create-arch-files-label" class="text-xs">上传 PDF / Word / TXT 文档</span>
+          <span class="text-[10px]" style="color:var(--claude-muted-foreground);opacity:0.75;">支持 PDF、DOC、DOCX、TXT，单个文件最大 50 MB</span>
         </button>
       </div>
       <div id="create-arch-json-panel" class="hidden space-y-3">
-        <button type="button" @click="triggerImportArchFile()" class="w-full flex items-center justify-center gap-2 px-4 py-8 rounded-lg cursor-pointer transition-colors hover:opacity-80" style="background:var(--claude-secondary);border:1px dashed var(--claude-border);color:var(--claude-foreground);">
+        <button type="button" @click="triggerImportArchFile()" class="w-full flex flex-col items-center justify-center gap-1.5 px-3 py-6 rounded-lg cursor-pointer transition-colors hover:opacity-80" style="background:var(--claude-accent);border:1.5px dashed var(--claude-border);color:var(--claude-foreground);">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--claude-brand-500)" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span id="import-arch-file-label" class="text-xs">选择 JSON 文件</span>
+          <span class="text-[10px]" style="color:var(--claude-muted-foreground);opacity:0.75;">仅支持 JSON，单个文件最大 50 MB</span>
         </button>
       </div>
     </div>
@@ -338,7 +321,7 @@
       <button type="button" @click="closeModal('modal-new-arch')" class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);border:none;">取消</button>
       <button type="button" @click="submitCreateArch()" class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" style="background:var(--claude-primary);color:var(--claude-primary-foreground);border:none;">创建</button>
     </div>
-    <input id="create-arch-files" type="file" class="hidden" multiple accept=".pdf,.doc,.docx,.txt" @change="handleCreateArchFiles($event.currentTarget)">
+    <input id="create-arch-files" type="file" class="hidden" multiple accept=".pdf,.docx,.txt" @change="handleCreateArchFiles($event.currentTarget)">
     <input id="import-arch-file" type="file" class="hidden" accept=".json" @change="handleImportArchFile($event.currentTarget)">
   </div>
 </div>
@@ -405,10 +388,12 @@
       </div>
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">上传文档</label>
-        <div class="flex items-center justify-center gap-2 py-5 px-3 rounded-lg cursor-pointer transition-colors" style="border:1.5px dashed var(--claude-border);background:var(--claude-background);" @click="clickElement('arch-file-input')">
-          <input type="file" id="arch-file-input" class="hidden" multiple @change="uploadArchFiles($event.currentTarget.files)" accept=".pdf,.doc,.docx,.txt">
+        <div class="flex flex-col items-center justify-center gap-1.5 py-6 px-3 rounded-lg cursor-pointer transition-colors" style="border:1.5px dashed var(--claude-border);background:var(--claude-accent);" @click="clickElement('arch-file-input')">
+          <input type="file" id="arch-file-input" class="hidden" multiple @change="uploadArchFiles($event.currentTarget.files)" accept=".pdf,.docx,.txt">
+          <div id="arch-file-list" class="hidden order-last w-full mt-2 space-y-1.5"></div>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="1.5"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-          <span class="text-xs" style="color:var(--claude-muted-foreground);">将文件拖到此处，或点击上传（pdf/Word/txt）</span>
+          <span class="text-xs" style="color:var(--claude-muted-foreground);">点击上传 PDF / Word / TXT 文档</span>
+          <span class="text-[10px]" style="color:var(--claude-muted-foreground);opacity:0.75;">支持 PDF、DOC、DOCX、TXT，单个文件最大 50 MB</span>
         </div>
       </div>
     </div>

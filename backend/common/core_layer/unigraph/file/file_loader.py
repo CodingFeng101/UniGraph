@@ -1,10 +1,13 @@
 import csv
 import json
+import logging
 import os
 from typing import Dict, List, Tuple
 
 from .content_getter import FileContentGetterFactory
 from .text_partitioner import TextPartitioner
+
+logger = logging.getLogger(__name__)
 
 
 class FileLoader:
@@ -77,8 +80,8 @@ class FileStorage:
         try:
             with open(os.path.join(store_dir_path, file_name), 'w', encoding='utf-8') as f:
                 json.dump(file_kg_data, f, ensure_ascii=False, indent=4)
-        except Exception as e:
-            print(f'Error: {e}')
+        except Exception:
+            logger.exception('Failed to persist knowledge graph data')
 
     @staticmethod
     def store_kg_source(kg_source: List[Dict], store_dir_path: str, file_name, csv_header: List = None):
