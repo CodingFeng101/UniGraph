@@ -77,11 +77,9 @@ export const ChatSidebar = window.ChatSidebar = (() => {
     const footer = document.querySelector('#app-sidebar > .px-3.py-2\\.5.relative.mt-auto');
     if (!footer) return;
     const name = user.nickname || user.username || '用户';
-    const avatar = footer.querySelector('.w-8.h-8.rounded-full');
     const nameElement = footer.querySelector('p.text-sm');
     const roleElement = footer.querySelector('p.text-\\[10px\\]');
     const emailElement = document.querySelector('#user-dropdown > div:first-child p');
-    if (avatar) avatar.textContent = name.slice(0, 2).toUpperCase();
     if (nameElement) nameElement.textContent = name;
     if (roleElement) roleElement.textContent = user.is_superuser ? '管理员' : '用户';
     if (emailElement) emailElement.textContent = user.email || '未设置邮箱';
@@ -93,23 +91,34 @@ export const ChatSidebar = window.ChatSidebar = (() => {
       const basesResponse = await KgBaseAPI.kgBase.getAll();
       if (basesResponse.code !== 200) throw new Error(basesResponse.msg || '加载知识库失败');
       const bases = Array.isArray(basesResponse.data) ? basesResponse.data : [];
-      const newChatLink = document.getElementById('workspace-app-link');
-      if (newChatLink && bases.length && !location.pathname.includes('/unigraphs/')) {
-        const latestBase = bases.slice().sort((a, b) =>
-          new Date(b.created_time || 0) - new Date(a.created_time || 0))[0];
-        newChatLink.href = `/unigraph/unigraphs/${encodeURIComponent(latestBase.uuid)}/qa`;
-      }
-      const results = await Promise.all(bases.map(async (base) => {
+      const baseContexts = await Promise.all(bases.map(async (base) => {
         try {
-          const response = await KgBaseAPI.chatLibrary.getAll(base.uuid);
-          return response.code === 200 && Array.isArray(response.data)
-            ? response.data.map((item) => ({ ...item, kg_base_uuid: base.uuid }))
+          const [chatResponse, graphResponse] = await Promise.all([
+            KgBaseAPI.chatLibrary.getAll(base.uuid),
+            KgBaseAPI.knowledgeGraph.getAll(base.uuid),
+          ]);
+          const chats = chatResponse.code === 200 && Array.isArray(chatResponse.data)
+            ? chatResponse.data.map((item) => ({ ...item, kg_base_uuid: base.uuid }))
             : [];
+          const hasIndex = graphResponse.code === 200 && Array.isArray(graphResponse.data)
+            && graphResponse.data.some((graph) => Number(graph.index_status) === 1);
+          return { base, chats, hasIndex };
         } catch {
-          return [];
+          return { base, chats: [], hasIndex: false };
         }
       }));
-      items = results.flat();
+      if (bases.length && !location.pathname.includes('/unigraphs/')) {
+        const preferredBase = baseContexts
+          .filter((context) => context.hasIndex)
+          .sort((left, right) =>
+            new Date(right.base.created_time || 0) - new Date(left.base.created_time || 0))[0]?.base;
+        if (preferredBase) {
+          window.dispatchEvent(new CustomEvent('unigraph:knowledge-base-default', {
+            detail: { uuid: preferredBase.uuid },
+          }));
+        }
+      }
+      items = baseContexts.flatMap((context) => context.chats);
       await hydrateUser();
       const searchInput = document.getElementById('search-input');
       if (searchInput) searchInput.oninput = () => filterSearch(searchInput.value);

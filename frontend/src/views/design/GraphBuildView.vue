@@ -9,7 +9,6 @@
     <div class="flex items-center gap-2">
       <div class="relative" id="graph-dropdown-wrapper-top">
         <button id="graph-dropdown-trigger" type="button" disabled @click="toggleElement('graph-dropdown-top')" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors w-[240px] disabled:cursor-not-allowed disabled:opacity-60" style="background:var(--claude-accent);border:1px solid var(--claude-border);">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-muted-foreground);opacity:0.4;"></span>
           <span class="text-xs font-medium truncate flex-1 text-left" style="color:var(--claude-muted-foreground);">暂无知识图谱</span>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="2.5" class="shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
@@ -35,7 +34,7 @@
       </button>
       <button type="button" @click="openModal('modal-reasoning')" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors hover:opacity-80 cursor-pointer" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);border:none;">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.5V20a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-2.5c2.9-1.2 5-4.1 5-7.5a8 8 0 0 0-8-8Z"/><path d="M9 22h6"/></svg>
-        知识推理
+                知识迁移
       </button>
       <button type="button" @click="buildGraphIndex()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors hover:opacity-80 cursor-pointer" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);border:none;">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
@@ -299,7 +298,7 @@
 </div>
 
 <div id="modal-entity-build" class="hidden fixed inset-0 z-[100] flex items-center justify-center" style="background:rgba(0,0,0,0.3);">
-  <div class="rounded-xl p-4 w-[360px]" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
+  <div class="rounded-xl p-5 w-[420px] max-w-[calc(100vw-32px)] max-h-[calc(100dvh-32px)] overflow-y-auto" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-sm font-semibold" style="font-family:var(--claude-font-display);color:var(--claude-foreground);">新增实体</h3>
       <button @click="closeModal('modal-entity-build')" class="p-1 transition-opacity hover:opacity-70 cursor-pointer" style="background:none;border:none;color:var(--claude-muted-foreground);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -308,16 +307,8 @@
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">实体类型</label>
         <div class="relative">
-          <button type="button" @click="toggleDropdown('entity-type-dropdown')" class="w-full h-9 px-3 text-sm rounded-lg border flex items-center justify-between outline-none cursor-pointer" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);">
-            <span id="entity-type-value">人员</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="2" class="shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div id="entity-type-dropdown" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-full" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-            <button type="button" @click="selectEntityType('人员')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">人员</button>
-            <button type="button" @click="selectEntityType('部门')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">部门</button>
-            <button type="button" @click="selectEntityType('项目')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">项目</button>
-            <button type="button" @click="selectEntityType('设备')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">设备</button>
-          </div>
+          <input id="entity-type-input" type="text" autocomplete="off" disabled data-value="" @focus="showEntityTypeList()" @input="filterEntityTypeList()" placeholder="搜索或选择实体类型" class="w-full h-9 px-3 text-sm rounded-lg border outline-none disabled:cursor-not-allowed disabled:opacity-60" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);">
+          <div id="entity-type-dropdown" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-x-hidden overflow-y-auto overscroll-contain z-50 w-full max-h-40" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
         </div>
       </div>
       <div>
@@ -345,7 +336,7 @@
 </div>
 
 <div id="modal-relation-build" class="hidden fixed inset-0 z-[100] flex items-center justify-center" style="background:rgba(0,0,0,0.3);">
-  <div class="rounded-xl p-4 w-[360px]" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
+  <div class="rounded-xl p-5 w-[460px] max-w-[calc(100vw-32px)] max-h-[calc(100dvh-32px)] overflow-y-auto" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-sm font-semibold" style="font-family:var(--claude-font-display);color:var(--claude-foreground);">新增关系</h3>
       <button @click="closeModal('modal-relation-build')" class="p-1 transition-opacity hover:opacity-70 cursor-pointer" style="background:none;border:none;color:var(--claude-muted-foreground);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -354,42 +345,30 @@
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">关系类型</label>
         <div class="relative">
-          <button type="button" @click="toggleDropdown('relation-type-dropdown')" class="w-full h-9 px-3 text-sm rounded-lg border flex items-center justify-between outline-none cursor-pointer" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);">
-            <span id="relation-type-value">属于</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="2" class="shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div id="relation-type-dropdown" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-full" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-            <button type="button" @click="selectRelationType('属于')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">属于</button>
-            <button type="button" @click="selectRelationType('负责')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">负责</button>
-            <button type="button" @click="selectRelationType('关联')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">关联</button>
-            <button type="button" @click="selectRelationType('依赖')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">依赖</button>
-          </div>
+          <input id="relation-type-input" type="text" autocomplete="off" disabled data-value="" @focus="showRelationTypeList()" @input="filterRelationTypeList()" placeholder="搜索或选择关系类型" class="w-full h-9 px-3 text-sm rounded-lg border outline-none disabled:cursor-not-allowed disabled:opacity-60" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);">
+          <div id="relation-type-dropdown" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-x-hidden overflow-y-auto overscroll-contain z-50 w-full max-h-36" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
         </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">关系名称</label>
+        <input id="relation-name-input" type="text" placeholder="输入关系名称" class="w-full h-9 px-3 text-sm rounded-lg border outline-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);">
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">关系描述</label>
+        <textarea id="relation-description-input" rows="2" placeholder="描述该关系的含义" class="w-full px-3 py-2 text-sm rounded-lg border outline-none resize-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);"></textarea>
       </div>
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">头实体</label>
         <div class="relative">
           <input type="text" id="head-entity-input" @input="filterEntityList('head-entity')" @focus="showEntityList('head-entity')" class="w-full h-9 px-3 text-sm rounded-lg border outline-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);" placeholder="搜索或选择头实体">
-          <div id="head-entity-list" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-full max-h-40 overflow-y-auto" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-            <button type="button" @click="selectEntity('head-entity','张磊')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">张磊</button>
-            <button type="button" @click="selectEntity('head-entity','李明')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">李明</button>
-            <button type="button" @click="selectEntity('head-entity','技术部')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">技术部</button>
-            <button type="button" @click="selectEntity('head-entity','数控机床A1')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">数控机床A1</button>
-            <button type="button" @click="selectEntity('head-entity','Q3项目')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">Q3项目</button>
-          </div>
+          <div id="head-entity-list" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-x-hidden z-50 w-full max-h-32 overflow-y-auto overscroll-contain" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
         </div>
       </div>
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">尾实体</label>
         <div class="relative">
           <input type="text" id="tail-entity-input" @input="filterEntityList('tail-entity')" @focus="showEntityList('tail-entity')" class="w-full h-9 px-3 text-sm rounded-lg border outline-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);" placeholder="搜索或选择尾实体">
-          <div id="tail-entity-list" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-full max-h-40 overflow-y-auto" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-            <button type="button" @click="selectEntity('tail-entity','张磊')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">张磊</button>
-            <button type="button" @click="selectEntity('tail-entity','李明')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">李明</button>
-            <button type="button" @click="selectEntity('tail-entity','技术部')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">技术部</button>
-            <button type="button" @click="selectEntity('tail-entity','数控机床A1')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">数控机床A1</button>
-            <button type="button" @click="selectEntity('tail-entity','Q3项目')" class="w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]" style="background:none;border:none;color:var(--claude-foreground);">Q3项目</button>
-          </div>
+          <div id="tail-entity-list" class="hidden absolute left-0 bottom-full mb-1 rounded-lg overflow-x-hidden z-50 w-full max-h-32 overflow-y-auto overscroll-contain" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
         </div>
       </div>
     </div>
@@ -443,6 +422,9 @@ export default {
     document.title = "知识图谱构建";
     document.body.className = "h-screen overflow-hidden min-h-0";
     this.controller = createGraphBuildViewController();
+  },
+  beforeUnmount() {
+    this.controller?.destroy?.();
   },
   methods: {
     clickElement(id) {
@@ -507,6 +489,18 @@ export default {
     },
     selectEntityType(...args) {
       return this.controller?.selectEntityType(...args);
+    },
+    filterEntityTypeList(...args) {
+      return this.controller?.filterEntityTypeList(...args);
+    },
+    showEntityTypeList(...args) {
+      return this.controller?.showEntityTypeList(...args);
+    },
+    filterRelationTypeList(...args) {
+      return this.controller?.filterRelationTypeList(...args);
+    },
+    showRelationTypeList(...args) {
+      return this.controller?.showRelationTypeList(...args);
     },
     changeGraphStyle(...args) {
       return this.controller?.changeGraphStyle(...args);

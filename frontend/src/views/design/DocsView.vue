@@ -84,9 +84,11 @@ import MarkdownIt from 'markdown-it';
 import python from 'highlight.js/lib/languages/python';
 import xml from 'highlight.js/lib/languages/xml';
 import technicalArchitecture from '../../../../docs/TECHNICAL_ARCHITECTURE.md?raw';
+import technicalArchitectureEn from '../../../../docs/TECHNICAL_ARCHITECTURE.en.md?raw';
 import AppSidebar from '@/components/layout/AppSidebar.vue';
 import AppSearchDialog from '@/components/layout/AppSearchDialog.vue';
 import TaskCenter from '@/components/task/TaskCenter.vue';
+import { getLocale, t } from '@/services/i18n';
 
 const architectureBase = `${import.meta.env.BASE_URL}docs/architecture/`;
 
@@ -106,8 +108,9 @@ function headingId(text) {
     .replace(/^-+|-+$/g, '');
 }
 
-function documentSource() {
-  return technicalArchitecture
+function documentSource(locale = getLocale()) {
+  const source = locale === 'en' ? technicalArchitectureEn : technicalArchitecture;
+  return source
     .replace(/\]\(assets\/architecture\/([^)]+)\)/g, `](${architectureBase}$1)`)
     .replace(/^#\s+.+\r?\n+/, '');
 }
@@ -145,7 +148,7 @@ function createMarkdownRenderer() {
       ? defaultImage(tokens, index, options, env, self)
       : self.renderToken(tokens, index, options);
     const caption = markdown.utils.escapeHtml(token.content || '架构图');
-    return `<figure class="architecture-figure"><div class="architecture-figure__canvas">${image}</div><figcaption>${caption}<span>点击查看大图</span></figcaption></figure>`;
+    return `<figure class="architecture-figure"><div class="architecture-figure__canvas">${image}</div><figcaption>${caption}<span>${t('点击查看大图')}</span></figcaption></figure>`;
   };
   markdown.renderer.rules.fence = (tokens, index) => {
     const token = tokens[index];
@@ -158,7 +161,7 @@ function createMarkdownRenderer() {
     const highlightedCode = hljs.getLanguage(highlightLanguage)
       ? hljs.highlight(code, { language: highlightLanguage }).value
       : markdown.utils.escapeHtml(code);
-    return `<section class="code-sample"><header><span class="code-sample__path">${markdown.utils.escapeHtml(path)}</span><span class="code-sample__actions"><span class="code-sample__language">${markdown.utils.escapeHtml(language)}</span><button type="button" data-copy-code>复制</button></span></header><pre><code class="hljs language-${markdown.utils.escapeHtml(language)}">${highlightedCode}</code></pre></section>`;
+    return `<section class="code-sample"><header><span class="code-sample__path">${markdown.utils.escapeHtml(path)}</span><span class="code-sample__actions"><span class="code-sample__language">${markdown.utils.escapeHtml(language)}</span><button type="button" data-copy-code>${t('复制')}</button></span></header><pre><code class="hljs language-${markdown.utils.escapeHtml(language)}">${highlightedCode}</code></pre></section>`;
   };
   markdown.renderer.rules.table_open = () => '<div class="markdown-table-wrap"><table>';
   markdown.renderer.rules.table_close = () => '</table></div>';
@@ -172,6 +175,7 @@ export default {
   components: { AppSidebar, AppSearchDialog, TaskCenter },
   data: () => ({
     source: documentSource(),
+    localeRevision: 0,
     activeModuleId: '',
     activeHeading: '',
     previewImage: '',
@@ -195,18 +199,20 @@ export default {
     },
   },
   mounted() {
-    document.title = '技术架构 · UniGraph';
+    document.title = `${t('技术架构')} · UniGraph`;
     document.body.className = 'overflow-hidden min-h-0';
     this.activeModuleId = this.modules[0]?.id || '';
     this.activeHeading = this.activeModuleId;
     this.$refs.article?.addEventListener('click', this.handleArticleClick);
     this.$nextTick(this.observeHeadings);
     window.addEventListener('keydown', this.handleKeydown);
+    window.addEventListener('unigraph:language-change', this.handleLanguageChange);
   },
   beforeUnmount() {
     this.$refs.article?.removeEventListener('click', this.handleArticleClick);
     this.headingObserver?.disconnect();
     window.removeEventListener('keydown', this.handleKeydown);
+    window.removeEventListener('unigraph:language-change', this.handleLanguageChange);
   },
   methods: {
     observeHeadings() {
@@ -236,8 +242,8 @@ export default {
       if (copyButton) {
         const code = copyButton.closest('.code-sample')?.querySelector('code')?.textContent || '';
         await navigator.clipboard.writeText(code);
-        copyButton.textContent = '已复制';
-        window.setTimeout(() => { copyButton.textContent = '复制'; }, 1200);
+        copyButton.textContent = t('已复制');
+        window.setTimeout(() => { copyButton.textContent = t('复制'); }, 1200);
         return;
       }
       const image = event.target.closest('.architecture-figure img');
@@ -249,6 +255,15 @@ export default {
     },
     handleKeydown(event) {
       if (event.key === 'Escape') this.previewImage = '';
+    },
+    handleLanguageChange(event) {
+      this.source = documentSource(event.detail?.lang || getLocale());
+      this.localeRevision += 1;
+      this.$nextTick(() => {
+        this.activeModuleId = this.modules[0]?.id || '';
+        this.activeHeading = this.activeModuleId;
+        this.observeHeadings();
+      });
     },
   },
 };

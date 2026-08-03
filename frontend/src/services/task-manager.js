@@ -4,6 +4,7 @@
  */
 import { Auth } from '@/api/runtime/auth';
 import { KgBaseAPI } from '@/api';
+import { getLocale, t } from '@/services/i18n';
 import { getTaskNotificationPreferences } from '@/services/preferences';
 import { gsap } from 'gsap';
 
@@ -88,8 +89,8 @@ export const TaskManager = window.TaskManager = (() => {
     const preferences = getTaskNotificationPreferences();
     if (!preferences.desktop || !('Notification' in window) || Notification.permission !== 'granted') return;
     try {
-      const notification = new Notification('UniGraph 后台任务已完成', {
-        body: [task.displayName, task.objectName].filter(Boolean).join('：'),
+      const notification = new Notification(t('UniGraph 后台任务已完成'), {
+        body: [t(task.displayName), task.objectName].filter(Boolean).join(': '),
         tag: `unigraph-task-${task.uid}`,
       });
       notification.onclick = () => {
@@ -110,7 +111,7 @@ export const TaskManager = window.TaskManager = (() => {
   }
 
   function stateLabel(state) {
-    return {
+    return t({
       PENDING: '等待中',
       STARTED: '执行中',
       PROGRESS: '执行中',
@@ -119,13 +120,12 @@ export const TaskManager = window.TaskManager = (() => {
       FAILURE: '失败',
       REVOKE: '已撤销',
       REVOKED: '已撤销',
-    }[state] || state;
+    }[state] || state);
   }
 
   function stateColor(state) {
     if (state === 'SUCCESS') return 'var(--claude-success-500)';
-    if (state === 'FAILURE') return 'var(--claude-destructive)';
-    if (state === 'REVOKE' || state === 'REVOKED') return 'var(--claude-muted-foreground)';
+    if (['FAILURE', 'REVOKE', 'REVOKED'].includes(state)) return 'var(--claude-destructive)';
     return 'var(--claude-brand-500)';
   }
 
@@ -133,7 +133,7 @@ export const TaskManager = window.TaskManager = (() => {
     const text = String(value || '');
     const match = text.match(/(\d{1,2}):(\d{2}):(\d{2})/);
     if (match) return `${match[1].padStart(2, '0')}:${match[2]}:${match[3]}`;
-    return new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    return new Date().toLocaleTimeString(getLocale() === 'en' ? 'en-US' : 'zh-CN', { hour12: false });
   }
 
   function getTaskSteps(task) {
@@ -157,13 +157,24 @@ export const TaskManager = window.TaskManager = (() => {
     render();
   }
 
+  function emitTaskUpdate(task) {
+    window.dispatchEvent(new CustomEvent('unigraph:task-updated', {
+      detail: { task: { ...task, kwargs: sanitizeKwargs(task.kwargs) } },
+    }));
+  }
+
+  function isTaskCenterVisible(task) {
+    return task.name !== 'knowledge_graph.ask';
+  }
+
   function render() {
     const panel = document.getElementById('task-panel');
     if (!panel) return;
 
-    const running = tasks.filter((task) => ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state));
+    const visibleTasks = tasks.filter(isTaskCenterVisible);
+    const running = visibleTasks.filter((task) => ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state));
     const headerBadge = panel.querySelector('[data-task-running-count]');
-    if (headerBadge) headerBadge.textContent = `${running.length} 进行中`;
+    if (headerBadge) headerBadge.textContent = t(`${running.length} 进行中`);
 
     const fabBadge = document.querySelector('[data-task-fab-count]');
     const fab = document.getElementById('task-fab-wrapper');
@@ -182,61 +193,61 @@ export const TaskManager = window.TaskManager = (() => {
     const container = panel.querySelector('[data-task-list]');
     if (!container) return;
 
-    if (!tasks.length) {
-      container.innerHTML = '<div class="task-empty">暂无后台任务</div>';
+    if (!visibleTasks.length) {
+      container.innerHTML = `<div class="task-empty">${escapeHtml(t('暂无后台任务'))}</div>`;
       return;
     }
 
     const previousScrollTop = container.scrollTop;
-    container.innerHTML = tasks.slice().reverse().map((task) => {
+    container.innerHTML = visibleTasks.slice().reverse().map((task) => {
       const progress = Math.max(0, Math.min(100, Number(task.progress) || 0));
       const canCancel = ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state);
       const canRetry = !canCancel && task.state !== 'SUCCESS';
       const isOpen = expandedTasks.has(task.uid);
       const steps = getTaskSteps(task);
       const previousStepCount = renderedStepCounts.get(task.uid) ?? steps.length;
-      const title = [task.displayName, task.objectName].filter(Boolean).join(': ');
-      const statusText = canCancel ? `${Math.round(progress)}%` : (task.state === 'SUCCESS' ? '完成' : stateLabel(task.state));
+      const title = [t(task.displayName), task.objectName].filter(Boolean).join(': ');
+      const statusText = canCancel ? `${Math.round(progress)}%` : (task.state === 'SUCCESS' ? t('完成') : stateLabel(task.state));
+      const taskColor = stateColor(task.state);
       const stepMarkup = steps.map((step, index) => {
         const isLast = index === steps.length - 1;
-        const color = isLast ? stateColor(task.state) : 'var(--claude-success-500)';
-        const description = step.detail || (Number(step.progress) > 0 && Number(step.progress) < 100
+        const description = t(step.detail || (Number(step.progress) > 0 && Number(step.progress) < 100
           ? `已处理 ${Math.round(Number(step.progress))}%`
-          : '');
+          : ''));
         return `
-          <div class="task-step${isLast ? ' is-latest' : ''}${isLast && canCancel ? ' is-running' : ''}${index >= previousStepCount ? ' is-new' : ''}" style="--step-color:${color};">
+          <div class="task-step${isLast ? ' is-latest' : ''}${isLast && canCancel ? ' is-running' : ''}${index >= previousStepCount ? ' is-new' : ''}" style="--step-color:${taskColor};">
             <span class="task-step__dot"></span>
             <div class="task-step__head">
-              <span class="task-step__label">${escapeHtml(step.label)}</span>
+              <span class="task-step__label">${escapeHtml(t(step.label))}</span>
               <span class="task-step__time">${escapeHtml(formatTaskTime(step.time))}</span>
             </div>
             ${description ? `<p class="task-step__description">${escapeHtml(description)}</p>` : ''}
           </div>`;
       }).join('');
       return `
-        <div class="task-card" data-task-id="${escapeHtml(task.uid)}">
+        <div class="task-card" data-task-id="${escapeHtml(task.uid)}" style="--task-state-color:${taskColor};">
           <div class="task-card__summary">
-            <button type="button" onclick="TaskManager.toggle(this)" class="task-card__toggle" aria-label="${isOpen ? '收起' : '展开'}任务日志">
+            <button type="button" onclick="TaskManager.toggle(this)" class="task-card__toggle" aria-label="${escapeHtml(t(isOpen ? '收起任务日志' : '展开任务日志'))}">
               <i data-lucide="chevron-right" class="task-chevron" style="transform:${isOpen ? 'rotate(90deg)' : 'rotate(0deg)'}"></i>
               ${task.state === 'SUCCESS'
-                ? '<i data-lucide="check" class="task-status-check" style="color:' + stateColor(task.state) + ';"></i>'
-                : '<span class="task-status-dot" style="background:' + stateColor(task.state) + ';"></span>'}
-              <p class="task-card__title">${escapeHtml(title || '后台任务')}<span class="task-card__start-time">${escapeHtml(formatTaskTime(task.createdAt))}</span></p>
+                ? '<i data-lucide="check" class="task-status-check" style="color:' + taskColor + ';"></i>'
+                : '<span class="task-status-dot" style="background:' + taskColor + ';"></span>'}
+              <p class="task-card__title">${escapeHtml(title || t('后台任务'))}<span class="task-card__start-time">${escapeHtml(formatTaskTime(task.createdAt))}</span></p>
             </button>
             <div class="task-inline-actions">
-              ${canCancel ? `<button type="button" onclick="TaskManager.pause('${escapeHtml(task.uid)}')" class="task-inline-action" title="暂停" aria-label="暂停"><i data-lucide="pause"></i></button>` : ''}
-              ${(canCancel || canRetry) ? `<button type="button" onclick="TaskManager.retry('${escapeHtml(task.uid)}')" class="task-inline-action" title="重启" aria-label="重启"><i data-lucide="rotate-ccw"></i></button>` : ''}
-              <button type="button" onclick="TaskManager.remove('${escapeHtml(task.uid)}')" class="task-inline-action task-delete-action" title="删除" aria-label="删除"><i data-lucide="trash-2"></i></button>
+              ${canCancel ? `<button type="button" onclick="TaskManager.pause('${escapeHtml(task.uid)}')" class="task-inline-action" title="${escapeHtml(t('暂停'))}" aria-label="${escapeHtml(t('暂停'))}"><i data-lucide="pause"></i></button>` : ''}
+              ${(canCancel || canRetry) ? `<button type="button" onclick="TaskManager.retry('${escapeHtml(task.uid)}')" class="task-inline-action" title="${escapeHtml(t('重启'))}" aria-label="${escapeHtml(t('重启'))}"><i data-lucide="rotate-ccw"></i></button>` : ''}
+              <button type="button" onclick="TaskManager.remove('${escapeHtml(task.uid)}')" class="task-inline-action task-delete-action" title="${escapeHtml(t('删除'))}" aria-label="${escapeHtml(t('删除'))}"><i data-lucide="trash-2"></i></button>
             </div>
-            <span class="task-card__state" style="color:${stateColor(task.state)};">${escapeHtml(statusText)}</span>
+            <span class="task-card__state">${escapeHtml(statusText)}</span>
           </div>
-          <div class="task-progress"><div class="task-progress__value" style="width:${progress}%;background:${stateColor(task.state)};"></div></div>
+          <div class="task-progress${canCancel ? ' is-running' : ''}"><div class="task-progress__value" style="width:${progress}%;background:${taskColor};"></div></div>
           <div class="task-detail${isOpen ? '' : ' hidden'}">
             <div class="task-timeline">${stepMarkup}</div>
           </div>
         </div>`;
     }).join('');
-    tasks.forEach((task) => renderedStepCounts.set(task.uid, getTaskSteps(task).length));
+    visibleTasks.forEach((task) => renderedStepCounts.set(task.uid, getTaskSteps(task).length));
     window.lucide?.createIcons();
     requestAnimationFrame(() => {
       container.scrollTop = previousScrollTop;
@@ -301,6 +312,10 @@ export const TaskManager = window.TaskManager = (() => {
     task.progress = task.state === 'SUCCESS' ? 100 : Number(meta.progress ?? task.progress ?? 0);
     const errorMessage = typeof meta.error === 'string' ? meta.error : meta.error?.message;
     task.message = meta.message || errorMessage || stateLabel(task.state);
+    if (typeof meta.partial_answer === 'string') task.partialAnswer = meta.partial_answer;
+    if (task.state === 'SUCCESS' && typeof meta.data?.results === 'string') {
+      task.partialAnswer = meta.data.results;
+    }
     task.updatedAt = new Date().toLocaleString();
     if (Array.isArray(meta.logs) && meta.logs.length) {
       task.steps = meta.logs.slice(-60).map((log) => ({
@@ -325,12 +340,13 @@ export const TaskManager = window.TaskManager = (() => {
     }
     task.result = meta.data ?? meta.result ?? null;
     persistAndRender();
+    emitTaskUpdate(task);
   }
 
   async function poll(task, taskUid = task.uid) {
     let statusFailures = 0;
     while (task.uid === taskUid && ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)) {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, task.name === 'knowledge_graph.ask' ? 500 : 1500));
       if (task.uid !== taskUid) return null;
       let response;
       try {
@@ -361,11 +377,11 @@ export const TaskManager = window.TaskManager = (() => {
     }
     if (task.state === 'SUCCESS') {
       notifyCompletion(task);
-      notify(`${task.displayName}已完成`);
+      notify(t(`${task.displayName}已完成`));
       return task.result;
     }
     if (task.state === 'REVOKE' || task.state === 'REVOKED') return null;
-    throw new Error(task.message || `${task.displayName}失败`);
+    throw new Error(t(task.message || `${task.displayName}失败`));
   }
 
   async function submit(name, displayName, objectName, kwargs) {
@@ -388,11 +404,13 @@ export const TaskManager = window.TaskManager = (() => {
       steps: [],
       result: null,
       completionNotified: false,
+      partialAnswer: '',
     };
     task.steps.push({ label: task.message, time: formatTaskTime(task.createdAt), progress: 0 });
     tasks.push(task);
     persistAndRender();
-    notify(`${displayName}任务已提交`);
+    emitTaskUpdate(task);
+    notify(t(`${displayName}任务已提交`));
     const taskUid = task.uid;
     const completion = poll(task, taskUid);
     completionById.set(taskUid, completion);
@@ -414,7 +432,7 @@ export const TaskManager = window.TaskManager = (() => {
     task.steps = Array.isArray(task.steps) ? task.steps : [];
     task.steps.push({ label: task.message, time: formatTaskTime(task.updatedAt), progress: task.progress });
     persistAndRender();
-    notify('任务已撤销');
+    notify(t('任务已撤销'));
   }
 
   async function retry(uid) {
@@ -444,7 +462,7 @@ export const TaskManager = window.TaskManager = (() => {
     task.completionNotified = false;
     if (wasExpanded) expandedTasks.add(newUid);
     persistAndRender();
-    notify(`${task.displayName}已重新启动`);
+    notify(t(`${task.displayName}已重新启动`));
 
     const completion = poll(task, newUid);
     completionById.set(newUid, completion);
@@ -492,11 +510,16 @@ export const TaskManager = window.TaskManager = (() => {
     render();
     document.addEventListener('pointerdown', primeAudio, { once: true });
     window.addEventListener('unigraph:preferences-changed', primeAudio);
+    window.addEventListener('unigraph:language-change', render);
     if (typeof Auth !== 'undefined' && Auth.isLogin()) resume();
   }
 
   document.addEventListener('DOMContentLoaded', init);
   if (document.readyState !== 'loading') init();
 
-  return { submit, cancel, pause, retry, remove, toggle, render, resume };
+  function getTasks() {
+    return tasks.map((task) => ({ ...task, kwargs: sanitizeKwargs(task.kwargs) }));
+  }
+
+  return { submit, cancel, pause, retry, remove, toggle, render, resume, getTasks };
 })();

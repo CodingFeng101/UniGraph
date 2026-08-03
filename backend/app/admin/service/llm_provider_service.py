@@ -40,6 +40,28 @@ class LlmProviderService:
             return await llm_provider_dao.get_all(db, user_uuid=user_uuid, name=name)
 
     @staticmethod
+    async def reorder(*, provider_uuids: list[str], user_uuid: str) -> bool:
+        """Persist the user's LLM provider order."""
+        if len(provider_uuids) != len(set(provider_uuids)):
+            raise ValueError('模型列表包含重复项')
+        async with async_db_session() as db:
+            providers = (
+                await db.execute(
+                    select(LlmProvider).where(
+                        LlmProvider.user_uuid == user_uuid,
+                        LlmProvider.uuid.in_(provider_uuids),
+                    )
+                )
+            ).scalars().all()
+            if len(providers) != len(provider_uuids):
+                raise ValueError('模型列表中包含无权访问的配置')
+            provider_map = {provider.uuid: provider for provider in providers}
+            for order, provider_uuid in enumerate(provider_uuids):
+                provider_map[provider_uuid].sort_order = order
+            await db.commit()
+            return True
+
+    @staticmethod
     async def update(*, llm_provider_uuid: str, obj: UpdateLlmProviderParam, user_uuid: str) -> Optional[LlmProvider]:
         """更新提供商信息"""
         if obj.api_key is not None:

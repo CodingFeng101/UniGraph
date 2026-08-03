@@ -1,9 +1,9 @@
 <template>
-  <div class="h-screen overflow-hidden min-h-0">
+  <div class="h-[100dvh] overflow-hidden min-h-0">
     <AppSidebar active="app" />
     <AppSearchDialog />
 
-    <main id="app-main" class="min-h-0 overflow-y-auto relative transition-all duration-300" style="margin-left:260px;" data-scroll-region="primary">
+    <main id="app-main" class="h-[100dvh] min-h-0 overflow-y-auto overscroll-contain relative transition-all duration-300" style="margin-left:260px;" data-scroll-region="primary">
       <div class="max-w-[900px] w-full mx-auto px-8 py-10 flex flex-col gap-8 min-w-0">
         <header class="min-w-0">
           <h1 class="text-[28px] font-normal leading-tight mb-2" style="font-family:var(--claude-font-display);color:var(--claude-foreground);">视频教程</h1>
@@ -24,13 +24,12 @@
         </div>
 
         <section id="video-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0">
-          <a
+          <button
             v-for="video in filteredVideos"
             :key="video.url"
-            :href="video.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="video-item flex flex-col gap-2.5 cursor-pointer group no-underline"
+            type="button"
+            class="video-item flex flex-col gap-2.5 cursor-pointer group text-left w-full"
+            @click="openVideo(video)"
           >
             <div class="video-cover relative aspect-video flex items-center justify-center rounded-lg overflow-hidden" style="background:var(--claude-accent);">
               <img
@@ -54,12 +53,57 @@
               </div>
               <p class="text-xs leading-relaxed line-clamp-2" style="color:var(--claude-muted-foreground);">{{ video.description }}</p>
             </div>
-          </a>
+          </button>
         </section>
       </div>
 
       <TaskCenter />
     </main>
+
+    <div
+      v-if="activeVideo"
+      ref="playerDialog"
+      class="video-player-overlay"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="`正在播放：${activeVideo.title}`"
+      tabindex="-1"
+      @click.self="closeVideo"
+    >
+      <section class="video-player-dialog">
+        <header class="video-player-header">
+          <div class="min-w-0">
+            <h2 class="video-player-title">{{ activeVideo.title }}</h2>
+            <p class="video-player-category">{{ activeVideo.category }}</p>
+          </div>
+          <button type="button" class="video-player-close" aria-label="关闭播放器" @click="closeVideo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </header>
+
+        <div class="video-player-frame">
+          <div v-if="!playerLoaded" class="video-player-skeleton" aria-label="视频加载中"></div>
+          <iframe
+            :class="['video-player-iframe', { 'is-loaded': playerLoaded }]"
+            :src="playerUrl"
+            :title="activeVideo.title"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowfullscreen
+            scrolling="no"
+            frameborder="0"
+            referrerpolicy="strict-origin-when-cross-origin"
+            @load="playerLoaded = true"
+          ></iframe>
+        </div>
+
+        <footer class="video-player-footer">
+          <p>{{ activeVideo.description }}</p>
+          <a :href="activeVideo.url" target="_blank" rel="noopener noreferrer">播放器无法加载？在哔哩哔哩打开</a>
+        </footer>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -73,6 +117,8 @@ export default {
   components: { AppSidebar, AppSearchDialog, TaskCenter },
   data: () => ({
     selectedCategory: 'all',
+    activeVideo: null,
+    playerLoaded: false,
     categories: [
       { value: 'all', label: '全部' },
       { value: '总览', label: '总览' },
@@ -86,6 +132,7 @@ export default {
         category: '总览',
         title: '一站式知识图谱智造平台',
         description: '系统了解 UniGraph 的完整工作流与核心能力。',
+        bvid: 'BV1jkivYZEyB',
         url: 'https://www.bilibili.com/video/BV1jkivYZEyB',
         cover: 'https://i1.hdslb.com/bfs/archive/28a393a50a1dcbbe1792d64750cfbe838d4c2b53.jpg',
       },
@@ -93,6 +140,7 @@ export default {
         category: '设计',
         title: '知识架构设计解说',
         description: '讲解实体类型、关系类型、属性与知识架构设计流程。',
+        bvid: 'BV1weR8YeEPh',
         url: 'https://www.bilibili.com/video/BV1weR8YeEPh',
         cover: 'https://i0.hdslb.com/bfs/archive/a1ea3888aa76832689fb230764844ecd2afe7b9a.jpg',
       },
@@ -100,6 +148,7 @@ export default {
         category: '构建',
         title: '知识图谱构建解说',
         description: '演示从文件上传、知识抽取到图谱生成的完整过程。',
+        bvid: 'BV1ceR8YeEhD',
         url: 'https://www.bilibili.com/video/BV1ceR8YeEhD',
         cover: 'https://i2.hdslb.com/bfs/archive/6dd89c00275b733dfdb50ad7949eef22cd7a9b09.jpg',
       },
@@ -107,6 +156,7 @@ export default {
         category: '检索',
         title: '知识图谱检索解说',
         description: '介绍图谱索引、上下文检索与知识问答能力。',
+        bvid: 'BV1weR8YeEjv',
         url: 'https://www.bilibili.com/video/BV1weR8YeEjv',
         cover: 'https://i0.hdslb.com/bfs/archive/2a2641bbc602b0516db8af5d4790cf67c2ed7006.jpg',
       },
@@ -114,12 +164,25 @@ export default {
         category: '集成',
         title: 'UniGraph & Sapper',
         description: '将 UniGraph 生成的知识能力接入智能体平台。',
+        bvid: 'BV1kcZuYjEuM',
         url: 'https://www.bilibili.com/video/BV1kcZuYjEuM',
         cover: 'https://i1.hdslb.com/bfs/archive/73262ab4fae706faed1c8f479650fd07a08cd794.jpg',
       },
     ],
   }),
   computed: {
+    playerUrl() {
+      if (!this.activeVideo?.bvid) return '';
+      const params = new URLSearchParams({
+        bvid: this.activeVideo.bvid,
+        autoplay: '1',
+        danmaku: '0',
+        high_quality: '1',
+        poster: '1',
+        p: '1',
+      });
+      return `https://player.bilibili.com/player.html?${params.toString()}`;
+    },
     filteredVideos() {
       if (this.selectedCategory === 'all') return this.videos;
       return this.videos.filter((video) => video.category === this.selectedCategory);
@@ -127,9 +190,25 @@ export default {
   },
   mounted() {
     document.title = '教程';
-    document.body.className = 'h-screen overflow-hidden min-h-0';
+    document.body.className = 'h-[100dvh] overflow-hidden min-h-0';
+    window.addEventListener('keydown', this.handlePlayerKeydown);
+  },
+  beforeUnmount() {
+    window.removeEventListener('keydown', this.handlePlayerKeydown);
   },
   methods: {
+    openVideo(video) {
+      this.activeVideo = video;
+      this.playerLoaded = false;
+      this.$nextTick(() => this.$refs.playerDialog?.focus());
+    },
+    closeVideo() {
+      this.activeVideo = null;
+      this.playerLoaded = false;
+    },
+    handlePlayerKeydown(event) {
+      if (event.key === 'Escape' && this.activeVideo) this.closeVideo();
+    },
     categoryStyle(value) {
       const active = this.selectedCategory === value;
       return {
@@ -191,9 +270,139 @@ export default {
 .video-cover__shade {
   background: linear-gradient(180deg, rgba(28,25,23,0.04), rgba(28,25,23,0.22));
 }
+.video-item {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
 .video-item:focus-visible .video-cover {
   outline: 2px solid var(--claude-ring);
   outline-offset: 3px;
+}
+.video-player-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(28, 25, 23, 0.72);
+  backdrop-filter: blur(8px);
+}
+.video-player-dialog {
+  width: min(100%, 880px);
+  overflow: hidden;
+  border: 1px solid var(--claude-border);
+  border-radius: var(--claude-radius-md);
+  background: var(--claude-card);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+.video-player-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+}
+.video-player-title {
+  overflow: hidden;
+  color: var(--claude-foreground);
+  font-family: var(--claude-font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.video-player-category {
+  margin-top: 2px;
+  color: var(--claude-muted-foreground);
+  font-size: 12px;
+}
+.video-player-close {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--claude-muted-foreground);
+  cursor: pointer;
+}
+.video-player-close:hover {
+  background: var(--claude-secondary);
+  color: var(--claude-foreground);
+}
+.video-player-close:focus-visible {
+  outline: 2px solid var(--claude-ring);
+  outline-offset: 2px;
+}
+.video-player-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #181614;
+}
+.video-player-iframe,
+.video-player-skeleton {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.video-player-iframe {
+  border: 0;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+.video-player-iframe.is-loaded {
+  opacity: 1;
+}
+.video-player-skeleton {
+  background: linear-gradient(105deg, #181614 25%, #292522 42%, #181614 58%);
+  background-size: 220% 100%;
+  animation: video-skeleton 1.4s ease-in-out infinite;
+}
+.video-player-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 18px 16px;
+  color: var(--claude-muted-foreground);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.video-player-footer p {
+  margin: 0;
+}
+.video-player-footer a {
+  flex: 0 0 auto;
+  color: var(--claude-primary);
+  text-decoration: none;
+}
+.video-player-footer a:hover {
+  text-decoration: underline;
+}
+@keyframes video-skeleton {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@media (max-width: 640px) {
+  .video-player-overlay { padding: 12px; }
+  .video-player-header { padding: 12px 14px; }
+  .video-player-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px 14px;
+  }
 }
 
 

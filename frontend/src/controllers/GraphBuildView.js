@@ -26,26 +26,64 @@ function toggleDropdown(id) {
   dropdown.classList.toggle('hidden');
 }
 
-function selectArch(el, value, uuid) {
+function selectArch(value, uuid) {
   document.getElementById('arch-modal-value').textContent = value;
   if (uuid) selectedSchemaUuid = uuid;
-  document.querySelectorAll('#arch-dropdown-modal > div').forEach(function(item) {
-    item.style.background = '';
-    item.innerHTML = '<span class="text-xs" style="color:var(--claude-muted-foreground);">' + item.querySelector('span').textContent + '</span>';
-  });
-  el.style.background = 'var(--claude-accent)';
-  el.innerHTML = '<div class="flex items-center justify-between"><span class="text-xs font-medium" style="color:var(--claude-foreground);">' + value + '</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>';
   document.getElementById('arch-dropdown-modal').classList.add('hidden');
 }
 
 function selectEntityType(type) {
-  document.getElementById('entity-type-value').textContent = type;
+  var value = document.getElementById('entity-type-input');
+  value.value = type;
+  value.dataset.value = type;
   document.getElementById('entity-type-dropdown').classList.add('hidden');
 }
 
+function filterEntityTypeList(preserveSelection) {
+  var input = document.getElementById('entity-type-input');
+  var dropdown = document.getElementById('entity-type-dropdown');
+  if (!input || !dropdown) return;
+  if (!preserveSelection) input.dataset.value = '';
+  var query = input.value.trim().toLowerCase();
+  var visibleCount = 0;
+  dropdown.querySelectorAll('button[data-type-name]').forEach(function(button) {
+    var visible = button.dataset.typeName.toLowerCase().includes(query);
+    button.classList.toggle('hidden', !visible);
+    if (visible) visibleCount += 1;
+  });
+  dropdown.querySelector('[data-empty-filter]')?.classList.toggle('hidden', visibleCount > 0);
+  dropdown.classList.remove('hidden');
+}
+
+function showEntityTypeList() {
+  filterEntityTypeList(true);
+}
+
 function selectRelationType(type) {
-  document.getElementById('relation-type-value').textContent = type;
+  var value = document.getElementById('relation-type-input');
+  value.value = type;
+  value.dataset.value = type;
   document.getElementById('relation-type-dropdown').classList.add('hidden');
+}
+
+function filterRelationTypeList(preserveSelection) {
+  var input = document.getElementById('relation-type-input');
+  var dropdown = document.getElementById('relation-type-dropdown');
+  if (!input || !dropdown) return;
+  if (!preserveSelection) input.dataset.value = '';
+  var query = input.value.trim().toLowerCase();
+  var visibleCount = 0;
+  dropdown.querySelectorAll('button[data-type-name]').forEach(function(button) {
+    var visible = button.dataset.typeName.toLowerCase().includes(query);
+    button.classList.toggle('hidden', !visible);
+    if (visible) visibleCount += 1;
+  });
+  dropdown.querySelector('[data-empty-filter]')?.classList.toggle('hidden', visibleCount > 0);
+  dropdown.classList.remove('hidden');
+}
+
+function showRelationTypeList() {
+  filterRelationTypeList(true);
 }
 
 function addEntityAttribute() {
@@ -103,19 +141,21 @@ function hideTooltip() {
   document.getElementById('canvas-tooltip').classList.add('hidden');
 }
 
-document.addEventListener('click', function(e) {
+function handleDocumentClick(e) {
   var wrapper = document.getElementById('graph-dropdown-wrapper-top');
   var dropdown = document.getElementById('graph-dropdown-top');
   if (wrapper && dropdown && !wrapper.contains(e.target)) {
     dropdown.classList.add('hidden');
   }
-  document.querySelectorAll('[id$="-dropdown"]').forEach(function(el) {
+  document.querySelectorAll('#entity-type-dropdown, #relation-type-dropdown, #head-entity-list, #tail-entity-list').forEach(function(el) {
     var wrapper = el.parentElement;
     if (wrapper && !wrapper.contains(e.target)) {
       el.classList.add('hidden');
     }
   });
-});
+}
+
+document.addEventListener('click', handleDocumentClick);
 
 
 
@@ -139,6 +179,134 @@ let selectedSchemaUuid = null;
 let selectedEntityUuids = { 'head-entity': null, 'tail-entity': null };
 let allEntitiesForDropdown = [];
 let currentGraphStyle = 'database';
+
+function getCurrentSchemaUuid() {
+  if (graphData.schema_graph && graphData.schema_graph.uuid) return graphData.schema_graph.uuid;
+  var graph = graphList.find(function(item) { return item.uuid === currentGraphUuid; });
+  if (!graph) return null;
+  return graph.schema_graph_uuid || (graph.schema_graph && graph.schema_graph.uuid) || null;
+}
+
+function renderSchemaTypeOptions(kind, items, emptyText) {
+  var isEntity = kind === 'entity';
+  var dropdown = document.getElementById(isEntity ? 'entity-type-dropdown' : 'relation-type-dropdown');
+  if (isEntity) {
+    var input = document.getElementById('entity-type-input');
+    if (!dropdown || !input) return;
+    var entityNames = Array.from(new Set((items || []).map(function(item) {
+      return String(item.name || item.type || '').trim();
+    }).filter(Boolean)));
+    var currentType = input.dataset.value || '';
+    dropdown.innerHTML = '';
+    input.disabled = entityNames.length === 0;
+    if (entityNames.length === 0) {
+      input.value = '';
+      input.dataset.value = '';
+      input.placeholder = emptyText;
+      dropdown.classList.add('hidden');
+      return;
+    }
+    input.placeholder = '搜索或选择实体类型';
+    if (!entityNames.includes(currentType)) {
+      input.value = '';
+      input.dataset.value = '';
+    }
+    entityNames.forEach(function(name) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.typeName = name;
+      button.className = 'block w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--claude-secondary)] cursor-pointer';
+      button.style.cssText = 'background:transparent;border:none;color:var(--claude-foreground);';
+      button.textContent = name;
+      button.onclick = function() { selectEntityType(name); };
+      dropdown.appendChild(button);
+    });
+    var emptyFilter = document.createElement('div');
+    emptyFilter.dataset.emptyFilter = 'true';
+    emptyFilter.className = 'hidden px-3 py-2 text-xs';
+    emptyFilter.style.color = 'var(--claude-muted-foreground)';
+    emptyFilter.textContent = '没有匹配的实体类型';
+    dropdown.appendChild(emptyFilter);
+    return;
+  }
+  var value = document.getElementById('relation-type-input');
+  if (!dropdown || !value) return;
+
+  var names = Array.from(new Set((items || []).map(function(item) {
+    return String(item.name || item.type || '').trim();
+  }).filter(Boolean)));
+  var currentValue = value.dataset.value || '';
+  dropdown.innerHTML = '';
+  value.disabled = names.length === 0;
+
+  if (names.length === 0) {
+    value.value = '';
+    value.dataset.value = '';
+    value.placeholder = emptyText;
+    dropdown.classList.add('hidden');
+    return;
+  }
+
+  value.placeholder = '搜索或选择关系类型';
+  if (!names.includes(currentValue)) {
+    value.value = '';
+    value.dataset.value = '';
+  }
+  names.forEach(function(name) {
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.typeName = name;
+    button.className = 'w-full px-3 py-2 text-xs text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]';
+    button.style.cssText = 'background:transparent;border:none;color:var(--claude-foreground);';
+    button.textContent = name;
+    button.onclick = function() {
+      selectRelationType(name);
+    };
+    dropdown.appendChild(button);
+  });
+  var relationEmptyFilter = document.createElement('div');
+  relationEmptyFilter.dataset.emptyFilter = 'true';
+  relationEmptyFilter.className = 'hidden px-3 py-2 text-xs';
+  relationEmptyFilter.style.color = 'var(--claude-muted-foreground)';
+  relationEmptyFilter.textContent = '没有匹配的关系类型';
+  dropdown.appendChild(relationEmptyFilter);
+}
+
+async function loadSchemaTypesForModal(kind) {
+  var isEntity = kind === 'entity';
+  var schemaUuid = getCurrentSchemaUuid();
+  var trigger = document.getElementById(isEntity ? 'entity-type-input' : 'relation-type-input');
+  var value = trigger;
+  if (trigger) trigger.disabled = true;
+  if (!schemaUuid) {
+    renderSchemaTypeOptions(kind, [], '当前图谱未绑定知识架构');
+    return;
+  }
+  try {
+    var response = await KgBaseAPI.schemaGraph.getDetail(schemaUuid);
+    if (schemaUuid !== getCurrentSchemaUuid()) return;
+    if (response.code !== 200 || !response.data) {
+      throw new Error(response.msg || '加载知识架构类型失败');
+    }
+    renderSchemaTypeOptions(
+      kind,
+      isEntity ? response.data.entities : response.data.relationships,
+      isEntity ? '该架构暂无实体类型' : '该架构暂无关系类型'
+    );
+  } catch (error) {
+    if (value) {
+      if (isEntity) {
+        value.value = '';
+        value.placeholder = '类型加载失败';
+      } else {
+        value.value = '';
+        value.placeholder = '类型加载失败';
+      }
+      value.dataset.value = '';
+    }
+    showToast(error.message || '加载知识架构类型失败');
+  }
+}
 
 // ===== Sidebar navigation =====
 function updateSidebarLinks(uuid) {
@@ -179,12 +347,12 @@ function renderSchemaOptions() {
   dropdown.innerHTML = '';
   schemaList.forEach(function(schema) {
     var item = document.createElement('div');
-    item.className = 'px-3 py-2 cursor-pointer transition-colors hover:opacity-80';
-    item.style.background = schema.uuid === selectedSchemaUuid ? 'var(--claude-accent)' : '#fff';
-    item.innerHTML = '<span class="text-xs" style="color:#1c1917;"></span>';
+    item.className = 'px-3 py-2 cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]';
+    item.style.background = 'transparent';
+    item.innerHTML = '<span class="text-xs" style="color:var(--claude-foreground);"></span>';
     item.querySelector('span').textContent = schema.name || '未命名架构';
     item.onclick = function() {
-      selectArch(item, schema.name || '未命名架构', schema.uuid);
+      selectArch(schema.name || '未命名架构', schema.uuid);
     };
     dropdown.appendChild(item);
   });
@@ -233,29 +401,18 @@ function renderGraphDropdown() {
   var dropdown = document.getElementById('graph-dropdown-top');
   if (!dropdown) return;
   var trigger = document.getElementById('graph-dropdown-trigger');
-  var label = trigger?.querySelector('span:nth-child(2)');
-  var dot = trigger?.querySelector('span:first-child');
+  var label = trigger?.querySelector('span.truncate');
   var hasGraphs = graphList.length > 0;
   if (trigger) {
     trigger.disabled = !hasGraphs;
     trigger.style.borderColor = hasGraphs ? 'var(--claude-brand-500)' : 'var(--claude-border)';
   }
-  if (dot) {
-    dot.style.background = hasGraphs ? 'var(--claude-success-500)' : 'var(--claude-muted-foreground)';
-    dot.style.opacity = hasGraphs ? '1' : '0.4';
-  }
   if (!hasGraphs) dropdown.classList.add('hidden');
   var html = '';
   graphList.forEach(function(g) {
-    var isActive = g.uuid === currentGraphUuid;
-        var dotColor = isActive ? 'var(--claude-success-500)' : 'var(--claude-muted-foreground)';
-    var dotOpacity = isActive ? '1' : '0.4';
-    var textColor = isActive ? 'var(--claude-foreground)' : 'var(--claude-muted-foreground)';
-    var weight = isActive ? 'font-medium' : '';
-    html += '<div class="px-3 py-2 flex items-center justify-between transition-colors hover:opacity-80 cursor-pointer" onclick="loadGraphDetail(\'' + g.uuid + '\')">';
-    html += '<div class="flex items-center gap-2 min-w-0">';
-    html += '<span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:' + dotColor + ';opacity:' + dotOpacity + ';"></span>';
-    html += '<span class="text-xs truncate ' + weight + '" style="color:' + textColor + ';">' + (g.name || '未命名图谱') + '</span>';
+    html += '<div class="px-3 py-2 flex items-center justify-between transition-colors hover:bg-[var(--claude-secondary)] cursor-pointer" onclick="loadGraphDetail(\'' + g.uuid + '\')">';
+    html += '<div class="flex items-center min-w-0">';
+    html += '<span class="text-xs truncate" style="color:var(--claude-foreground);">' + (g.name || '未命名图谱') + '</span>';
     html += '</div>';
     html += '<button type="button" onclick="event.stopPropagation();deleteKnowledgeGraph(\'' + g.uuid + '\')" class="w-6 h-6 flex items-center justify-center cursor-pointer transition-opacity hover:opacity-70" style="background:none;border:none;color:var(--claude-destructive);" aria-label="删除知识图谱"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
     html += '</div>';
@@ -765,7 +922,11 @@ async function submitEntity() {
     showToast('请输入实体名称');
     return;
   }
-  var type = document.getElementById('entity-type-value').textContent.trim();
+  var type = document.getElementById('entity-type-input').dataset.value || '';
+  if (!type) {
+    showToast('当前架构没有可用的实体类型');
+    return;
+  }
   var attributes = {};
   var attrRows = document.querySelectorAll('#entity-attributes > div');
   attrRows.forEach(function(row) {
@@ -876,7 +1037,17 @@ function renderEntityDropdown(prefix) {
 
 // Submit relationship
 async function submitRelation() {
-  var type = document.getElementById('relation-type-value').textContent.trim();
+  var type = document.getElementById('relation-type-input').dataset.value || '';
+  if (!type) {
+    showToast('请选择关系类型');
+    return;
+  }
+  var name = document.getElementById('relation-name-input').value.trim();
+  if (!name) {
+    showToast('请输入关系名称');
+    return;
+  }
+  var description = document.getElementById('relation-description-input').value.trim();
   var headUuid = selectedEntityUuids['head-entity'];
   var tailUuid = selectedEntityUuids['tail-entity'];
   if (!headUuid || !tailUuid) {
@@ -888,9 +1059,9 @@ async function submitRelation() {
       knowledge_graph_uuid: currentGraphUuid,
       source_entity_uuid: headUuid,
       target_entity_uuid: tailUuid,
-      name: type,
+      name: name,
       type: type,
-      attributes: '{}'
+      attributes: JSON.stringify(description ? { description: description } : {})
     };
     var res = editingRelationshipUuid
       ? await KgBaseAPI.knowledgeRelationship.update(editingRelationshipUuid, payload)
@@ -912,6 +1083,9 @@ function editRelationship(relationship) {
   editingRelationshipUuid = relationship.uuid;
   openModal('modal-relation-build');
   selectRelationType(relationship.type || relationship.name || '关联');
+  document.getElementById('relation-name-input').value = relationship.name || '';
+  var relationAttributes = normalizeGraphAttributes(relationship.attributes);
+  document.getElementById('relation-description-input').value = relationAttributes.description || '';
   var source = graphData.entities.find(function(entity) { return entity.uuid === relationship.source_entity_uuid; });
   var target = graphData.entities.find(function(entity) { return entity.uuid === relationship.target_entity_uuid; });
   selectEntity('head-entity', source ? source.name : relationship.source_entity_uuid, relationship.source_entity_uuid);
@@ -1031,6 +1205,15 @@ function fitCanvas() {
 function onOpenModal(id) {
   if (id === 'modal-relation-build') {
     if (!editingRelationshipUuid) {
+      var relationTypeValue = document.getElementById('relation-type-input');
+      if (relationTypeValue) {
+        relationTypeValue.value = '';
+        relationTypeValue.dataset.value = '';
+      }
+      var relationNameInput = document.getElementById('relation-name-input');
+      var relationDescriptionInput = document.getElementById('relation-description-input');
+      if (relationNameInput) relationNameInput.value = '';
+      if (relationDescriptionInput) relationDescriptionInput.value = '';
       selectedEntityUuids = { 'head-entity': null, 'tail-entity': null };
       var headInput = document.getElementById('head-entity-input');
       var tailInput = document.getElementById('tail-entity-input');
@@ -1041,9 +1224,15 @@ function onOpenModal(id) {
       var button = document.querySelector('#modal-relation-build .flex.justify-end button:last-child');
       if (button) button.textContent = '创建';
     }
+    loadSchemaTypesForModal('relation');
     loadEntitiesForDropdowns();
   }
   if (id === 'modal-entity-build' && !editingEntityUuid) {
+    var entityTypeValue = document.getElementById('entity-type-input');
+    if (entityTypeValue) {
+      entityTypeValue.value = '';
+      entityTypeValue.dataset.value = '';
+    }
     var nameInput = document.getElementById('entity-name-input');
     if (nameInput) nameInput.value = '';
     var container = document.getElementById('entity-attributes');
@@ -1056,6 +1245,7 @@ function onOpenModal(id) {
     var submitBtn = document.querySelector('#modal-entity-build .flex.justify-end button:last-child');
     if (submitBtn) submitBtn.textContent = '创建';
   }
+  if (id === 'modal-entity-build') loadSchemaTypesForModal('entity');
 }
 
 function onCloseModal(id) {
@@ -1085,6 +1275,8 @@ loadGraphList();
     editSelected,
     exportGraphIndex,
     filterGraph,
+    filterEntityTypeList,
+    filterRelationTypeList,
     filterEntityList,
     fitCanvas,
     hideTooltip,
@@ -1097,6 +1289,8 @@ loadGraphList();
     selectRelationType,
     showToast,
     showEntityList,
+    showEntityTypeList,
+    showRelationTypeList,
     showTooltip,
     startKnowledgeInference,
     submitEntity,
@@ -1107,5 +1301,8 @@ loadGraphList();
     triggerUpdateFile,
     zoomIn,
     zoomOut,
+    destroy() {
+      document.removeEventListener('click', handleDocumentClick);
+    },
   };
 }

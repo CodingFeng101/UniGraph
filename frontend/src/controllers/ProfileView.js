@@ -1,5 +1,6 @@
 /* Generated from pages/profile.html; keep behavior changes in the source controller during migration. */
 import { MAX_IMAGE_SIZE, validateUploadSize } from '@/utils/upload';
+import { resolveImageUrl } from '@/utils/image-url';
 
 export function createProfileViewController() {
   const { Auth, API, KgBaseAPI } = window;
@@ -10,16 +11,61 @@ export function createProfileViewController() {
   var editingLlmCapsule = null;
   var editingProfile = false;
   var hasEmbeddingModel = false;
+  var draggedLlmCapsule = null;
+  var dragHoldTimer = null;
+  var dragPreview = null;
+  var dragStartPoint = null;
+  var dragPreviewFrame = 0;
+
+  function renderAvatar(avatar, user, name) {
+    avatar.replaceChildren();
+    if (!user.avatar) {
+      avatar.textContent = name.slice(0, 2).toUpperCase();
+      return;
+    }
+
+    var image = document.createElement('img');
+    var retries = 0;
+    var avatarSource = function() {
+      var resolved = resolveImageUrl(user.avatar);
+      if (/^(data:|blob:)/i.test(resolved)) return resolved;
+      var url = new URL(resolved);
+      url.searchParams.set('avatar_v', String(Date.now()));
+      return url.href;
+    };
+    image.src = avatarSource();
+    image.alt = `${name}的头像`;
+    image.className = 'w-full h-full object-cover';
+    image.addEventListener('error', function() {
+      if (retries < 12) {
+        retries += 1;
+        window.setTimeout(function() { image.src = avatarSource(); }, Math.min(5000, retries * 500));
+        return;
+      }
+      avatar.replaceChildren();
+      avatar.textContent = name.slice(0, 2).toUpperCase();
+    });
+    avatar.appendChild(image);
+  }
 
   async function ensureCurrentUser() {
     var cached = Auth.getUserInfo() || {};
-    if (cached.uuid || cached.user_uuid) return cached;
-    var response = await KgBaseAPI.auth.getUserInfo();
-    if (response.code !== 200 || !response.data) {
-      throw new Error(response.msg || '无法获取当前用户');
+    try {
+      var response = await KgBaseAPI.auth.getUserInfo();
+      if (response.code === 200 && response.data) {
+        var current = {
+          ...cached,
+          ...response.data,
+          avatar: response.data.avatar || cached.avatar || null,
+        };
+        Auth.setUserInfo(current);
+        return current;
+      }
+    } catch {
+      if (cached.uuid || cached.user_uuid) return cached;
     }
-    Auth.setUserInfo(response.data);
-    return response.data;
+    if (cached.uuid || cached.user_uuid) return cached;
+    throw new Error('无法获取当前用户');
   }
 
   async function loadProfile() {
@@ -30,11 +76,7 @@ export function createProfileViewController() {
       var nickname = document.getElementById('profile-nickname');
       var email = document.getElementById('profile-email');
       if (avatar) {
-        if (user.avatar) {
-          avatar.innerHTML = '<img src="' + String(user.avatar).replace(/"/g, '&quot;') + '" alt="" class="w-full h-full object-cover">';
-        } else {
-          avatar.textContent = name.slice(0, 2).toUpperCase();
-        }
+        renderAvatar(avatar, user, name);
       }
       if (nickname) nickname.textContent = name;
       if (email) email.textContent = user.email || '未设置邮箱';
@@ -51,19 +93,27 @@ export function createProfileViewController() {
     var cancelButton = document.getElementById('profile-cancel-button');
     if (!nickname || !email || !button) return;
     if (editingProfile) {
+      var username = nickname.value.trim();
+      if (!username) return showToast('用户名不能为空');
+      if (username.length > 20) return showToast('用户名不能超过 20 个字符');
       var response = await KgBaseAPI.auth.updateUser(user.username, {
-        username: user.username,
-        nickname: nickname.value.trim(),
+        username: username,
+        nickname: username,
         email: email.value.trim(),
       });
       if (response.code !== 200) return showToast(response.msg || '保存资料失败');
-      Auth.setUserInfo({ ...user, nickname: nickname.value.trim(), email: email.value.trim() });
+      Auth.setUserInfo({
+        ...user,
+        username: username,
+        nickname: username,
+        email: email.value.trim(),
+      });
       editingProfile = false;
       button.textContent = '编辑资料';
       cancelButton?.classList.add('hidden');
       setAvatarHint(false);
       renderProfileFields(Auth.getUserInfo());
-      showToast('个人资料已更新');
+      showToast('个人资料已更新，下次请使用新用户名登录');
       return;
     }
     var nicknameInput = document.createElement('input');
@@ -123,7 +173,12 @@ export function createProfileViewController() {
       if (upload.code !== 200 || !upload.data?.url) throw new Error(upload.msg || '头像上传失败');
       var response = await KgBaseAPI.auth.updateAvatar(user.username, upload.data.url);
       if (response.code !== 200) throw new Error(response.msg || '头像更新失败');
-      Auth.setUserInfo({ ...user, avatar: upload.data.url });
+      var currentUser = await KgBaseAPI.auth.getUserInfo();
+      Auth.setUserInfo(
+        currentUser.code === 200 && currentUser.data
+          ? { ...user, ...currentUser.data, avatar: currentUser.data.avatar || upload.data.url }
+          : { ...user, avatar: upload.data.url }
+      );
       await loadProfile();
       showToast('头像已更新');
     } catch (error) {
@@ -137,11 +192,140 @@ export function createProfileViewController() {
     window.showToast(msg);
   }
 
+  function refreshLlmDefaults() {
+    document.querySelectorAll('#llm-capsules > [data-model-uuid]').forEach(function(capsule, index) {
+      var badge = capsule.querySelector('[data-role="default-badge"]');
+      if (badge) badge.classList.toggle('hidden', index !== 0);
+    });
+  }
+
+  async function persistLlmOrder() {
+    var providerUuids = Array.from(document.querySelectorAll('#llm-capsules > [data-provider-uuid]'))
+      .map(function(capsule) { return capsule.dataset.providerUuid; })
+      .filter(Boolean);
+    if (!providerUuids.length) return;
+    var response = await KgBaseAPI.llm.reorderProviders(providerUuids);
+    if (response.code !== 200) throw new Error(response.msg || '模型顺序保存失败');
+  }
+
+  function enableLongPressSort(capsule) {
+    capsule.addEventListener('pointerdown', function(event) {
+      if (event.target.closest('button')) return;
+      event.preventDefault();
+      var pointerId = event.pointerId;
+      dragStartPoint = { x: event.clientX, y: event.clientY };
+      dragHoldTimer = window.setTimeout(function() {
+        draggedLlmCapsule = capsule;
+        capsule.setPointerCapture(pointerId);
+        var rect = capsule.getBoundingClientRect();
+        dragPreview = capsule.cloneNode(true);
+        dragPreview.removeAttribute('data-model-uuid');
+        dragPreview.removeAttribute('data-provider-uuid');
+        dragPreview.querySelectorAll('button').forEach(function(button) { button.remove(); });
+        dragPreview.classList.add('llm-drag-preview');
+        dragPreview.style.width = rect.width + 'px';
+        dragPreview.style.height = rect.height + 'px';
+        dragPreview.style.left = rect.left + 'px';
+        dragPreview.style.top = rect.top + 'px';
+        document.body.appendChild(dragPreview);
+        document.body.classList.add('llm-sorting-active');
+        capsule.classList.add('llm-capsule-dragging');
+        capsule.style.cursor = 'grabbing';
+        if (navigator.vibrate) navigator.vibrate(18);
+      }, 350);
+    });
+    capsule.addEventListener('pointermove', function(event) {
+      if (!draggedLlmCapsule && dragStartPoint
+        && Math.hypot(event.clientX - dragStartPoint.x, event.clientY - dragStartPoint.y) > 7) {
+        window.clearTimeout(dragHoldTimer);
+        dragHoldTimer = null;
+        return;
+      }
+      if (!draggedLlmCapsule) return;
+      if (dragPreview) {
+        var previewX = event.clientX - dragStartPoint.x;
+        var previewY = event.clientY - dragStartPoint.y;
+        window.cancelAnimationFrame(dragPreviewFrame);
+        dragPreviewFrame = window.requestAnimationFrame(function() {
+          if (dragPreview) dragPreview.style.transform = `translate3d(${previewX}px,${previewY}px,0) scale(1.04)`;
+        });
+      }
+      var siblings = Array.from(capsule.parentNode.querySelectorAll(':scope > [data-model-uuid]'));
+      var candidates = siblings.filter(function(item) { return item !== capsule; });
+      var target = candidates.reduce(function(nearest, item) {
+        var rect = item.getBoundingClientRect();
+        var distance = Math.abs(event.clientX - (rect.left + rect.width / 2))
+          + Math.abs(event.clientY - (rect.top + rect.height / 2)) * 2;
+        return !nearest || distance < nearest.distance ? { item: item, distance: distance } : nearest;
+      }, null)?.item;
+      if (!target) return;
+      var rect = target.getBoundingClientRect();
+      var targetCenterX = rect.left + rect.width / 2;
+      var targetCenterY = rect.top + rect.height / 2;
+      var sameRow = Math.abs(event.clientY - targetCenterY) <= rect.height;
+      var insertBefore = sameRow ? event.clientX < targetCenterX : event.clientY < targetCenterY;
+      var alreadyPlaced = insertBefore
+        ? capsule.nextElementSibling === target
+        : target.nextElementSibling === capsule;
+      if (alreadyPlaced) return;
+      var before = new Map(siblings.map(function(item) { return [item, item.getBoundingClientRect()]; }));
+      target.parentNode.insertBefore(capsule, insertBefore ? target : target.nextSibling);
+      siblings.forEach(function(item) {
+        if (item === capsule) return;
+        var previous = before.get(item);
+        var current = item.getBoundingClientRect();
+        var dx = previous.left - current.left;
+        var dy = previous.top - current.top;
+        if (dx || dy) {
+          item.getAnimations().forEach(function(animation) { animation.cancel(); });
+          item.animate(
+            [{ transform: `translate3d(${dx}px,${dy}px,0)` }, { transform: 'translate3d(0,0,0)' }],
+            { duration: 165, easing: 'cubic-bezier(.22,1,.36,1)' }
+          );
+        }
+      });
+      refreshLlmDefaults();
+    });
+    var finish = async function() {
+      window.clearTimeout(dragHoldTimer);
+      dragHoldTimer = null;
+      if (!draggedLlmCapsule) {
+        dragStartPoint = null;
+        return;
+      }
+      draggedLlmCapsule.classList.remove('llm-capsule-dragging');
+      draggedLlmCapsule.style.cursor = 'grab';
+      window.cancelAnimationFrame(dragPreviewFrame);
+      dragPreviewFrame = 0;
+      dragPreview?.remove();
+      dragPreview = null;
+      dragStartPoint = null;
+      document.body.classList.remove('llm-sorting-active');
+      draggedLlmCapsule = null;
+      try {
+        await persistLlmOrder();
+        showToast('模型顺序已更新，第一个模型将默认使用');
+      } catch (error) {
+        showToast(error.message || '模型顺序保存失败');
+        await loadModelConfig();
+      }
+    };
+    capsule.addEventListener('pointerup', finish);
+    capsule.addEventListener('pointercancel', finish);
+    capsule.addEventListener('pointerleave', function() {
+      if (!draggedLlmCapsule) {
+        window.clearTimeout(dragHoldTimer);
+        dragHoldTimer = null;
+        dragStartPoint = null;
+      }
+    });
+  }
+
   function createModelCapsule(model, provider, type) {
     var pill = document.createElement('div');
     var isEmbed = type === 'embedding';
     pill.className = 'group inline-flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-full transition-colors';
-    pill.style.cssText = 'background:var(--claude-card);border:1px solid var(--claude-border);';
+    pill.style.cssText = 'background:var(--claude-card);border:1px solid var(--claude-border);cursor:' + (isEmbed ? 'default' : 'grab') + ';touch-action:none;user-select:none;-webkit-user-select:none;';
     pill.dataset.modelUuid = model.uuid || '';
     pill.dataset.providerUuid = provider.uuid || '';
     pill.dataset.providerName = provider.name || model.name || '';
@@ -150,12 +334,14 @@ export function createProfileViewController() {
     pill.dataset.modelType = type;
     pill.innerHTML =
       '<span class="text-xs font-medium" style="font-family:var(--claude-font-mono);color:var(--claude-foreground);"></span>' +
+      (!isEmbed ? '<span data-role="default-badge" class="hidden text-[10px] px-1.5 py-0.5 rounded-full" style="background:var(--claude-accent);color:var(--claude-primary);">默认</span>' : '') +
       (provider.api_key
         ? '<span class="inline-flex items-center gap-1 text-[10px]" style="color:var(--claude-success-500);" title="API Key 已加密保存"><i data-lucide="shield-check" style="width:11px;height:11px;"></i>已保存</span>'
         : '<span class="text-[10px]" style="color:var(--claude-destructive);">未配置密钥</span>') +
       '<button type="button" onclick="editCapsule(this)" class="w-5 h-5 rounded-full flex items-center justify-center transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-muted-foreground);" title="编辑" aria-label="' + (isEmbed ? '编辑嵌入模型' : '编辑模型') + '"><i data-lucide="pencil" style="width:11px;height:11px;"></i></button>' +
       '<button type="button" onclick="removeCapsule(this)" class="w-5 h-5 rounded-full flex items-center justify-center transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;border:none;color:var(--claude-muted-foreground);" title="删除" aria-label="' + (isEmbed ? '删除嵌入模型' : '删除模型') + '"><i data-lucide="x" style="width:11px;height:11px;"></i></button>';
     pill.querySelector('span').textContent = model.name || '未命名模型';
+    if (!isEmbed) enableLongPressSort(pill);
     return pill;
   }
 
@@ -188,6 +374,7 @@ export function createProfileViewController() {
         });
       });
       hasEmbeddingModel = embeddingCount > 0;
+      refreshLlmDefaults();
       if (embedAdd) {
         embedAdd.disabled = hasEmbeddingModel;
         embedAdd.classList.toggle('opacity-40', hasEmbeddingModel);

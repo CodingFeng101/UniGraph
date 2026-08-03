@@ -6,6 +6,7 @@ from celery import Task
 from tqdm import tqdm
 
 from backend.common.task_progress import scaled_progress, should_report, task_progress
+from backend.core.conf import settings
 
 from ..ai_unit.executor.ai_executor import AIExecutor
 
@@ -122,14 +123,19 @@ class SemanticKGInfer:
         # Process inference tasks with real-time updates
         infer_kg = []
         tasks = []
+        inference_slots = asyncio.Semaphore(settings.LLM_MAX_CONCURRENCY)
 
         async def process_with_progress(
             masked_triple, type_triple, attributes, api_key, base_url, model, index, index_
         ):
             try:
-                result = await self._process_mask_triple(
-                    masked_triple, type_triple, attributes, api_key, base_url, model
-                )
+                async with inference_slots:
+                    result = await asyncio.wait_for(
+                        self._process_mask_triple(
+                            masked_triple, type_triple, attributes, api_key, base_url, model
+                        ),
+                        timeout=120,
+                    )
                 return result, index, index_
             finally:
                 progress_bar.update(1)  # Update progress bar when task completes

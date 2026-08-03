@@ -6,6 +6,7 @@ from backend.app.admin.schema import (
     CreateLlmProviderParam,
     LlmProviderDetailSchema,
     LlmProviderListSchema,
+    ReorderLlmProviderParam,
     UpdateLlmProviderParam,
 )
 from backend.app.admin.service.llm_provider_service import LlmProviderService
@@ -36,6 +37,15 @@ async def create_provider(request: Request, obj: CreateLlmProviderParam) -> Resp
         raise RequestError(msg='提供商配置无效或名称已存在') from exc
     data = LlmProviderListSchema(**select_as_dict(new_provider))
     return response_base.success(data=data)
+
+
+@router.put('/order', summary='调整模型顺序', dependencies=[DependsJwtAuth])
+async def reorder_providers(request: Request, obj: ReorderLlmProviderParam) -> ResponseModel:
+    try:
+        await LlmProviderService.reorder(provider_uuids=obj.provider_uuids, user_uuid=request.user.uuid)
+    except ValueError as exc:
+        raise RequestError(msg=str(exc)) from exc
+    return response_base.success(data='模型顺序已更新')
 
 
 @router.get('/{llm_provider_uuid}/detail', summary='获取提供商详细信息', dependencies=[DependsJwtAuth])

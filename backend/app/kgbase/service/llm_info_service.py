@@ -28,7 +28,7 @@ async def get_user_llm_info(user_token: str, model_uuid: str | None = None) -> t
                 LlmModel.type == 'llm',
                 LlmModel.status == 1,
             )
-            .order_by(LlmProvider.id.asc(), LlmModel.id.asc())
+            .order_by(LlmProvider.sort_order.asc(), LlmProvider.id.asc(), LlmModel.id.asc())
         )
         if model_uuid is not None:
             stmt = stmt.where(LlmModel.uuid == model_uuid)

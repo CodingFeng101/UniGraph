@@ -44,7 +44,7 @@
       </button>
     </div>
 
-    <div class="space-y-0.5" style="visibility:hidden;">
+    <div v-once class="space-y-0.5" style="visibility:hidden;">
       <div class="group relative px-3 py-2 rounded-lg transition-colors hover:bg-[var(--claude-accent)]" style="background:var(--claude-accent);">
         <a href="#" class="block" style="text-decoration:none;">
           <p class="text-[13px] truncate pr-6" style="color:var(--claude-foreground);">关于张磊的技能查询</p>
@@ -170,15 +170,18 @@
 
   <div class="px-3 py-2.5 relative mt-auto">
     <button type="button" data-role="user-menu-trigger" @click="toggleUserDropdown()" class="w-full flex items-center justify-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:opacity-80 cursor-pointer" style="background:transparent;border:none;">
-      <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium shrink-0" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);">ZL</div>
+      <div class="relative w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium shrink-0 overflow-hidden" style="background:var(--claude-secondary);color:var(--claude-secondary-foreground);">
+        <span>{{ userInitials }}</span>
+        <img v-if="avatarSrc" :key="avatarSrc" :src="avatarSrc" :alt="`${userName}的头像`" class="absolute inset-0 w-full h-full object-cover transition-opacity duration-200" :class="avatarImageLoaded ? 'opacity-100' : 'opacity-0'" @load="handleAvatarLoad" @error="handleAvatarError" />
+      </div>
       <div class="flex-1 min-w-0 text-left sidebar-collapsed-hide">
-        <p class="text-sm font-medium truncate" style="color:var(--claude-foreground);">张磊</p>
-        <p class="text-[10px]" style="color:var(--claude-muted-foreground);">管理员</p>
+        <p class="text-sm font-medium truncate" style="color:var(--claude-foreground);">{{ userName }}</p>
+        <p class="text-[10px]" style="color:var(--claude-muted-foreground);">{{ userRole }}</p>
       </div>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--claude-muted-foreground);flex-shrink:0;" class="sidebar-collapsed-hide"><polyline points="6 9 12 15 18 9"/></svg>
     </button>
     <div id="user-dropdown" class="hidden absolute bottom-full left-3 w-[236px] mb-2 rounded-xl overflow-visible z-50" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-      <div class="px-4 py-3" style="border-bottom:1px solid var(--claude-border);"><p class="text-xs" style="color:var(--claude-muted-foreground);">zhanglei@company.com</p></div>
+      <div class="px-4 py-3" style="border-bottom:1px solid var(--claude-border);"><p class="text-xs truncate" style="color:var(--claude-muted-foreground);">{{ userInfo.email || '未设置邮箱' }}</p></div>
       <div class="py-1">
         <a href="/unigraph/usercenter" class="user-menu-item flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" style="color:var(--claude-foreground);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -252,13 +255,45 @@
 
 <script>
 import { Auth } from '@/api/runtime/auth';
+import { KgBaseAPI } from '@/api';
+import { resolveImageUrl } from '@/utils/image-url';
 
 export default {
   name: 'AppSidebar',
   props: {
     active: { type: String, default: 'list' },
   },
-  mounted() {
+  data() {
+    return {
+      userInfo: Auth.getUserInfo() || {},
+      avatarImageLoaded: false,
+      avatarRetryCount: 0,
+      avatarRevision: Date.now(),
+      avatarRetryTimer: null,
+      defaultKnowledgeBaseUuid: '',
+    };
+  },
+  computed: {
+    userName() {
+      return this.userInfo.nickname || this.userInfo.username || '用户';
+    },
+    userInitials() {
+      return this.userName.slice(0, 2).toUpperCase();
+    },
+    userRole() {
+      return this.userInfo.is_superuser ? '管理员' : '用户';
+    },
+    avatarSrc() {
+      const path = this.userInfo.avatar;
+      if (!path) return '';
+      const resolved = resolveImageUrl(path);
+      if (/^(data:|blob:)/i.test(resolved)) return resolved;
+      const url = new URL(resolved);
+      url.searchParams.set('avatar_v', String(this.avatarRevision));
+      return url.href;
+    },
+  },
+  async mounted() {
     this.applySavedPreferences();
     this.updateNavigation();
     const history = this.$el.querySelector('.sidebar-content .space-y-0\\.5');
@@ -266,33 +301,127 @@ export default {
       history.innerHTML = '';
       history.style.visibility = 'visible';
     }
-    if (this.active !== 'app') {
+    if (this.$route.name !== 'graph-application') {
       window.ChatSidebar?.render();
-      window.ChatSidebar?.load();
+      await window.ChatSidebar?.load();
+      if (!this.defaultKnowledgeBaseUuid) await this.resolveDefaultKnowledgeBase();
     }
     window.TaskManager?.render();
+    window.addEventListener('unigraph:user-updated', this.syncUserInfo);
+    window.addEventListener('unigraph:knowledge-base-default', this.handleDefaultKnowledgeBase);
+    window.addEventListener('storage', this.handleUserStorage);
+    this.refreshUserInfo();
+  },
+  beforeUnmount() {
+    window.removeEventListener('unigraph:user-updated', this.syncUserInfo);
+    window.removeEventListener('unigraph:knowledge-base-default', this.handleDefaultKnowledgeBase);
+    window.removeEventListener('storage', this.handleUserStorage);
+    if (this.avatarRetryTimer) window.clearTimeout(this.avatarRetryTimer);
   },
   updated() {
     this.updateNavigation();
   },
   methods: {
+    async refreshUserInfo() {
+      try {
+        const response = await KgBaseAPI.auth.getUserInfo();
+        if (response.code === 200 && response.data) {
+          Auth.setUserInfo(response.data);
+        }
+      } catch {
+        // Keep the cached user when the profile endpoint is temporarily unavailable.
+      }
+    },
+    syncUserInfo(event) {
+      const nextUser = event.detail || Auth.getUserInfo() || {};
+      const mergedUser = {
+        ...this.userInfo,
+        ...nextUser,
+        avatar: nextUser.avatar || this.userInfo.avatar || null,
+      };
+      const avatarChanged = mergedUser.avatar !== this.userInfo.avatar;
+      this.userInfo = mergedUser;
+      if (avatarChanged) {
+        this.avatarImageLoaded = false;
+        this.avatarRetryCount = 0;
+        this.avatarRevision = Date.now();
+      }
+    },
+    handleAvatarLoad() {
+      this.avatarImageLoaded = true;
+      this.avatarRetryCount = 0;
+      if (this.avatarRetryTimer) {
+        window.clearTimeout(this.avatarRetryTimer);
+        this.avatarRetryTimer = null;
+      }
+    },
+    handleAvatarError() {
+      this.avatarImageLoaded = false;
+      if (!this.userInfo.avatar || this.avatarRetryCount >= 12) return;
+      this.avatarRetryCount += 1;
+      if (this.avatarRetryTimer) window.clearTimeout(this.avatarRetryTimer);
+      this.avatarRetryTimer = window.setTimeout(() => {
+        this.avatarRevision = Date.now();
+        this.avatarRetryTimer = null;
+      }, Math.min(5000, 500 * this.avatarRetryCount));
+    },
+    handleUserStorage(event) {
+      if (event.key === 'user') this.syncUserInfo({ detail: Auth.getUserInfo() });
+    },
+    handleDefaultKnowledgeBase(event) {
+      this.defaultKnowledgeBaseUuid = event.detail?.uuid || '';
+      this.$nextTick(this.updateNavigation);
+    },
     async handleLogout() {
       document.getElementById('user-dropdown')?.classList.add('hidden');
       await Auth.logout();
     },
-    handleNewChat(event) {
-      if (this.active !== 'app') return;
+    async handleNewChat(event) {
       event.preventDefault();
-      window.newConversation?.();
+      if (this.$route.name === 'graph-application' && typeof window.newConversation === 'function') {
+        window.newConversation();
+        return;
+      }
+      const uuid = this.$route.params.uuid || this.defaultKnowledgeBaseUuid || await this.resolveDefaultKnowledgeBase();
+      if (!uuid) {
+        this.showToast('请先创建知识库并完成索引构建');
+        return;
+      }
+      await this.$router.push(`/unigraphs/${uuid}/qa`);
+    },
+    async resolveDefaultKnowledgeBase() {
+      try {
+        const basesResponse = await KgBaseAPI.kgBase.getAll();
+        const bases = basesResponse.code === 200 && Array.isArray(basesResponse.data) ? basesResponse.data : [];
+        const contexts = await Promise.all(bases.map(async (base) => {
+          try {
+            const response = await KgBaseAPI.knowledgeGraph.getAll(base.uuid);
+            const hasIndex = response.code === 200 && Array.isArray(response.data)
+              && response.data.some((graph) => Number(graph.index_status) === 1);
+            return { base, hasIndex };
+          } catch {
+            return { base, hasIndex: false };
+          }
+        }));
+        const preferred = contexts
+          .filter((context) => context.hasIndex)
+          .sort((left, right) => new Date(right.base.created_time || 0) - new Date(left.base.created_time || 0))[0]?.base;
+        this.defaultKnowledgeBaseUuid = preferred?.uuid || '';
+        this.$nextTick(this.updateNavigation);
+        return this.defaultKnowledgeBaseUuid;
+      } catch {
+        return '';
+      }
     },
     updateNavigation() {
       const uuid = this.$route.params.uuid || this.$route.query.uuid || '';
+      const appUuid = uuid || this.defaultKnowledgeBaseUuid;
       const links = {
         list: '/unigraph/workspace',
         info: uuid ? `/unigraph/unigraphs/${uuid}/info` : '/unigraph/workspace',
         design: uuid ? `/unigraph/unigraphs/${uuid}/structure` : '/unigraph/workspace',
         build: uuid ? `/unigraph/unigraphs/${uuid}/graph` : '/unigraph/workspace',
-        app: uuid ? `/unigraph/unigraphs/${uuid}/qa` : '/unigraph/workspace',
+        app: appUuid ? `/unigraph/unigraphs/${appUuid}/qa` : '/unigraph/workspace',
       };
       const items = [...this.$el.querySelectorAll('nav > a')].slice(0, 5);
       Object.keys(links).forEach((key, index) => {

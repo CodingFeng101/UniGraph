@@ -11,6 +11,21 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 
+def _context_records(context_data: dict, source_type: str, limit: int = 24) -> dict:
+    frame = context_data.get(source_type)
+    records = frame.to_dict(orient='records') if frame is not None else []
+    normalized = [
+        {str(key): '' if value is None else str(value) for key, value in record.items()}
+        for record in records[:limit]
+    ]
+    return {
+        'source_type': source_type,
+        'total': len(records),
+        'items': normalized,
+        'truncated': len(records) > limit,
+    }
+
+
 class LocalSearch(BaseSearch):
     """本地搜索类"""
 
@@ -50,6 +65,25 @@ class LocalSearch(BaseSearch):
         # 执行搜索操作
         self.context_text = context_text
         self.context_data = {key: value.to_dict() for key, value in context_data.items()}
+        progress_callback = kwargs.get('progress_callback')
+        if progress_callback:
+            labels = {
+                'Entities': ('实体检索完成', '个实体'),
+                'Relationships': ('关系检索完成', '条关系'),
+                'Sources': ('信息源检索完成', '条原文片段'),
+                'Reports': ('社区报告检索完成', '份社区报告'),
+            }
+            for source_type in ('Entities', 'Relationships', 'Sources', 'Reports'):
+                payload = _context_records(context_data, source_type)
+                if not payload['total']:
+                    continue
+                message, unit = labels[source_type]
+                suffix = '，仅展示前 24 条' if payload['truncated'] else ''
+                await progress_callback(
+                    message,
+                    f'本次检索到 {payload["total"]} {unit}{suffix}',
+                    payload,
+                )
         conversation_context = None
         context_provider = kwargs.get('context_provider')
         if context_provider:

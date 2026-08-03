@@ -457,6 +457,7 @@ class KnowledgeGraphService:
         embedding_model: str,
         context_provider=None,
         token_callback=None,
+        progress_callback=None,
     ):
         entities = [entity.to_dict() for entity in knowledge_graph.entities]
         relationships = [relationship.to_dict() for relationship in knowledge_graph.relationships]
@@ -510,6 +511,7 @@ class KnowledgeGraphService:
                 embedding_model=embedding_model,
                 context_provider=context_provider,
                 token_callback=token_callback,
+                progress_callback=progress_callback,
             )
             return {'results': results, 'context_text': context_text, 'context_data': context_data}
 

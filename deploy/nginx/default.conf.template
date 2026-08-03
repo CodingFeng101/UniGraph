@@ -17,6 +17,18 @@ server {
         try_files $uri =404;
     }
 
+    location = /unigraph/config.js {
+        default_type application/javascript;
+        add_header Cache-Control "no-store";
+        alias /usr/share/nginx/html/config.js;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
+        expires -1;
+        try_files $uri =404;
+    }
+
     location /knowg/ {
         proxy_pass http://${NGINX_BACKEND_HOST}:${NGINX_BACKEND_PORT}/knowg/;
         proxy_http_version 1.1;

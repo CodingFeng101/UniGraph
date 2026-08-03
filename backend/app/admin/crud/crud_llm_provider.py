@@ -1,6 +1,6 @@
 from typing import Optional, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select, and_, desc
@@ -45,7 +45,7 @@ class CRUDLlmProvider(CRUDPlus[LlmProvider]):
         """
         获取所有提供商信息（支持条件筛选）
         """
-        stmt = select(self.model).order_by(desc(self.model.created_time))
+        stmt = select(self.model).order_by(self.model.sort_order.asc(), self.model.id.asc())
         filters = []
 
         if user_uuid:
@@ -65,6 +65,10 @@ class CRUDLlmProvider(CRUDPlus[LlmProvider]):
         """
         provider_data = obj.model_dump()
         new_provider = self.model(**provider_data)
+        max_order = await db.scalar(
+            select(func.max(self.model.sort_order)).where(self.model.user_uuid == obj.user_uuid)
+        )
+        new_provider.sort_order = (max_order if max_order is not None else -1) + 1
         db.add(new_provider)
         await db.commit()
         return new_provider

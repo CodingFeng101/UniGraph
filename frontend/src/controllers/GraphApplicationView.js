@@ -3,6 +3,7 @@ import { copyText } from '@/utils/clipboard';
 import { gsap } from 'gsap';
 import { validateUploadSize } from '@/utils/upload';
 import { displayChatName } from '@/utils/chat-name';
+import { t } from '@/services/i18n';
 import {
   normalizeChatSources as normalizeSources,
   renderAnswerWithCitations,
@@ -180,6 +181,34 @@ function copyMessage(button) {
     copyText(content).then(function(copied) {
       showToast(copied ? '已复制' : '复制失败');
     });
+  }
+}
+
+async function regenerateAnswer(button) {
+  if (isStreaming) {
+    showToast('正在生成回答，请稍候...');
+    return;
+  }
+  var assistantGroup = button.closest('.chat-assistant-message');
+  var userGroup = assistantGroup?.previousElementSibling;
+  while (userGroup && !userGroup.classList.contains('chat-user-message')) {
+    userGroup = userGroup.previousElementSibling;
+  }
+  var requestText = userGroup?.dataset.rawMessage || '';
+  var messageUuid = userGroup?.dataset.messageUuid || '';
+  if (!currentChatUuid || !requestText || !messageUuid) {
+    showToast('当前消息暂时无法重新生成');
+    return;
+  }
+  button.disabled = true;
+  try {
+    var response = await KgBaseAPI.chatLibrary.updateMessage(currentChatUuid, messageUuid, requestText);
+    if (response.code !== 200) throw new Error(response.msg || '重新生成失败');
+    while (userGroup.nextElementSibling) userGroup.nextElementSibling.remove();
+    await streamAnswer(requestText, { message_uuid: messageUuid }, Promise.resolve());
+  } catch (error) {
+    if (document.body.contains(button)) button.disabled = false;
+    showToast(error.message || '重新生成失败');
   }
 }
 
@@ -420,6 +449,15 @@ function getSelectedEffort() {
   return effortRetrievalDepth[level] ? level : 'Low';
 }
 
+function hasRunningQuestionTask(chatUuid) {
+  if (!chatUuid || !window.TaskManager?.getTasks) return false;
+  return window.TaskManager.getTasks().some(function(task) {
+    return task.name === 'knowledge_graph.ask' &&
+      task.kwargs?.obj_data?.chat_library_uuid === chatUuid &&
+      ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state);
+  });
+}
+
 function updateSendBtn() {
   var input = document.getElementById('message-input');
   var btn = document.getElementById('send-btn');
@@ -441,7 +479,7 @@ async function sendMessage() {
   var text = input.value.trim();
   if (!text && !pendingAttachments.length) return;
   var requestText = composeMessageText(text, pendingAttachments);
-  if (isStreaming) {
+  if (isStreaming || hasRunningQuestionTask(currentChatUuid)) {
     showToast('正在生成回答，请稍候...');
     return;
   }
@@ -476,6 +514,7 @@ async function sendMessage() {
 
   var titlePromise = KgBaseAPI.chatLibrary.generateTitle(currentChatUuid, requestText)
     .then(function(response) {
+      if (controllerDestroyed) return;
       if (response.code === 200) {
         if (response.data) {
           currentChatName = response.data;
@@ -550,61 +589,116 @@ async function streamAnswer(requestText, savedMessage, titlePromise) {
   }
 
   var selectedEffort = getSelectedEffort();
-  return KgBaseAPI.knowledgeGraph.ask(currentGraphUuid, {
-    message: requestText,
-    infer: true,
-    depth: effortRetrievalDepth[selectedEffort],
-    chat_library_uuid: currentChatUuid,
-    current_message_uuid: savedMessage?.message_uuid || null,
-    llm_model_uuid: selectedLlmModelUuid
-  }, function(event) {
-    if (!event) return;
-    if (event.type === 'processing') {
-      var msg = event.message || (event.data && event.data.message) || '正在思考...';
-      appendThinkingLog(thinkingEl, msg, event.detail || '');
-    } else if (event.type === 'answer_delta') {
-      var delta = event.delta || '';
-      if (!delta) return;
+  var taskChatUuid = currentChatUuid;
+  var askTaskUid = null;
+  var renderedTaskSteps = new Set();
+  var thinkingQueueTail = Promise.resolve();
+  var answerRevealUnlocked = false;
+  var pendingAnswer = '';
+
+  function enqueueThinkingStep(step, unlockAnswer = false) {
+    var interval = step.metrics?.retrieval ? 760 : 620;
+    thinkingQueueTail = thinkingQueueTail.then(async function() {
+      if (controllerDestroyed || !thinkingEl?.isConnected) return;
+      appendThinkingLog(
+        thinkingEl,
+        t(step.label),
+        step.detail ? t(step.detail) : '',
+        step.metrics?.retrieval || null,
+      );
+      if (unlockAnswer) {
+        answerRevealUnlocked = true;
+        if (pendingAnswer) {
+          finalAnswer = pendingAnswer;
+          scheduleStreamRender();
+        }
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, interval));
+    });
+    return thinkingQueueTail;
+  }
+
+  function applyAskTaskUpdate(task) {
+    if (controllerDestroyed || !task || task.uid !== askTaskUid) return;
+    var steps = Array.isArray(task.steps) ? task.steps : [];
+    steps.forEach(function(step, index) {
+      if (!step?.label || step.label === '任务已创建') return;
+      var key = step.id != null ? String(step.id) : `${step.label}:${index}`;
+      if (renderedTaskSteps.has(key)) return;
+      renderedTaskSteps.add(key);
+      var unlockAnswer = step.label === '正在生成回答';
+      if (unlockAnswer) hasAnswerDelta = true;
+      enqueueThinkingStep(step, unlockAnswer);
+    });
+    if (task.partialAnswer) {
+      pendingAnswer = task.partialAnswer;
       if (!hasAnswerDelta) {
         hasAnswerDelta = true;
-        appendThinkingLog(thinkingEl, '生成回答', '正在根据检索到的知识逐步生成回答');
+        enqueueThinkingStep({
+          label: '正在生成回答',
+          detail: '正在根据检索到的知识逐步生成回答',
+          metrics: {},
+        }, true);
       }
-      finalAnswer += delta;
-      scheduleStreamRender();
-    } else if (event.type === 'final_result') {
-      var content = '';
-      if (event.data) {
-        if (typeof event.data === 'string') content = event.data;
-        else content = event.data.results || event.data.answer || event.data.content || event.data.message || event.data.response || '';
-        finalSources = event.data.context_data || {};
+      if (answerRevealUnlocked) {
+        finalAnswer = pendingAnswer;
+        scheduleStreamRender();
       }
-      finalAnswer = content || finalAnswer;
-      finalReceived = true;
-      completeThinkingLog(thinkingEl);
-      scheduleStreamRender();
-    } else if (event.type === 'error') {
-      renderAskFailure(event.msg || event.message || '请求失败');
     }
-  }).then(async function() {
-    if (!hasRenderedError) {
-      finalReceived = true;
-      scheduleStreamRender();
-      await streamFlush;
+    if (task.state === 'FAILURE') renderAskFailure(task.message || '请求失败');
+  }
+
+  function handleAskTaskUpdate(event) {
+    applyAskTaskUpdate(event.detail?.task);
+  }
+
+  window.addEventListener('unigraph:task-updated', handleAskTaskUpdate);
+  try {
+    var submitted = await window.TaskManager.submit(
+      'knowledge_graph.ask',
+      '知识问答',
+      currentChatName,
+      {
+        uuid: currentGraphUuid,
+        obj_data: {
+          message: requestText,
+          infer: true,
+          depth: effortRetrievalDepth[selectedEffort],
+          chat_library_uuid: taskChatUuid,
+          current_message_uuid: savedMessage?.message_uuid || null,
+          llm_model_uuid: selectedLlmModelUuid,
+          effort: selectedEffort,
+        },
+      },
+    );
+    askTaskUid = submitted.uid;
+    var result = await submitted.completion;
+    pendingAnswer = result?.results || pendingAnswer || finalAnswer;
+    finalSources = result?.context_data || {};
+    if (controllerDestroyed || !aiDiv.isConnected) return;
+    if (!hasAnswerDelta && pendingAnswer) {
+      hasAnswerDelta = true;
+      enqueueThinkingStep({
+        label: '正在生成回答',
+        detail: '正在根据检索到的知识逐步生成回答',
+        metrics: {},
+      }, true);
     }
+    await thinkingQueueTail;
+    finalAnswer = pendingAnswer || finalAnswer;
+    finalReceived = true;
+    completeThinkingLog(thinkingEl);
+    scheduleStreamRender();
+    await streamFlush;
+    if (finalAnswer) finalizeAssistantMessage(aiDiv, finalAnswer);
+    await titlePromise;
+    if (currentChatUuid === taskChatUuid) await loadChatHistory();
+  } catch (error) {
+    renderAskFailure(error.message || '请求失败');
+  } finally {
+    window.removeEventListener('unigraph:task-updated', handleAskTaskUpdate);
     isStreaming = false;
-    if (finalAnswer) {
-      try {
-        await saveConversationMessage('assistant', finalAnswer, finalSources);
-        await titlePromise;
-        await loadChatHistory();
-      } catch (error) {
-        showToast(error.message || '保存对话失败');
-      }
-    }
-  }).catch(function(err) {
-    isStreaming = false;
-    renderAskFailure(err.message || '请求失败');
-  });
+  }
 }
 
 function normalizeAskErrorMessage(message) {
@@ -623,19 +717,16 @@ document.addEventListener('click', function(e) {
   if (citation && !e.target.closest('.source-popup')) {
     var shouldOpen = !citation.classList.contains('is-open');
     document.querySelectorAll('[data-citation].is-open').forEach(function(item) {
-      item.classList.remove('is-open');
-      item.setAttribute('aria-expanded', 'false');
+      hideCitationPopup(item);
     });
     if (shouldOpen) {
-      citation.classList.add('is-open');
-      citation.setAttribute('aria-expanded', 'true');
+      showCitationPopup(citation);
     }
     return;
   }
   if (!e.target.closest('.source-popup')) {
     document.querySelectorAll('[data-citation].is-open').forEach(function(item) {
-      item.classList.remove('is-open');
-      item.setAttribute('aria-expanded', 'false');
+      hideCitationPopup(item);
     });
   }
   var modelDropdown = document.getElementById('model-dropdown');
@@ -654,12 +745,129 @@ document.addEventListener('click', function(e) {
   }
 });
 
+var citationCloseTimers = new WeakMap();
+
+function isCitationPopoverOpen(popup) {
+  try {
+    return popup.matches(':popover-open');
+  } catch {
+    return false;
+  }
+}
+
+function showCitationPopup(citation) {
+  var popup = citation?.querySelector('.source-popup');
+  if (!popup) return;
+  citation.classList.add('is-open');
+  citation.setAttribute('aria-expanded', 'true');
+  if (typeof popup.showPopover === 'function' && !isCitationPopoverOpen(popup)) {
+    try {
+      popup.showPopover();
+    } catch {
+      // Fall back to the existing positioned panel in browsers without popover support.
+    }
+  }
+  positionCitationPopup(citation);
+}
+
+function hideCitationPopup(citation) {
+  var popup = citation?.querySelector('.source-popup');
+  citation.classList.remove('is-open');
+  citation.setAttribute('aria-expanded', 'false');
+  if (popup && typeof popup.hidePopover === 'function' && isCitationPopoverOpen(popup)) {
+    try {
+      popup.hidePopover();
+    } catch {
+      // The panel may already have been dismissed by the browser.
+    }
+  }
+}
+
+function positionCitationPopup(citation) {
+  var popup = citation?.querySelector('.source-popup');
+  if (!popup) return;
+  var pageElement = document.getElementById('chat-message-list') || document.getElementById('app-main');
+  var page = pageElement?.getBoundingClientRect();
+  var boundary = {
+    left: Math.max(12, page?.left || 0) + 12,
+    right: Math.min(window.innerWidth - 12, page?.right || window.innerWidth) - 12,
+    top: Math.max(12, page?.top || 0) + 12,
+    bottom: Math.min(window.innerHeight - 12, page?.bottom || window.innerHeight) - 12,
+  };
+  var heightCap = citation.classList.contains('citation-tag--overview') ? 320 : 300;
+  popup.classList.remove('source-popup--below');
+  popup.style.removeProperty('max-height');
+  popup.style.maxWidth = Math.max(220, boundary.right - boundary.left) + 'px';
+  popup.style.setProperty('--source-popup-shift-x', '0px');
+
+  var citationRect = citation.getBoundingClientRect();
+  var spaceAbove = Math.max(0, citationRect.top - boundary.top - 8);
+  var spaceBelow = Math.max(0, boundary.bottom - citationRect.bottom - 8);
+
+  if (typeof popup.showPopover === 'function' && isCitationPopoverOpen(popup)) {
+    var desiredHeight = Math.min(popup.scrollHeight, heightCap);
+    var showBelowInTopLayer = desiredHeight > spaceAbove && spaceBelow > spaceAbove;
+    var availableHeight = showBelowInTopLayer ? spaceBelow : spaceAbove;
+    var maxHeight = Math.max(96, Math.min(heightCap, Math.floor(availableHeight)));
+    popup.style.position = 'fixed';
+    popup.style.transform = 'none';
+    popup.style.maxHeight = maxHeight + 'px';
+
+    var topLayerRect = popup.getBoundingClientRect();
+    var left = Math.min(Math.max(citationRect.left, boundary.left), boundary.right - topLayerRect.width);
+    var top = showBelowInTopLayer
+      ? citationRect.bottom + 8
+      : citationRect.top - topLayerRect.height - 8;
+    popup.style.left = Math.round(Math.max(boundary.left, left)) + 'px';
+    popup.style.top = Math.round(Math.min(Math.max(top, boundary.top), boundary.bottom - topLayerRect.height)) + 'px';
+    popup.style.right = 'auto';
+    popup.style.bottom = 'auto';
+    return;
+  }
+
+  var popupRect = popup.getBoundingClientRect();
+  var shiftX = 0;
+  if (popupRect.right > boundary.right) shiftX -= popupRect.right - boundary.right;
+  if (popupRect.left + shiftX < boundary.left) shiftX += boundary.left - (popupRect.left + shiftX);
+  popup.style.setProperty('--source-popup-shift-x', Math.round(shiftX) + 'px');
+
+  var showBelow = popupRect.height > spaceAbove && spaceBelow > spaceAbove;
+  popup.classList.toggle('source-popup--below', showBelow);
+  popup.style.maxHeight = Math.max(96, Math.min(heightCap, Math.floor(showBelow ? spaceBelow : spaceAbove))) + 'px';
+}
+
+function scheduleCitationClose(citation) {
+  var existingTimer = citationCloseTimers.get(citation);
+  if (existingTimer) window.clearTimeout(existingTimer);
+  var timer = window.setTimeout(function() {
+    citationCloseTimers.delete(citation);
+    if (citation.matches(':hover') || citation.contains(document.activeElement)) return;
+    hideCitationPopup(citation);
+    citation.blur();
+  }, 180);
+  citationCloseTimers.set(citation, timer);
+}
+
+document.addEventListener('pointerover', function(e) {
+  var citation = e.target.closest('[data-citation]');
+  if (!citation) return;
+  var existingTimer = citationCloseTimers.get(citation);
+  if (existingTimer) {
+    window.clearTimeout(existingTimer);
+    citationCloseTimers.delete(citation);
+  }
+  showCitationPopup(citation);
+});
+
+document.addEventListener('focusin', function(e) {
+  var citation = e.target.closest('[data-citation]');
+  if (citation) showCitationPopup(citation);
+});
+
 document.addEventListener('pointerout', function(e) {
   var citation = e.target.closest('[data-citation]');
   if (!citation || citation.contains(e.relatedTarget)) return;
-  citation.classList.remove('is-open');
-  citation.setAttribute('aria-expanded', 'false');
-  citation.blur();
+  scheduleCitationClose(citation);
 });
 
 document.querySelectorAll('.trace-toggle').forEach(function(btn) {
@@ -701,6 +909,8 @@ var knowledgeGraphList = [];
 var chatHistoryItems = [];
 var chatSortAscending = false;
 var isStreaming = false;
+var resumedAskViews = new Map();
+var controllerDestroyed = false;
 var pendingAttachments = [];
 
 // Update sidebar navigation links with UUID
@@ -880,12 +1090,12 @@ function appendAIThinking() {
   var container = document.getElementById('chat-message-list');
   if (!container) return null;
   var div = document.createElement('div');
-  div.className = 'group';
+  div.className = 'group chat-assistant-message';
   div.innerHTML =
     '<div class="max-w-[680px] w-full">' +
-      '<details class="ai-thinking mb-4" aria-label="回答处理进度" open>' +
+      '<details class="ai-thinking mb-4" data-state="running" aria-label="回答处理进度" open>' +
         '<summary class="ai-thinking-summary">' +
-          '<span class="ai-thinking-summary__status"><i data-lucide="loader-circle" aria-hidden="true"></i></span>' +
+          '<span class="ai-thinking-summary__status"><i data-lucide="sparkles" aria-hidden="true"></i></span>' +
           '<span class="ai-thinking-summary__text">正在思考...</span>' +
           '<i class="ai-thinking-summary__chevron" data-lucide="chevron-right" aria-hidden="true"></i>' +
         '</summary>' +
@@ -899,7 +1109,7 @@ function appendAIThinking() {
   return div;
 }
 
-function appendThinkingLog(thinkingEl, message, detail) {
+function appendThinkingLog(thinkingEl, message, detail, retrieval) {
   if (!thinkingEl) return;
   updateThinkingSummary(thinkingEl, message, 'running');
   var log = thinkingEl.querySelector('.ai-thinking-log');
@@ -914,28 +1124,69 @@ function appendThinkingLog(thinkingEl, message, detail) {
   if (last) {
     last.classList.remove('is-current');
     last.classList.add('is-complete');
+    last.querySelector('.ai-thinking-log__retrieval')?.removeAttribute('open');
   }
   var item = document.createElement('div');
-  item.className = 'ai-thinking-log__item is-current' + (/对话上下文/.test(message) ? ' is-context' : '');
+  item.className = 'ai-thinking-log__item is-current' + (/对话上下文|conversation context/i.test(message) ? ' is-context' : '');
   item.dataset.message = message;
   item.innerHTML = '<span class="ai-thinking-log__marker"><i data-lucide="' + thinkingIcon(message) + '" aria-hidden="true"></i></span>' +
     '<div class="ai-thinking-log__content"><div class="ai-thinking-log__label">' + escapeHtml(message) + '</div>' +
-    (detail ? '<div class="ai-thinking-log__detail">' + escapeHtml(detail) + '</div>' : '') + '</div>';
+    (retrieval ? renderThinkingRetrieval(retrieval, detail) : (detail ? '<div class="ai-thinking-log__detail">' + escapeHtml(detail) + '</div>' : '')) + '</div>';
   log.appendChild(item);
   while (log.children.length > 12) log.removeChild(log.firstElementChild);
   lucide.createIcons();
   scrollToBottom();
 }
 
+function renderThinkingRetrieval(data, detail) {
+  var sourceType = data?.source_type || '';
+  var items = Array.isArray(data?.items) ? data.items : [];
+  var itemHtml = items.map(function(item, index) {
+    var title;
+    var meta = '';
+    var content;
+    if (sourceType === 'Entities') {
+      title = item.entity_name || item.name || `${t('实体')} ${index + 1}`;
+      meta = item.entity_type || '';
+      content = thinkingRetrievalPreview(item.text);
+    } else if (sourceType === 'Relationships') {
+      title = [item.source, item.target].filter(Boolean).join(' → ') || `${t('关系')} ${index + 1}`;
+      meta = item.name || '';
+      content = thinkingRetrievalPreview(item.text);
+    } else if (sourceType === 'Reports') {
+      var reportText = String(item.text || '');
+      title = reportText.match(/社区名称\s*[:：]\s*([^\n]+)/)?.[1] || `${t('社区报告')} ${index + 1}`;
+      content = thinkingRetrievalPreview(reportText.match(/社区摘要\s*[:：]\s*([^\n]+)/)?.[1] || reportText);
+    } else {
+      title = `${t('信息源')} ${index + 1}`;
+      content = thinkingRetrievalPreview(item.text);
+    }
+    return '<div class="ai-thinking-retrieval__item">' +
+      '<div class="ai-thinking-retrieval__heading"><span>' + escapeHtml(title) + '</span>' +
+      (meta ? '<small>' + escapeHtml(meta) + '</small>' : '') + '</div>' +
+      (content ? '<p>' + escapeHtml(content) + '</p>' : '') + '</div>';
+  }).join('');
+  var truncated = data?.truncated ? '<div class="ai-thinking-retrieval__more">' + escapeHtml(t('仅展示前 24 条，完整记录保留在回答引用中')) + '</div>' : '';
+  return '<details class="ai-thinking-log__retrieval" open>' +
+    '<summary><span>' + escapeHtml(detail || t(`检索到 ${data?.total || items.length} 条记录`)) + '</span>' +
+    '<i data-lucide="chevron-right" aria-hidden="true"></i></summary>' +
+    '<div class="ai-thinking-retrieval__list">' + itemHtml + truncated + '</div></details>';
+}
+
+function thinkingRetrievalPreview(value, limit = 260) {
+  var text = String(value || '').replace(/\s+/g, ' ').trim();
+  return text.length > limit ? text.slice(0, limit).trimEnd() + '…' : text;
+}
+
 function thinkingIcon(message) {
   var text = String(message || '');
-  if (/接收|问题/.test(text)) return 'message-square-text';
-  if (/加载|索引|数据/.test(text)) return 'database';
-  if (/检索|查询|召回|匹配/.test(text)) return 'search';
-  if (/实体|关系|图谱|上下文/.test(text)) return 'network';
-  if (/历史|社区|摘要|概览/.test(text)) return 'layers-3';
-  if (/来源|证据|引用|整理/.test(text)) return 'file-search';
-  if (/生成|回答/.test(text)) return 'sparkles';
+  if (/接收|问题|question/i.test(text)) return 'message-square-text';
+  if (/加载|索引|数据|load|index|data/i.test(text)) return 'database';
+  if (/检索|查询|召回|匹配|retriev|search|match/i.test(text)) return 'search';
+  if (/实体|关系|图谱|上下文|entit|relation|graph|context/i.test(text)) return 'network';
+  if (/历史|社区|摘要|概览|history|communit|summary|overview/i.test(text)) return 'layers-3';
+  if (/来源|证据|引用|整理|source|evidence|citation|prepar/i.test(text)) return 'file-search';
+  if (/生成|回答|generat|answer/i.test(text)) return 'sparkles';
   return 'clock-3';
 }
 
@@ -958,9 +1209,28 @@ function updateThinkingSummary(thinkingEl, message, state) {
   if (text) text.textContent = message;
   thinkingEl.dataset.state = state;
   if (status) {
-    var icon = state === 'complete' ? 'circle-check' : state === 'error' ? 'circle-alert' : 'loader-circle';
+    var icon = state === 'complete' ? 'circle-check' : state === 'error' ? 'circle-alert' : 'sparkles';
     status.innerHTML = '<i data-lucide="' + icon + '" aria-hidden="true"></i>';
   }
+}
+
+function assistantActionsHtml() {
+  return '<div class="chat-assistant-actions flex items-center gap-1 mt-2">' +
+    '<button type="button" onclick="copyMessage(this)" class="chat-assistant-action" title="复制回答" aria-label="复制回答">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' +
+    '<button type="button" onclick="regenerateAnswer(this)" class="chat-assistant-action" title="重新生成" aria-label="重新生成">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"/></svg></button>' +
+    '</div>';
+}
+
+function finalizeAssistantMessage(aiDiv, text) {
+  if (!aiDiv) return;
+  aiDiv.dataset.rawMessage = String(text || '');
+  var answer = aiDiv.querySelector('.ai-answer');
+  if (answer && !aiDiv.querySelector('.chat-assistant-actions')) {
+    answer.insertAdjacentHTML('afterend', assistantActionsHtml());
+  }
+  lucide.createIcons();
 }
 
 function failThinkingLog(thinkingEl, message) {
@@ -996,6 +1266,7 @@ function appendAIMessage(text, sources) {
   var answerEl = aiDiv.querySelector('.ai-answer');
   if (thinkingEl) thinkingEl.style.display = 'none';
   answerEl.innerHTML = renderAnswerWithCitations(text, sources || {});
+  finalizeAssistantMessage(aiDiv, text);
   scrollToBottom();
 }
 
@@ -1122,14 +1393,32 @@ async function loadKnowledgeGraphs() {
     return;
   }
   try {
-    var res = await KgBaseAPI.knowledgeGraph.getAll(kgBaseUuid);
-    if (res.code === 200 && Array.isArray(res.data)) {
-      knowledgeGraphList = res.data.filter(function(graph) { return Number(graph.index_status) === 1; });
-      currentGraphUuid = knowledgeGraphList[0]?.uuid || null;
-      updateGraphIndicator(knowledgeGraphList[0] || null);
+    var basesResponse = await KgBaseAPI.kgBase.getAll();
+    if (basesResponse.code === 200 && Array.isArray(basesResponse.data)) {
+      var graphGroups = await Promise.all(basesResponse.data.map(async function(base) {
+        try {
+          var graphResponse = await KgBaseAPI.knowledgeGraph.getAll(base.uuid);
+          if (graphResponse.code !== 200 || !Array.isArray(graphResponse.data)) return [];
+          return graphResponse.data
+            .filter(function(graph) { return Number(graph.index_status) === 1; })
+            .map(function(graph) {
+              return { ...graph, kg_base_uuid: base.uuid, kg_base_name: base.name || '' };
+            });
+        } catch {
+          return [];
+        }
+      }));
+      knowledgeGraphList = graphGroups.flat();
+      var selectedGraph = knowledgeGraphList.find(function(graph) {
+        return graph.uuid === currentGraphUuid;
+      }) || knowledgeGraphList.find(function(graph) {
+        return graph.kg_base_uuid === kgBaseUuid;
+      }) || knowledgeGraphList[0] || null;
+      currentGraphUuid = selectedGraph?.uuid || null;
+      updateGraphIndicator(selectedGraph);
       renderKnowledgeGraphMenu();
     } else {
-      showToast(res.msg || '加载知识图谱失败');
+      showToast(basesResponse.msg || '加载知识图谱失败');
     }
   } catch (err) {
     console.error('Failed to load knowledge graphs:', err);
@@ -1139,7 +1428,7 @@ async function loadKnowledgeGraphs() {
 
 function selectKnowledgeGraph() {
   if (!knowledgeGraphList.length) {
-    showToast('当前知识库暂无已建立索引的图谱');
+    showToast('所有知识库中暂无已建立索引的图谱');
     return;
   }
   renderKnowledgeGraphMenu();
@@ -1156,9 +1445,10 @@ function renderKnowledgeGraphMenu() {
   }
   menu.innerHTML = knowledgeGraphList.map(function(item) {
     var active = item.uuid === currentGraphUuid;
-    return '<button type="button" data-kg-uuid="' + escapeHtml(item.uuid) + '" class="claude-menu-item w-full flex items-center px-2 py-2 rounded-lg text-left cursor-pointer" style="background:transparent;border:none;color:var(--claude-foreground);font-weight:' +
+    return '<button type="button" data-kg-uuid="' + escapeHtml(item.uuid) + '" class="claude-menu-item w-full flex flex-col items-start gap-0.5 px-2 py-2 rounded-lg text-left cursor-pointer" style="background:transparent;border:none;color:var(--claude-foreground);font-weight:' +
       (active ? '600' : '400') + ';">' +
-      '<span class="text-xs truncate flex-1">' + escapeHtml(item.name || '未命名图谱') + '</span></button>';
+      '<span class="text-xs truncate w-full">' + escapeHtml(item.name || '未命名图谱') + '</span>' +
+      '<span class="text-[10px] truncate w-full" style="color:var(--claude-muted-foreground);font-weight:400;">' + escapeHtml(item.kg_base_name || '未命名知识库') + '</span></button>';
   }).join('');
   menu.querySelectorAll('[data-kg-uuid]').forEach(function(button) {
     button.onclick = function() {
@@ -1219,34 +1509,24 @@ async function loadAvailableModels() {
   }
 }
 
-async function loadCurrentSidebarUser() {
-  try {
-    var response = await KgBaseAPI.auth.getUserInfo();
-    if (response.code !== 200 || !response.data) return;
-    var user = response.data;
-    var footer = document.querySelector('#app-sidebar > .px-3.py-2\\.5.relative.mt-auto');
-    if (!footer) return;
-    var name = user.nickname || user.username || '用户';
-    var avatar = footer.querySelector('.w-8.h-8.rounded-full');
-    var nameElement = footer.querySelector('p.text-sm');
-    var roleElement = footer.querySelector('p.text-\\[10px\\]');
-    if (avatar) avatar.textContent = name.slice(0, 2).toUpperCase();
-    if (nameElement) nameElement.textContent = name;
-    if (roleElement) roleElement.textContent = user.is_superuser ? '管理员' : '用户';
-  } catch (error) {
-    console.error('Failed to load user:', error);
-  }
-}
-
 // Load chat library history and render into the sidebar
 async function loadChatHistory() {
-  if (!kgBaseUuid) return;
   try {
-    var res = await KgBaseAPI.chatLibrary.getAll(kgBaseUuid);
-    if (res.code === 200) {
-      chatHistoryItems = Array.isArray(res.data) ? res.data : [];
-      renderChatHistory(chatHistoryItems);
-    }
+    var basesResponse = await KgBaseAPI.kgBase.getAll();
+    if (basesResponse.code !== 200) throw new Error(basesResponse.msg || '加载知识库失败');
+    var bases = Array.isArray(basesResponse.data) ? basesResponse.data : [];
+    var histories = await Promise.all(bases.map(async function(base) {
+      try {
+        var response = await KgBaseAPI.chatLibrary.getAll(base.uuid);
+        return response.code === 200 && Array.isArray(response.data)
+          ? response.data.map(function(item) { return { ...item, kg_base_uuid: base.uuid }; })
+          : [];
+      } catch (error) {
+        return [];
+      }
+    }));
+    chatHistoryItems = histories.flat();
+    renderChatHistory(chatHistoryItems);
   } catch (err) {
     console.error('Failed to load chat history:', err);
   }
@@ -1279,8 +1559,13 @@ function renderChatHistory(list) {
       var uuid = item.uuid || '';
       var isActive = uuid === currentChatUuid;
       var bgStyle = (isActive || item.is_favorite) ? 'style="background:var(--claude-accent);"' : '';
+      var itemKgBaseUuid = item.kg_base_uuid || kgBaseUuid;
+      var chatHref = '/unigraph/unigraphs/' + encodeURIComponent(itemKgBaseUuid) + '/qa?chat=' + encodeURIComponent(uuid);
+      var chatAction = itemKgBaseUuid === kgBaseUuid
+        ? 'href="javascript:void(0)" onclick="switchChat(\'' + escapeQuotes(uuid) + '\', \'' + escapeQuotes(name) + '\')"'
+        : 'href="' + chatHref + '"';
       return '<div data-chat-uuid="' + escapeHtml(uuid) + '" class="group relative px-3 py-2 rounded-lg transition-colors hover:bg-[var(--claude-accent)]" ' + bgStyle + '>' +
-        '<a href="javascript:void(0)" class="block" style="text-decoration:none;" onclick="switchChat(\'' + escapeQuotes(uuid) + '\', \'' + escapeQuotes(name) + '\')">' +
+        '<a ' + chatAction + ' class="block" style="text-decoration:none;">' +
           '<p class="text-[15px] leading-[22px] font-normal truncate pr-7" style="color:var(--claude-foreground);">' + escapeHtml(name) + '</p>' +
         '</a>' +
         '<button type="button" onclick="event.stopPropagation();toggleChatMenu(this)" class="absolute right-2 top-1.5 flex w-6 h-6 items-center justify-center rounded-md claude-menu-item opacity-55 group-hover:opacity-100 transition-opacity" style="background:transparent;border:none;color:var(--claude-muted-foreground);font-size:18px;line-height:1;" aria-label="对话菜单">⋮</button>' +
@@ -1340,11 +1625,16 @@ function renderChatSearchResults(list) {
   }
   container.innerHTML = '<div class="px-2 py-2">' + list.map(function(item) {
     var name = displayChatName(item.name || item.title || '未命名对话');
-    return '<div class="chat-search-item flex items-center justify-between cursor-pointer px-3 py-2.5 rounded-lg transition-colors hover:opacity-80" onclick="switchChat(\'' +
-      escapeQuotes(item.uuid || '') + '\',\'' + escapeQuotes(name) + '\');toggleSearchModal();">' +
+    var uuid = item.uuid || '';
+    var itemKgBaseUuid = item.kg_base_uuid || kgBaseUuid;
+    var chatHref = '/unigraph/unigraphs/' + encodeURIComponent(itemKgBaseUuid) + '/qa?chat=' + encodeURIComponent(uuid);
+    var chatAction = itemKgBaseUuid === kgBaseUuid
+      ? 'href="javascript:void(0)" onclick="switchChat(\'' + escapeQuotes(uuid) + '\',\'' + escapeQuotes(name) + '\');toggleSearchModal();"'
+      : 'href="' + chatHref + '"';
+    return '<a ' + chatAction + ' class="chat-search-item flex items-center justify-between cursor-pointer px-3 py-2.5 rounded-lg transition-colors hover:opacity-80" style="text-decoration:none;">' +
       '<span class="text-sm" style="color:var(--claude-foreground);">' + escapeHtml(name) + '</span>' +
       '<span class="text-xs" style="color:var(--claude-muted-foreground);">' + escapeHtml(item.updated_time || item.created_time || '') + '</span>' +
-      '</div>';
+      '</a>';
   }).join('') + '</div>';
 }
 
@@ -1435,10 +1725,6 @@ async function deleteChat(uuid) {
 // Switch to a historical conversation
 async function switchChat(chatUuid, name) {
   if (!chatUuid) return;
-  if (isStreaming) {
-    showToast('正在生成回答，请稍候...');
-    return;
-  }
   currentChatUuid = chatUuid;
   syncCurrentChatQuery(chatUuid);
   currentChatName = displayChatName(name || '对话');
@@ -1478,15 +1764,78 @@ async function switchChat(chatUuid, name) {
     showToast('加载对话失败');
   }
   if (!loadedMessages) renderEmptyState();
+  resumeActiveAskForCurrentChat();
   loadChatHistory();
+}
+
+function isRunningAskTask(task) {
+  return task?.name === 'knowledge_graph.ask' &&
+    ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state);
+}
+
+function renderResumedAskTask(task) {
+  if (!task || task.kwargs?.obj_data?.chat_library_uuid !== currentChatUuid) return;
+  var view = resumedAskViews.get(task.uid);
+  if (!view?.aiDiv?.isConnected) {
+    var aiDiv = appendAIThinking();
+    if (!aiDiv) return;
+    aiDiv.dataset.askTaskUid = task.uid;
+    view = { aiDiv: aiDiv, renderedSteps: new Set() };
+    resumedAskViews.set(task.uid, view);
+  }
+  var thinkingEl = view.aiDiv.querySelector('.ai-thinking');
+  var answerEl = view.aiDiv.querySelector('.ai-answer');
+  (Array.isArray(task.steps) ? task.steps : []).forEach(function(step, index) {
+    if (!step?.label || step.label === '任务已创建') return;
+    var key = step.id != null ? String(step.id) : `${step.label}:${index}`;
+    if (view.renderedSteps.has(key)) return;
+    view.renderedSteps.add(key);
+    appendThinkingLog(
+      thinkingEl,
+      t(step.label),
+      step.detail ? t(step.detail) : '',
+      step.metrics?.retrieval || null,
+    );
+  });
+  if (task.partialAnswer && answerEl) {
+    answerEl.innerHTML = renderMarkdown(task.partialAnswer) +
+      '<span class="streaming-caret" aria-hidden="true"></span>';
+  }
+  scrollToBottom();
+}
+
+function resumeActiveAskForCurrentChat() {
+  if (!currentChatUuid || !window.TaskManager?.getTasks) return;
+  window.TaskManager.getTasks()
+    .filter(isRunningAskTask)
+    .filter(function(task) {
+      return task.kwargs?.obj_data?.chat_library_uuid === currentChatUuid;
+    })
+    .forEach(renderResumedAskTask);
+}
+
+function handleBackgroundAskTaskUpdate(event) {
+  var task = event.detail?.task;
+  var taskChatUuid = task?.kwargs?.obj_data?.chat_library_uuid;
+  if (task?.name !== 'knowledge_graph.ask' || !taskChatUuid || taskChatUuid !== currentChatUuid) return;
+  if (isRunningAskTask(task)) {
+    renderResumedAskTask(task);
+    return;
+  }
+  var view = resumedAskViews.get(task.uid);
+  if (task.state === 'FAILURE' && view?.aiDiv?.isConnected) {
+    failThinkingLog(view.aiDiv.querySelector('.ai-thinking'), task.message || '请求失败');
+    resumedAskViews.delete(task.uid);
+    return;
+  }
+  if (task.state === 'SUCCESS' && !isStreaming) {
+    resumedAskViews.delete(task.uid);
+    switchChat(currentChatUuid, currentChatName);
+  }
 }
 
 // Start a new conversation
 async function newConversation() {
-  if (isStreaming) {
-    showToast('正在生成回答，请稍候...');
-    return;
-  }
   currentChatUuid = null;
   currentChatName = '新对话';
   pendingAttachments = [];
@@ -1513,15 +1862,17 @@ if (messageInput) {
 updateSidebarLinks(kgBaseUuid);
 var appMain = document.getElementById('app-main');
 if (appMain) motionContext = gsap.context(function() {}, appMain);
+window.addEventListener('unigraph:task-updated', handleBackgroundAskTaskUpdate);
 showEmptyConversation();
 setConversationTitle('新对话');
 (async function initializeApp() {
-  await Promise.all([loadKnowledgeGraphs(), loadChatHistory(), loadAvailableModels(), loadCurrentSidebarUser()]);
+  await Promise.all([loadKnowledgeGraphs(), loadChatHistory(), loadAvailableModels()]);
   var requestedChatUuid = urlParams.get('chat');
   if (requestedChatUuid) await switchChat(requestedChatUuid, '对话');
 })();
 
   window.copyMessage = copyMessage;
+  window.regenerateAnswer = regenerateAnswer;
   window.cancelUserMessageEdit = cancelUserMessageEdit;
   window.editUserMessage = editUserMessage;
   window.saveUserMessageEdit = saveUserMessageEdit;
@@ -1535,6 +1886,9 @@ setConversationTitle('新对话');
   window.toggleChatMenu = toggleChatMenu;
 
   function destroy() {
+    controllerDestroyed = true;
+    resumedAskViews.clear();
+    window.removeEventListener('unigraph:task-updated', handleBackgroundAskTaskUpdate);
     motionContext?.revert();
     motionContext = null;
   }

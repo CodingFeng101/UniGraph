@@ -65,6 +65,7 @@ def init_celery() -> celery.Celery:
         timezone=settings.DATETIME_TIMEZONE,
         enable_utc=False,
         task_track_started=True,
+        worker_concurrency=task_settings.CELERY_WORKER_CONCURRENCY,
         beat_schedule=_beat_schedule,
     )
 

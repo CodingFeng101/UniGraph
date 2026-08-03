@@ -23,6 +23,7 @@ class LlmProviderListSchema(LlmProviderSchemaBase):
     user_uuid: str
     created_time: datetime
     updated_time: Optional[datetime] = None
+    sort_order: int = 0
 
     @model_validator(mode='after')
     def format_urls(self):
@@ -57,6 +58,10 @@ class UpdateLlmProviderParam(SchemaBase):
     document_url: Optional[str] = Field(None, max_length=512, description='文档URL')
     llm_model_url: Optional[str] = Field(None, max_length=512, description='模型URL')
     status: Optional[int] = Field(None, description='状态(0停用 1正常)')
+
+
+class ReorderLlmProviderParam(SchemaBase):
+    provider_uuids: List[str] = Field(..., min_length=1, description='按目标顺序排列的提供商 UUID')
 
 
 # ================= Model Schemas =================
@@ -128,6 +133,7 @@ class LlmProviderDetailSchema(LlmProviderSchemaBase):
     models: List[LlmModelListSchema]
     created_time: datetime
     updated_time: Optional[datetime] = None
+    sort_order: int = 0
 
     @model_validator(mode='after')
     def mask_api_key(self):

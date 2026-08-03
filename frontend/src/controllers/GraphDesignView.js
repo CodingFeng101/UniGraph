@@ -34,6 +34,10 @@ function openModal(id) {
   if (id === 'modal-relation') {
     populateEntityDropdowns();
     if (!editingSchemaElement) {
+      relationSourceUuid = null;
+      relationTargetUuid = null;
+      document.getElementById('relation-source-input').value = '';
+      document.getElementById('relation-target-input').value = '';
       document.getElementById('relation-name').value = '';
       document.getElementById('relation-desc').value = '';
       var relationTitle = document.querySelector('#modal-relation h3');
@@ -205,7 +209,7 @@ async function exportArchitecture() {
       showToast(res.msg || '导出失败');
     }
   } catch (err) {
-    showToast('导出失败');
+    showToast(err.message || '导出失败');
   }
 }
 
@@ -308,30 +312,42 @@ function toggleDropdown(id) {
   dropdown.classList.toggle('hidden');
 }
 
-function selectRelationSource(el, uuid, name) {
+function selectRelationSource(uuid, name) {
   relationSourceUuid = uuid;
-  document.getElementById('relation-source-value').textContent = name;
-  document.querySelectorAll('#relation-source-dropdown > div').forEach(function(item) {
-    item.style.background = '';
-    var span = item.querySelector('span');
-    if (span) item.innerHTML = '<span class="text-xs" style="color:var(--claude-muted-foreground);">' + span.textContent + '</span>';
-  });
-  el.style.background = 'var(--claude-accent)';
-  el.innerHTML = '<div class="flex items-center justify-between"><span class="text-xs font-medium" style="color:var(--claude-foreground);">' + name + '</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>';
+  document.getElementById('relation-source-input').value = name;
   document.getElementById('relation-source-dropdown').classList.add('hidden');
 }
 
-function selectRelationTarget(el, uuid, name) {
+function selectRelationTarget(uuid, name) {
   relationTargetUuid = uuid;
-  document.getElementById('relation-target-value').textContent = name;
-  document.querySelectorAll('#relation-target-dropdown > div').forEach(function(item) {
-    item.style.background = '';
-    var span = item.querySelector('span');
-    if (span) item.innerHTML = '<span class="text-xs" style="color:var(--claude-muted-foreground);">' + span.textContent + '</span>';
-  });
-  el.style.background = 'var(--claude-accent)';
-  el.innerHTML = '<div class="flex items-center justify-between"><span class="text-xs font-medium" style="color:var(--claude-foreground);">' + name + '</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>';
+  document.getElementById('relation-target-input').value = name;
   document.getElementById('relation-target-dropdown').classList.add('hidden');
+}
+
+function filterRelationEntityList(kind, preserveSelection) {
+  var input = document.getElementById('relation-' + kind + '-input');
+  var dropdown = document.getElementById('relation-' + kind + '-dropdown');
+  if (!input || !dropdown) return;
+  if (!preserveSelection) {
+    if (kind === 'source') relationSourceUuid = null;
+    else relationTargetUuid = null;
+  }
+  var query = input.value.trim().toLowerCase();
+  var visibleCount = 0;
+  dropdown.querySelectorAll('button[data-entity-name]').forEach(function(button) {
+    var visible = button.dataset.entityName.toLowerCase().includes(query);
+    button.classList.toggle('hidden', !visible);
+    if (visible) visibleCount += 1;
+  });
+  dropdown.querySelector('[data-empty-filter]')?.classList.toggle('hidden', visibleCount > 0);
+  dropdown.classList.remove('hidden');
+}
+
+function showRelationEntityList(kind) {
+  document.querySelectorAll('#relation-source-dropdown,#relation-target-dropdown').forEach(function(dropdown) {
+    if (dropdown.id !== 'relation-' + kind + '-dropdown') dropdown.classList.add('hidden');
+  });
+  filterRelationEntityList(kind, true);
 }
 
 function showToast(message) {
@@ -398,16 +414,24 @@ function updateSidebarLinks(uuid) {
 }
 
 // Load all schema graphs for the knowledge base
-async function loadSchemaGraphs() {
+async function loadSchemaGraphs(preferredSchema) {
   if (!kgBaseUuid) return;
   try {
     var res = await KgBaseAPI.schemaGraph.getAll(kgBaseUuid);
     if (res.code === 200 && res.data) {
       schemaList = Array.isArray(res.data) ? res.data : [res.data];
-      populateArchDropdown(schemaList);
       if (schemaList.length >= 1) {
-        loadSchemaDetail(schemaList[0].uuid);
+        var preferredUuid = typeof preferredSchema === 'string' ? preferredSchema : preferredSchema?.uuid;
+        var preferredName = typeof preferredSchema === 'object' ? preferredSchema?.name : '';
+        var selectedSchema = schemaList.find(function(schema) {
+          return (preferredUuid && schema.uuid === preferredUuid) || (preferredName && schema.name === preferredName);
+        }) || schemaList.find(function(schema) {
+          return schema.uuid === currentSchemaUuid;
+        }) || schemaList[0];
+        populateArchDropdown(schemaList);
+        await loadSchemaDetail(selectedSchema.uuid);
       } else {
+        populateArchDropdown(schemaList);
         showToast('暂无架构图谱');
       }
     } else {
@@ -423,8 +447,7 @@ function populateArchDropdown(schemas) {
   var dropdown = document.getElementById('arch-dropdown-top');
   if (!dropdown) return;
   var trigger = document.getElementById('arch-dropdown-trigger');
-  var label = trigger?.querySelector('span:nth-child(2)');
-  var dot = trigger?.querySelector('span:first-child');
+  var label = trigger?.querySelector('span.truncate');
   var hasSchemas = schemas.length > 0;
   if (trigger) {
     trigger.disabled = !hasSchemas;
@@ -434,24 +457,14 @@ function populateArchDropdown(schemas) {
     label.textContent = hasSchemas ? (schemas[0].name || '未命名架构') : '暂无知识架构';
     label.style.color = hasSchemas ? 'var(--claude-foreground)' : 'var(--claude-muted-foreground)';
   }
-  if (dot) {
-    dot.style.background = hasSchemas ? 'var(--claude-success-500)' : 'var(--claude-muted-foreground)';
-    dot.style.opacity = hasSchemas ? '1' : '0.4';
-  }
   if (!hasSchemas) dropdown.classList.add('hidden');
   dropdown.innerHTML = '';
-  schemas.forEach(function(schema, idx) {
-    var isActive = idx === 0;
+  schemas.forEach(function(schema) {
     var item = document.createElement('div');
-    item.className = 'px-3 py-2 flex items-center justify-between transition-colors hover:opacity-80 cursor-pointer group';
-    if (isActive) item.style.background = 'var(--claude-accent)';
+    item.className = 'px-3 py-2 flex items-center justify-between transition-colors hover:bg-[var(--claude-secondary)] cursor-pointer group';
     item.onclick = function() { loadSchemaDetail(schema.uuid); };
-    var dotStyle = isActive ? 'background:var(--claude-success-500);' : 'background:var(--claude-muted-foreground);opacity:0.4;';
-    var nameStyle = isActive ? 'color:var(--claude-foreground);' : 'color:var(--claude-muted-foreground);';
-    var nameClass = isActive ? 'text-xs font-medium truncate' : 'text-xs truncate';
-    item.innerHTML = '<div class="flex items-center gap-2 min-w-0">' +
-      '<span class="w-1.5 h-1.5 rounded-full shrink-0" style="' + dotStyle + '"></span>' +
-      '<span class="' + nameClass + '" style="' + nameStyle + '">' + (schema.name || '未命名架构') + '</span>' +
+    item.innerHTML = '<div class="flex items-center min-w-0">' +
+      '<span class="text-xs truncate" style="color:var(--claude-foreground);">' + (schema.name || '未命名架构') + '</span>' +
       '</div>';
     var delBtn = document.createElement('button');
     delBtn.type = 'button';
@@ -498,6 +511,46 @@ function resolveSchemaEntityName(uuid, preferredName) {
   return entity && entity.name ? entity.name : '未知实体';
 }
 
+function formatSchemaSource(value) {
+  function collect(source) {
+    if (source === null || source === undefined || source === '') return [];
+    if (Array.isArray(source)) return source.flatMap(collect);
+    if (typeof source === 'object') {
+      var values = Object.values(source).flatMap(collect);
+      return values.length ? values : Object.keys(source).flatMap(collect);
+    }
+    if (typeof source === 'string') {
+      try {
+        var parsed = JSON.parse(source);
+        if (parsed !== source) return collect(parsed);
+      } catch (error) {
+        // Plain source text does not need JSON parsing.
+      }
+    }
+    var text = String(source).trim();
+    return text ? [text] : [];
+  }
+
+  var sources = Array.from(new Set(collect(value)));
+  if (!sources.length) return '';
+  var visible = sources.slice(0, 3).join('；');
+  return sources.length > 3 ? visible + '；等 ' + sources.length + ' 条' : visible;
+}
+
+function escapeTooltipText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function appendSchemaSource(bodyHtml, raw) {
+  var source = formatSchemaSource(raw?.source);
+  return source ? bodyHtml + '<br>来源: ' + escapeTooltipText(source) : bodyHtml;
+}
+
 // Render schema graph using GraphRenderer (Cytoscape.js)
 function renderSchemaGraph(detail) {
   // Schema graph: entity type's name is used as the grouping type
@@ -536,7 +589,11 @@ function renderSchemaGraph(detail) {
       } else if (attrs) {
         attrStr = String(attrs);
       }
-      showTooltipByPos(data.label || '实体类型', '实体类型', '属性: ' + attrStr);
+      showTooltipByPos(
+        data.label || '实体类型',
+        '实体类型',
+        appendSchemaSource('属性: ' + attrStr, data.raw || data)
+      );
     },
     onNodeDoubleClick: function(data) {
       if (currentGraphStyle === 'load' && cyInstance && cyInstance.expandNeighborhood) {
@@ -548,22 +605,31 @@ function renderSchemaGraph(detail) {
       var raw = data.raw || {};
       var sourceName = resolveSchemaEntityName(raw.source_entity_uuid, raw.source_entity_name);
       var targetName = resolveSchemaEntityName(raw.target_entity_uuid, raw.target_entity_name);
-      showTooltipByPos(data.label || '关系类型', '关系类型',
-        '起始: ' + sourceName + '<br>目标: ' + targetName);
+      showTooltipByPos(data.label || '关系类型', '关系类型', appendSchemaSource(
+        '起始: ' + sourceName + '<br>目标: ' + targetName,
+        raw
+      ));
     },
     onNodeHover: function(data, node, position) {
       selectedElement = { type: 'entity', uuid: data.id, data: data };
       var attrs = data.attributes && typeof data.attributes === 'object'
         ? Object.keys(data.attributes).join(', ')
         : String(data.attributes || '');
-      showTooltipByPos(data.label || '实体类型', '实体类型', '属性: ' + attrs, position);
+      showTooltipByPos(
+        data.label || '实体类型',
+        '实体类型',
+        appendSchemaSource('属性: ' + attrs, data.raw || data),
+        position
+      );
     },
     onEdgeHover: function(data, edge, position) {
       var raw = data.raw || {};
       selectedElement = { type: 'relationship', uuid: data.id, data: data };
-      showTooltipByPos(data.label || '关系类型', '关系类型',
+      showTooltipByPos(data.label || '关系类型', '关系类型', appendSchemaSource(
         '起始: ' + resolveSchemaEntityName(raw.source_entity_uuid, raw.source_entity_name) + '<br>目标: ' +
-        resolveSchemaEntityName(raw.target_entity_uuid, raw.target_entity_name), position);
+        resolveSchemaEntityName(raw.target_entity_uuid, raw.target_entity_name),
+        raw
+      ), position);
     },
     onElementLeave: scheduleTooltipHide,
     onCanvasClick: function() {
@@ -664,12 +730,8 @@ function editSelectedElement() {
   relationTargetUuid = raw.target_entity_uuid;
   var sourceEntity = (currentSchemaData.entities || []).find(function(item) { return item.uuid === relationSourceUuid; });
   var targetEntity = (currentSchemaData.entities || []).find(function(item) { return item.uuid === relationTargetUuid; });
-  var sourceItem = sourceEntity && Array.from(document.querySelectorAll('#relation-source-dropdown > div'))
-    .find(function(item) { return item.textContent.trim() === sourceEntity.name; });
-  var targetItem = targetEntity && Array.from(document.querySelectorAll('#relation-target-dropdown > div'))
-    .find(function(item) { return item.textContent.trim() === targetEntity.name; });
-  if (sourceItem) selectRelationSource(sourceItem, sourceEntity.uuid, sourceEntity.name);
-  if (targetItem) selectRelationTarget(targetItem, targetEntity.uuid, targetEntity.name);
+  if (sourceEntity) selectRelationSource(sourceEntity.uuid, sourceEntity.name);
+  if (targetEntity) selectRelationTarget(targetEntity.uuid, targetEntity.name);
   document.querySelector('#modal-relation h3').textContent = '编辑关系类型';
 }
 
@@ -689,39 +751,28 @@ function populateEntityDropdowns() {
       dropdown.appendChild(empty);
       return;
     }
-    var defaultIdx = isSource ? 0 : (entities.length > 1 ? 1 : 0);
-    entities.forEach(function(entity, idx) {
-      var isDefault = idx === defaultIdx;
-      var item = document.createElement('div');
-      item.className = 'px-3 py-2 cursor-pointer transition-colors hover:opacity-80';
-      if (isDefault) item.style.background = 'var(--claude-accent)';
+    entities.forEach(function(entity) {
+      var item = document.createElement('button');
+      item.type = 'button';
+      item.dataset.entityName = entity.name || '';
+      item.className = 'block w-full px-3 py-2 text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]';
+      item.style.cssText = 'background:transparent;border:none;color:var(--claude-foreground);';
       item.onclick = function() {
         if (isSource) {
-          selectRelationSource(this, entity.uuid, entity.name);
+          selectRelationSource(entity.uuid, entity.name);
         } else {
-          selectRelationTarget(this, entity.uuid, entity.name);
+          selectRelationTarget(entity.uuid, entity.name);
         }
       };
-      if (isDefault) {
-        item.innerHTML = '<div class="flex items-center justify-between"><span class="text-xs font-medium" style="color:var(--claude-foreground);">' + entity.name + '</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>';
-      } else {
-        item.innerHTML = '<span class="text-xs" style="color:var(--claude-muted-foreground);">' + entity.name + '</span>';
-      }
+      item.textContent = entity.name;
       dropdown.appendChild(item);
     });
-    // Set default selection
-    if (entities.length > 0) {
-      var defaultEntity = entities[defaultIdx];
-      if (isSource) {
-        relationSourceUuid = defaultEntity.uuid;
-        var sourceVal = document.getElementById('relation-source-value');
-        if (sourceVal) sourceVal.textContent = defaultEntity.name;
-      } else {
-        relationTargetUuid = defaultEntity.uuid;
-        var targetVal = document.getElementById('relation-target-value');
-        if (targetVal) targetVal.textContent = defaultEntity.name;
-      }
-    }
+    var emptyFilter = document.createElement('div');
+    emptyFilter.dataset.emptyFilter = 'true';
+    emptyFilter.className = 'hidden px-3 py-2 text-xs';
+    emptyFilter.style.color = 'var(--claude-muted-foreground)';
+    emptyFilter.textContent = '没有匹配的实体类型';
+    dropdown.appendChild(emptyFilter);
   }
 
   buildOptions(sourceDropdown, true);
@@ -889,7 +940,7 @@ async function submitCreateArch() {
       }
     );
     await task.completion;
-    await loadSchemaGraphs();
+    await loadSchemaGraphs({ name: name });
   } catch (error) {
     showToast(error.message || '创建知识架构失败');
   } finally {
@@ -1028,6 +1079,7 @@ lucide.createIcons();
     editSelectedElement,
     exportArchitecture,
     filterGraph,
+    filterRelationEntityList,
     generateSuggestion,
     handleCreateArchFiles,
     handleImportArchFile,
@@ -1040,6 +1092,7 @@ lucide.createIcons();
     selectRelationSource,
     selectRelationTarget,
     showTooltip,
+    showRelationEntityList,
     submitArchUpdate,
     submitCreateArch,
     toggleArchDropdown,

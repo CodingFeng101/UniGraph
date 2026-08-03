@@ -2,11 +2,13 @@
   position: absolute;
   bottom: calc(100% + 8px);
   left: 0;
-  z-index: 100;
+  z-index: 2147483000;
   width: min(340px, calc(100vw - 48px));
-  max-height: 260px;
+  max-height: min(340px, 60vh);
+  display: flex;
+  flex-direction: column;
   padding: 12px 14px;
-  overflow-y: auto;
+  overflow: hidden;
   border: 1px solid var(--claude-border);
   border-radius: 12px;
   background: var(--claude-card);
@@ -14,30 +16,22 @@
   opacity: 0;
   pointer-events: none;
   text-align: left;
+  font-weight: 400;
+  line-height: normal;
+  transform: translateX(var(--source-popup-shift-x, 0));
   transition: opacity 0.18s ease;
 }
-.citation-tag:nth-last-child(-n+2) .source-popup { right: 0; left: auto; }
+.citation-tag--overview .source-popup {
+  width: min(460px, calc(100vw - 48px));
+  max-height: min(320px, calc(100dvh - 32px));
+}
+.source-popup[popover] { margin: 0; inset: auto; }
+.source-popup:popover-open { display: flex; opacity: 1; pointer-events: auto; }
+.source-popup.source-popup--below { top: calc(100% + 8px); bottom: auto; }
 .source-tag:hover .source-popup,
 .source-tag:focus .source-popup,
 .source-tag:focus-within .source-popup,
 .source-tag.is-open .source-popup { opacity: 1; pointer-events: auto; }
-.source-popup::before {
-  position: absolute;
-  right: 0;
-  bottom: -8px;
-  left: 0;
-  height: 8px;
-  content: '';
-}
-.source-popup::after {
-  position: absolute;
-  top: 100%;
-  left: 14px;
-  border: 5px solid transparent;
-  border-top-color: var(--claude-border);
-  content: '';
-}
-.citation-tag:nth-last-child(-n+2) .source-popup::after { right: 14px; left: auto; }
 .source-popup-title {
   display: flex;
   align-items: center;
@@ -47,15 +41,72 @@
   color: var(--claude-brand-700);
   font-size: 11px;
   font-weight: 600;
+  flex: none;
 }
 .source-popup-id,
 .source-popup-record__id { color: var(--claude-muted-foreground); font-family: var(--claude-font-mono); font-size: 10px; font-weight: 500; }
-.source-popup-records { display: grid; gap: 14px; }
+.source-popup-records {
+  display: grid;
+  min-height: 0;
+  gap: 14px;
+  padding-right: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
 .source-popup-record { display: grid; gap: 6px; }
 .source-popup-fields { display: grid; gap: 8px; }
 .source-popup-field { display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 10px; }
 .source-popup-field__label { color: var(--claude-muted-foreground); font-size: 10px; line-height: 1.55; }
-.source-popup-field__value { overflow-wrap: anywhere; color: var(--claude-foreground); font-size: 11px; line-height: 1.55; white-space: pre-wrap; }
+.source-popup-field__value { overflow-wrap: anywhere; color: var(--claude-foreground); font-size: 11px; font-weight: 400; line-height: 1.55; white-space: pre-wrap; }
+.citation-tag--overview .source-popup-title { margin-bottom: 10px; }
+.source-popup-overview-record { gap: 8px; }
+.source-popup-overview-record + .source-popup-overview-record {
+  padding-top: 14px;
+  border-top: 1px solid var(--claude-border);
+}
+.source-popup-overview__index {
+  color: var(--claude-muted-foreground);
+  font-family: var(--claude-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+}
+.source-popup-overview__heading {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--claude-foreground);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.source-popup-overview__sections { display: grid; }
+.source-popup-overview__section {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in srgb, var(--claude-border) 72%, transparent);
+}
+.source-popup-overview__section.is-summary {
+  padding: 2px 0 10px 10px;
+  border-top: 0;
+  border-left: 2px solid color-mix(in srgb, var(--claude-primary) 58%, var(--claude-border));
+}
+.source-popup-overview__label {
+  color: var(--claude-muted-foreground);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.source-popup-overview__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--claude-foreground);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.75;
+}
+.source-popup-overview__paragraph { display: block; }
+.source-popup-overview__paragraph + .source-popup-overview__paragraph { margin-top: 8px; }
 .citation-group { display: inline; margin-left: 4px; vertical-align: 0.12em; }
 .citation-tag {
   position: relative;

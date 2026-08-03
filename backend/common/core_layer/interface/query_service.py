@@ -76,6 +76,7 @@ async def query_kg(
     embedding_model: str = '',
     context_provider=None,
     token_callback=None,
+    progress_callback=None,
 ) -> tuple:
     """
     初始化搜索器
@@ -103,6 +104,7 @@ async def query_kg(
         embedding_model=embedding_model,
         context_provider=context_provider,
         token_callback=token_callback,
+        progress_callback=progress_callback,
     )
     logger.info('Knowledge graph query completed')
 

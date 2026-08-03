@@ -29,7 +29,8 @@
 
     <div class="mb-12">
       <h3 class="text-base font-semibold mb-1" style="font-family:var(--claude-font-display);color:var(--claude-foreground);">大模型配置</h3>
-      <p class="text-xs mb-5" style="color:var(--claude-muted-foreground);font-family:var(--claude-font-serif);">用于知识推理和问答的大模型 API，支持添加多个模型</p>
+      <p class="text-xs mb-2" style="color:var(--claude-muted-foreground);font-family:var(--claude-font-serif);">用于知识推理和问答的大模型 API，新增模型会添加到列表末尾</p>
+      <p class="text-[11px] mb-5 inline-flex items-center gap-1.5" style="color:var(--claude-primary);"><i data-lucide="info" style="width:12px;height:12px;"></i>默认使用第一个模型，长按模型后拖动可调整顺序</p>
 
       <div id="llm-capsules" class="flex flex-wrap items-center gap-2 mb-1">
         <div class="group inline-flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-full transition-colors" style="background:var(--claude-card);border:1px solid var(--claude-border);">
@@ -58,7 +59,7 @@
 
     <div class="mb-20">
       <h3 class="text-base font-semibold mb-1" style="font-family:var(--claude-font-display);color:var(--claude-foreground);">向量嵌入配置</h3>
-      <p class="text-xs mb-5" style="color:var(--claude-muted-foreground);font-family:var(--claude-font-serif);">用于知识索引和实体向量化，支持配置多个嵌入模型</p>
+      <p class="text-xs mb-5" style="color:var(--claude-muted-foreground);font-family:var(--claude-font-serif);">用于知识索引和实体向量化</p>
 
       <div id="embed-capsules" class="flex flex-wrap items-center gap-2 mb-1">
         <div class="group inline-flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-full transition-colors" style="background:var(--claude-card);border:1px solid var(--claude-border);">
@@ -223,6 +224,20 @@ export default {
 <style>
 
 @layer base { body { background: var(--claude-background); color: var(--claude-foreground); font-family: var(--claude-font-sans); -webkit-font-smoothing: antialiased; } *, *::before, *::after { box-sizing: border-box; } }
+
+.llm-capsule-dragging { opacity:.22; border-style:dashed !important; }
+.llm-sorting-active { user-select:none !important; -webkit-user-select:none !important; cursor:grabbing !important; }
+.llm-sorting-active * { user-select:none !important; -webkit-user-select:none !important; }
+.llm-drag-preview {
+  position:fixed;
+  z-index:210;
+  pointer-events:none;
+  margin:0;
+  opacity:.96;
+  box-shadow:0 12px 28px rgba(83,61,47,.18);
+  will-change:transform;
+  transition:box-shadow .18s ease;
+}
 
 
 

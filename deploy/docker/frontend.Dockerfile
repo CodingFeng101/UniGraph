@@ -3,9 +3,19 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+RUN npm ci \
+    && cd /tmp \
+    && npm pack lightningcss-linux-x64-musl@1.32.0 \
+    && mkdir -p /app/node_modules/lightningcss-linux-x64-musl \
+    && tar -xzf lightningcss-linux-x64-musl-1.32.0.tgz \
+        -C /app/node_modules/lightningcss-linux-x64-musl --strip-components=1 \
+    && npm pack @tailwindcss/oxide-linux-x64-musl@4.3.3 \
+    && mkdir -p /app/node_modules/@tailwindcss/oxide-linux-x64-musl \
+    && tar -xzf tailwindcss-oxide-linux-x64-musl-4.3.3.tgz \
+        -C /app/node_modules/@tailwindcss/oxide-linux-x64-musl --strip-components=1
 
 COPY frontend/ ./
+COPY docs/ /docs/
 RUN npm run build
 
 FROM nginx:1.27-alpine

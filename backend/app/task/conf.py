@@ -25,6 +25,7 @@ class TaskSettings(BaseSettings):
     CELERY_BACKEND_REDIS_PREFIX: str = 'fba:celery'
     CELERY_BACKEND_REDIS_TIMEOUT: float = 5.0
     CELERY_TASK_OWNER_TTL_SECONDS: int = 7 * 24 * 60 * 60
+    CELERY_WORKER_CONCURRENCY: int = 4
 
     # 这里需要添加新增的包路径
     CELERY_TASKS_PACKAGES: list[str] = [

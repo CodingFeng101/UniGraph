@@ -32,10 +32,11 @@ class AskKnowledgeGraphParam(SchemaBase):
     message: str
     infer: bool = False
     depth: int = 1
-    user_token: str
+    user_token: str | None = None
     chat_library_uuid: str | None = None
     current_message_uuid: str | None = None
     llm_model_uuid: str | None = None
+    effort: str | None = None
 
 
 class BuildKnowledgeGraphIndexParam(SchemaBase):

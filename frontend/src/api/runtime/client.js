@@ -5,6 +5,7 @@
  */
 import { Auth } from './auth';
 import { AppConfig } from './config';
+import { getLocale, t } from '@/services/i18n';
 
 function redirectToLogin() {
   Auth.clearToken();
@@ -25,6 +26,7 @@ export const API = window.API = {
     const token = Auth.getToken();
     const headers = {
       ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      'Accept-Language': getLocale() === 'en' ? 'en-US' : 'zh-CN',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     };
@@ -48,7 +50,7 @@ export const API = window.API = {
       // 401 未授权，跳转登录
       if (response.status === 401 && path !== '/v1/auth/login') {
         redirectToLogin();
-        return { code: 401, msg: '认证已失效，请重新登录', data: null };
+        return { code: 401, msg: t('认证已失效，请重新登录'), data: null };
       }
 
       // blob 响应（文件下载）
@@ -62,12 +64,12 @@ export const API = window.API = {
       const message = (await response.text()).trim();
       return {
         code: response.status,
-        msg: message || (response.ok ? 'success' : `请求失败 (${response.status})`),
+        msg: message || (response.ok ? 'success' : `${t('请求失败')} (${response.status})`),
         data: null,
       };
     } catch (error) {
       console.error('API Error:', error);
-      return { code: 500, msg: error.message || '网络请求失败', data: null };
+      return { code: 500, msg: error.message || t('网络请求失败'), data: null };
     }
   },
 
@@ -109,6 +111,7 @@ export const API = window.API = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept-Language': getLocale() === 'en' ? 'en-US' : 'zh-CN',
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ ...body, user_token: token }),
@@ -116,11 +119,11 @@ export const API = window.API = {
 
     if (response.status === 401) {
       redirectToLogin();
-      throw new Error('认证已失效，请重新登录');
+      throw new Error(t('认证已失效，请重新登录'));
     }
 
     if (!response.ok || !response.body) {
-      let message = `请求失败 (${response.status})`;
+      let message = `${t('请求失败')} (${response.status})`;
       try {
         const errorBody = await response.json();
         message = errorBody.msg || errorBody.detail || message;
@@ -143,7 +146,7 @@ export const API = window.API = {
           resolve(event.data);
         } else if (event.type === 'error') {
           settled = true;
-          reject(new Error(event.msg || event.message || '请求失败'));
+          reject(new Error(event.msg || event.message || t('请求失败')));
         }
       };
 

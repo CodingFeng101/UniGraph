@@ -34,6 +34,72 @@ from backend.utils.serializers import select_as_dict
 
 logger = logging.getLogger(__name__)
 
+
+def _collect_entity_sources(schema: list[dict]) -> dict[str, list[str]]:
+    entity_sources: dict[str, list[str]] = {}
+
+    for index, item in enumerate(schema):
+        schema_item = item.get('schema') or {}
+        directional_entity = (schema_item.get('DirectionalEntityType') or {}).get('Name')
+        directed_entity = (schema_item.get('DirectedEntityType') or {}).get('Name')
+        if not directional_entity or not directed_entity:
+            logger.warning('Missing entity type in schema item index=%s schema=%r', index, schema_item)
+            continue
+
+        source_mapping = item.get('source')
+        if not isinstance(source_mapping, dict) or not source_mapping:
+            logger.warning(
+                'Missing schema source mapping index=%s directional=%r directed=%r source=%r',
+                index,
+                directional_entity,
+                directed_entity,
+                source_mapping,
+            )
+            continue
+
+        source_key = next(iter(source_mapping))
+        source_parts = (
+            [part.strip(' ()"\'') for part in source_key.split(',')]
+            if isinstance(source_key, str)
+            else []
+        )
+        source_parts = [part for part in source_parts if part]
+        if len(source_parts) == 3:
+            directional_source, directed_source = source_parts[0], source_parts[2]
+        else:
+            logger.warning(
+                'Malformed schema source triple index=%s directional=%r directed=%r source_key=%r parts=%r',
+                index,
+                directional_entity,
+                directed_entity,
+                source_key,
+                source_parts,
+            )
+            directional_source, directed_source = directional_entity, directed_entity
+
+        entity_sources.setdefault(directional_entity, []).append(directional_source)
+        entity_sources.setdefault(directed_entity, []).append(directed_source)
+
+    return {name: list(dict.fromkeys(values)) for name, values in entity_sources.items()}
+
+
+def _source_mapping(item: dict) -> dict:
+    source = item.get('source')
+    return source if isinstance(source, dict) else {}
+
+
+def _parse_json_value(value, default):
+    """Parse JSON-compatible database text without rejecting legacy plain text."""
+    if value is None or value == '':
+        return default
+    if isinstance(value, (dict, list, int, float, bool)):
+        return value
+    try:
+        return json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return value
+
+
 router = APIRouter()
 
 
@@ -89,10 +155,10 @@ async def export_schema_graph(request: Request, uuid: Annotated[str, Path(...)])
     for entity in schema_graph.entities:
         entities.append({
             'name': entity.name,
-            'attributes': json.loads(entity.attributes),
+            'attributes': _parse_json_value(entity.attributes, {}),
             'definition': entity.definition,
             'uuid': entity.uuid,
-            'source': json.loads(entity.source),
+            'source': _parse_json_value(entity.source, []),
         })
 
     # 处理 relationships
@@ -100,11 +166,11 @@ async def export_schema_graph(request: Request, uuid: Annotated[str, Path(...)])
     for relationship in schema_graph.relationships:
         relationships.append({
             'name': relationship.name,
-            'attributes': relationship.attributes,
+            'attributes': _parse_json_value(relationship.attributes, {}),
             'definition': relationship.definition,
             'source_entity_uuid': relationship.source_entity_uuid,
             'target_entity_uuid': relationship.target_entity_uuid,
-            'source': json.loads(relationship.source),
+            'source': _parse_json_value(relationship.source, []),
         })
 
     definition = {}
@@ -168,11 +234,14 @@ async def export_schema_graph(request: Request, uuid: Annotated[str, Path(...)])
 
             # 构造 source 部分
             source_data = {}
-            if relation_name in relation_sources and relation_sources[relation_name]:
-                for key, value in relation_sources[relation_name].items():
+            relation_source = relation_sources.get(relation_name)
+            if isinstance(relation_source, dict):
+                for key, value in relation_source.items():
                     entities = key.strip('() ').split(', ')
                     if len(entities) == 3 and entities[0] in source_entity[2] and entities[2] in target_entity[2]:
                         source_data[key] = value
+            elif relation_source not in (None, '', [], {}):
+                source_data['_raw'] = relation_source
 
             # 构造完整的字典
             transformed = {'schema': schema, 'source': source_data}
@@ -225,40 +294,14 @@ async def import_schema_graph(request: Request, obj: ImportSchemaGraphParam) -> 
         obj.data.modify_suggestion = modify_suggestion
         schema_uuid = await schema_graph_service.add(obj=obj.data)
         # 从架构中获取实体类型的source
-        entity_source = {}
-
-        for item in schema:
-            # 提取 DirectionalEntityType 和 DirectedEntityType 的名称
-            directional_entity = item['schema']['DirectionalEntityType']['Name']
-            directed_entity = item['schema']['DirectedEntityType']['Name']
-
-            # 提取 source 中的实体名称
-            try:
-                source_key = next(iter(item['source'].keys()))  # 获取 source 字典的第一个键
-                source_entities = source_key.strip('()').split(', ')  # 去掉括号并按逗号分割
-
-                # 将实体名称添加到结果字典中
-                if directional_entity not in entity_source:
-                    entity_source[directional_entity] = []
-                if directed_entity not in entity_source:
-                    entity_source[directed_entity] = []
-
-                # 添加 source 中的实体名称
-                entity_source[directional_entity].append(source_entities[0])
-                entity_source[directed_entity].append(source_entities[2])
-            except StopIteration:
-                continue
-
-        # 去重并保持顺序
-        for key in entity_source:
-            entity_source[key] = list(dict.fromkeys(entity_source[key]))
+        entity_source = _collect_entity_sources(schema)
 
         # 从架构中得到关系类型的source
         relation_source = {}
 
         for item in schema:
             relation_type = item['schema']['RelationType']  # 获取关系类型
-            sources = item['source']  # 获取 source 字典
+            sources = _source_mapping(item)  # 获取 source 字典
 
             # 如果关系类型不存在于结果字典中，则初始化一个空字典
             if relation_type not in relation_source:
@@ -337,6 +380,7 @@ async def create_schema_graph(self, user_token: str, obj_data: dict):
     :param user_token: User JWT token
     :param obj_data: Serialized AddSchemaGraphParam data (JSON string)
     """
+    schema_uuid = None
     try:
         # 初始化任务状态
         task_progress(self, '准备创建知识架构', 3, detail='正在校验架构名称、需求和文档')
@@ -419,31 +463,14 @@ async def create_schema_graph(self, user_token: str, obj_data: dict):
         )
 
         # 从架构中获取实体类型的source
-        entity_source = {}
+        entity_source = _collect_entity_sources(schema)
         schema_total = len(schema)
-        for item in schema:
-            directional_entity = item['schema']['DirectionalEntityType']['Name']
-            directed_entity = item['schema']['DirectedEntityType']['Name']
-            source_key = next(iter(item['source'].keys()))  # 获取 source 字典的第一个键
-            source_entities = source_key.strip('()').split(', ')  # 去掉括号并按逗号分割
-
-            if directional_entity not in entity_source:
-                entity_source[directional_entity] = []
-            if directed_entity not in entity_source:
-                entity_source[directed_entity] = []
-
-            entity_source[directional_entity].append(source_entities[0])
-            entity_source[directed_entity].append(source_entities[2])
-
-        # 去重并保持顺序
-        for key in entity_source:
-            entity_source[key] = list(dict.fromkeys(entity_source[key]))
 
         # 从架构中得到关系类型的source
         relation_source = {}
         for item in schema:
             relation_type = item['schema']['RelationType']
-            sources = item['source']
+            sources = _source_mapping(item)
 
             if relation_type not in relation_source:
                 relation_source[relation_type] = {}
@@ -521,6 +548,11 @@ async def create_schema_graph(self, user_token: str, obj_data: dict):
         )
 
     except Exception as e:
+        if schema_uuid:
+            try:
+                await schema_graph_service.delete(uuid=schema_uuid)
+            except Exception:
+                logger.exception('Failed to clean up incomplete schema graph uuid=%s', schema_uuid)
         error_payload = {
             'error': {
                 'code': 'INTERNAL_ERROR',
@@ -636,37 +668,18 @@ async def update_schema_graph(self, uuid: str, user_token: str, obj_data: dict):
             )
 
             # 从架构中获取实体类型的source
-            entity_source = {}
+            entity_source = _collect_entity_sources(schema)
             schema_total = len(schema)
-            for item in schema:
-                if item['source']:
-                    directional_entity = item['schema']['DirectionalEntityType']['Name']
-                    directed_entity = item['schema']['DirectedEntityType']['Name']
-                    source_key = next(iter(item['source'].keys()))  # 获取 source 字典的第一个键
-                    source_entities = source_key.strip('()').split(', ')  # 去掉括号并按逗号分割
-
-                    if directional_entity not in entity_source:
-                        entity_source[directional_entity] = []
-                    if directed_entity not in entity_source:
-                        entity_source[directed_entity] = []
-
-                    entity_source[directional_entity].append(source_entities[0])
-                    entity_source[directed_entity].append(source_entities[2])
-
-            # 去重并保持顺序
-            for key in entity_source:
-                entity_source[key] = list(dict.fromkeys(entity_source[key]))
 
             # 从架构中得到关系类型的source
             relation_source = {}
             for item in schema:
-                if item['source']:
-                    relation_type = item['schema']['RelationType']
-                    sources = item['source']
+                relation_type = item['schema']['RelationType']
+                sources = _source_mapping(item)
 
-                    if relation_type not in relation_source:
-                        relation_source[relation_type] = {}
-                    relation_source[relation_type].update(sources)
+                if relation_type not in relation_source:
+                    relation_source[relation_type] = {}
+                relation_source[relation_type].update(sources)
 
             # 遍历提取的架构数据，处理实体和关系
             for schema_index, item in enumerate(schema, start=1):

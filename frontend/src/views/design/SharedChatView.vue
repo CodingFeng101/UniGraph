@@ -112,9 +112,12 @@ function handlePageClick(event) {
 function handleCitationPointerOut(event) {
   const citation = event.target.closest('[data-citation]');
   if (!citation || citation.contains(event.relatedTarget)) return;
-  citation.classList.remove('is-open');
-  citation.setAttribute('aria-expanded', 'false');
-  citation.blur();
+  window.setTimeout(() => {
+    if (citation.matches(':hover') || citation.contains(document.activeElement)) return;
+    citation.classList.remove('is-open');
+    citation.setAttribute('aria-expanded', 'false');
+    citation.blur();
+  }, 180);
 }
 
 onMounted(async () => {

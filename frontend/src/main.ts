@@ -6,7 +6,6 @@ import {
   CircleCheck,
   Clock3,
   ContactRound,
-  createIcons,
   Database,
   Eye,
   FileSearch,
@@ -37,43 +36,79 @@ import './api';
 import './services/task-manager';
 import './services/sidebar-chat';
 import './services/i18n';
+import { t } from './services/i18n';
 import './graph/renderer';
 import { installFeedback } from './utils/feedback';
 
 installFeedback();
 
+const lucideIcons = {
+  ContactRound,
+  Check,
+  ChevronRight,
+  CircleAlert,
+  CircleCheck,
+  Clock3,
+  Eye,
+  Database,
+  FileSearch,
+  FileText,
+  Layers3,
+  ListTodo,
+  LoaderCircle,
+  Lock,
+  Mail,
+  MessageSquareText,
+  Network,
+  Pencil,
+  Pause,
+  Plus,
+  RotateCcw,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  User,
+  X,
+};
+
+const iconName = (value: string) => value
+  .split('-')
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+  .join('');
+
 window.lucide = {
-  createIcons: () => createIcons({
-    icons: {
-      ContactRound,
-      Check,
-      ChevronRight,
-      CircleAlert,
-      CircleCheck,
-      Clock3,
-      Eye,
-      Database,
-      FileSearch,
-      FileText,
-      Layers3,
-      ListTodo,
-      LoaderCircle,
-      Lock,
-      Mail,
-      MessageSquareText,
-      Network,
-      Pencil,
-      Pause,
-      Plus,
-      RotateCcw,
-      Search,
-      ShieldCheck,
-      Sparkles,
-      Trash2,
-      User,
-      X,
-    },
-  }),
+  createIcons: () => {
+    document.querySelectorAll<HTMLElement>('i[data-lucide]').forEach((element) => {
+      const name = element.dataset.lucide || '';
+      const definition = lucideIcons[iconName(name) as keyof typeof lucideIcons];
+      if (!definition) return;
+
+      element.style.display = 'inline-flex';
+      element.style.alignItems = 'center';
+      element.style.justifyContent = 'center';
+      element.style.flexShrink = '0';
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', '100%');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2');
+      svg.setAttribute('stroke-linecap', 'round');
+      svg.setAttribute('stroke-linejoin', 'round');
+      svg.setAttribute('aria-hidden', 'true');
+      svg.style.display = 'block';
+      svg.classList.add('lucide', `lucide-${name}`);
+      definition.forEach(([tag, attributes]) => {
+        const child = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        Object.entries(attributes).forEach(([key, value]) => child.setAttribute(key, String(value)));
+        svg.appendChild(child);
+      });
+      element.replaceChildren(svg);
+    });
+  },
 };
 
 window.getUniGraphSearchParams = () => {
@@ -89,7 +124,7 @@ const reportGlobalError = (error: unknown) => {
   console.error('Unhandled application error:', error);
   const now = Date.now();
   if (now - lastGlobalErrorAt > 2000) {
-    window.showToast?.('页面发生异常，请重试；若问题持续请刷新页面');
+    window.showToast?.(t('页面发生异常，请重试；若问题持续请刷新页面'));
     lastGlobalErrorAt = now;
   }
 };

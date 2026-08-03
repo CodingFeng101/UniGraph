@@ -107,6 +107,7 @@ async def run_task(
     kwargs: Annotated[dict | None, Body(description='任务函数关键字参数')] = None,
 ) -> ResponseModel:
     allowed_tasks = {
+        'knowledge_graph.ask',
         'knowledge_graph.build_index',
         'knowledge_graph.create_knowledge_graph',
         'knowledge_graph.infer_knowledge_graph',
@@ -119,6 +120,7 @@ async def run_task(
         raise NotFoundError(msg='任务不存在')
     task_kwargs = dict(kwargs or {})
     if name in {
+        'knowledge_graph.ask',
         'knowledge_graph.build_index',
         'knowledge_graph.infer_knowledge_graph',
         'knowledge_graph.update_knowledge_graph',
@@ -137,6 +139,8 @@ async def run_task(
     elif name == 'schema_graph.create_schema_graph':
         data = (task_kwargs.get('obj_data') or {}).get('data') or {}
         await ownership_service.require_kg_base(user_uuid=request.user.uuid, uuid=data.get('kg_base_uuid'))
+    if name == 'knowledge_graph.ask':
+        task_kwargs['user_uuid'] = request.user.uuid
     task_kwargs['user_token'] = get_token(request)
     task = task_service.run(name=name, user_uuid=request.user.uuid, args=args, kwargs=task_kwargs)
     return response_base.success(data=task)

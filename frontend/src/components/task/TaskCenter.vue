@@ -333,7 +333,7 @@ export default {
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   column-gap: 7px;
-  color: var(--claude-foreground);
+  color: var(--task-state-color);
   background: transparent;
 }
 
@@ -344,7 +344,7 @@ export default {
   grid-template-columns: 13px 7px minmax(0, 1fr);
   align-items: center;
   column-gap: 6px;
-  color: var(--claude-foreground);
+  color: inherit;
   background: transparent;
   border: 0;
   text-align: left;
@@ -375,7 +375,7 @@ export default {
   min-width: 0;
   overflow: hidden;
   margin: 0;
-  color: var(--claude-foreground);
+  color: inherit;
   font-size: 11px;
   line-height: 1.25;
   font-weight: 500;
@@ -389,6 +389,7 @@ export default {
   font-size: 10px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  color: var(--task-state-color);
 }
 
 :deep(.task-inline-actions) {
@@ -431,9 +432,20 @@ export default {
 }
 
 :deep(.task-progress__value) {
+  position: relative;
   height: 100%;
+  overflow: hidden;
   border-radius: inherit;
   transition: width .28s cubic-bezier(.16, 1, .3, 1);
+}
+
+:deep(.task-progress.is-running .task-progress__value::after) {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, .58) 48%, transparent 100%);
+  transform: translateX(-100%);
+  animation: task-progress-sweep 1.35s cubic-bezier(.16, 1, .3, 1) infinite;
 }
 
 :deep(.task-detail) {
@@ -447,10 +459,12 @@ export default {
 
 :deep(.task-timeline) {
   max-height: 250px;
-  padding: 1px 6px 1px 0;
+  padding: 1px 6px 1px 8px;
+  overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: auto;
+  touch-action: pan-y;
 }
 
 :deep(.task-step) {
@@ -471,7 +485,7 @@ export default {
 
 :deep(.task-card__start-time) {
   margin-left: 6px;
-  color: var(--claude-muted-foreground);
+  color: color-mix(in srgb, var(--task-state-color) 72%, var(--claude-muted-foreground));
   font-family: var(--claude-font-mono);
   font-size: 9px;
   font-weight: 400;
@@ -485,7 +499,7 @@ export default {
   top: 11px;
   bottom: -2px;
   width: 1px;
-  background: color-mix(in srgb, var(--claude-border) 92%, transparent);
+  background: color-mix(in srgb, var(--task-state-color) 32%, transparent);
 }
 
 :deep(.task-step__dot) {
@@ -521,7 +535,7 @@ export default {
 
 :deep(.task-step__label) {
   overflow: hidden;
-  color: var(--claude-foreground);
+  color: var(--task-state-color);
   font-size: 10px;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -530,7 +544,7 @@ export default {
 
 :deep(.task-step__time) {
   flex: none;
-  color: var(--claude-muted-foreground);
+  color: color-mix(in srgb, var(--task-state-color) 66%, var(--claude-muted-foreground));
   font-family: var(--claude-font-mono);
   font-size: 9px;
   letter-spacing: .04em;
@@ -538,7 +552,7 @@ export default {
 
 :deep(.task-step__description) {
   margin: 3px 0 0;
-  color: var(--claude-muted-foreground);
+  color: color-mix(in srgb, var(--task-state-color) 78%, var(--claude-muted-foreground));
   font-size: 10px;
   line-height: 1.35;
 }
@@ -546,6 +560,13 @@ export default {
 @keyframes task-log-enter {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes task-progress-sweep {
+  0% { transform: translateX(-100%); opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
 }
 
 @keyframes task-step-ripple {
@@ -559,6 +580,7 @@ export default {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :deep(.task-progress.is-running .task-progress__value::after),
   :deep(.task-step.is-running .task-step__dot::after),
   :deep(.task-step.is-running .task-step__label),
   :deep(.task-step.is-new) {

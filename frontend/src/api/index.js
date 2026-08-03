@@ -378,6 +378,9 @@ export const KgBaseAPI = window.KgBaseAPI = {
     updateProvider(uuid, data) {
       return API.put(`/v1/llm/provider/${uuid}`, data);
     },
+    reorderProviders(providerUuids) {
+      return API.put('/v1/llm/provider/order', { provider_uuids: providerUuids });
+    },
     deleteProvider(uuid) {
       return API.delete(`/v1/llm/provider?llm_provider_uuid=${encodeURIComponent(uuid)}`);
     },

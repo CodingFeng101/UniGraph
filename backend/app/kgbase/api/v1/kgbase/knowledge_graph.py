@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from backend.app.file.file import MAX_UPLOAD_SIZE
 from backend.app.kgbase.schema import GetIndexDetail, GetKnowledgeGraphDetail, GetSchemaGraphDetail
+from backend.app.kgbase.schema.chat_library import AppendMessageParam
 from backend.app.kgbase.schema.community import AddCommunityParam, UpdateCommunityParam
 from backend.app.kgbase.schema.embedding import EmbeddingBase
 from backend.app.kgbase.schema.knowledge_entity import AddKnowledgeEntityParam
@@ -25,6 +26,7 @@ from backend.app.kgbase.schema.knowledge_graph import (
 )
 from backend.app.kgbase.schema.knowledge_relationship import AddKnowledgeRelationshipParam
 from backend.app.kgbase.service.chat_context_service import chat_context_service
+from backend.app.kgbase.service.chat_library_service import chat_library_service
 from backend.app.kgbase.service.community_service import community_service
 from backend.app.kgbase.service.embedding_service import embedding_service
 from backend.app.kgbase.service.knowledge_entity_service import knowledge_entity_service
@@ -119,6 +121,69 @@ async def merge_async_generators(*gens):
         raise
     except Exception:
         raise
+
+
+async def _run_knowledge_question(
+    *,
+    uuid: str,
+    obj: AskKnowledgeGraphParam,
+    user_uuid: str,
+    progress_callback=None,
+    token_callback=None,
+):
+    async def report(message: str, detail: str, data: dict | None = None) -> None:
+        if progress_callback:
+            await progress_callback(message, detail, data)
+
+    await report('正在解析问题', '正在识别查询意图并准备检索上下文')
+    api_key, base_url, model = await knowledge_graph_service.get_user_llm_info(
+        user_token=obj.user_token,
+        model_uuid=obj.llm_model_uuid,
+    )
+    embedding_api_key, embedding_base_url, embedding_model = (
+        await knowledge_graph_service.get_user_embedding_info(user_token=obj.user_token)
+    )
+    await report('模型配置加载完成', f'将使用 {model} 生成回答')
+
+    knowledge_graph = await knowledge_graph_service.get_knowledge_graph(uuid=uuid)
+    data = GetIndexDetail(**select_as_dict(knowledge_graph))
+    await report(
+        '知识索引加载完成',
+        f'已载入 {len(data.entities)} 个实体、{len(data.relationships)} 条关系和 {len(data.communities)} 份社区报告',
+    )
+    await report('正在检索实体与关系', '正在构建与问题相关的局部知识上下文')
+
+    async def provide_conversation_context(context_text: str):
+        return await chat_context_service.prepare(
+            chat_library_uuid=obj.chat_library_uuid,
+            current_message_uuid=obj.current_message_uuid,
+            user_uuid=user_uuid,
+            current_question=obj.message,
+            knowledge_context=context_text,
+            system_prompt=LOCAL_SEARCH_SYSTEM_PROMPT,
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            progress_callback=progress_callback,
+        )
+
+    response = await knowledge_graph_service.query(
+        knowledge_graph=data,
+        query=obj.message,
+        infer=obj.infer,
+        depth=obj.depth,
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+        embedding_api_key=embedding_api_key,
+        embedding_base_url=embedding_base_url,
+        embedding_model=embedding_model,
+        context_provider=provide_conversation_context if obj.chat_library_uuid else None,
+        token_callback=token_callback,
+        progress_callback=progress_callback,
+    )
+    await report('正在整理回答', '知识检索完成，正在汇总回答与信息源')
+    return response, model
 
 
 @router.get('/all/{kg_base_uuid}', summary='获取kgbase下所有实例图谱', dependencies=[DependsJwtAuth])
@@ -296,100 +361,28 @@ async def ask_knowledge_graph(request: Request, uuid: Annotated[str, Path(...)],
                     )
 
         async def process_request():
-
             try:
-                yield (
-                    json.dumps(
-                        {'type': 'processing', 'message': '正在解析问题', 'detail': '正在识别查询意图并准备检索上下文'},
-                        ensure_ascii=False,
-                    )
-                    + '\n'
-                )
-                # 获取用户信息和知识图谱
-                api_key, base_url, model = await knowledge_graph_service.get_user_llm_info(
-                    user_token=obj.user_token,
-                    model_uuid=obj.llm_model_uuid,
-                )
-                (
-                    embedding_api_key,
-                    embedding_base_url,
-                    embedding_model,
-                ) = await knowledge_graph_service.get_user_embedding_info(user_token=obj.user_token)
-                yield (
-                    json.dumps(
-                        {'type': 'processing', 'message': '模型配置加载完成', 'detail': f'将使用 {model} 生成回答'},
-                        ensure_ascii=False,
-                    )
-                    + '\n'
-                )
-                knowledge_graph = await knowledge_graph_service.get_knowledge_graph(uuid=uuid)
-                data = GetIndexDetail(**select_as_dict(knowledge_graph))
-                yield (
-                    json.dumps(
-                        {
-                            'type': 'processing',
-                            'message': '知识索引加载完成',
-                            'detail': (
-                                f'已载入 {len(data.entities)} 个实体、{len(data.relationships)} 条关系'
-                                f'和 {len(data.communities)} 份社区报告'
-                            ),
-                        },
-                        ensure_ascii=False,
-                    )
-                    + '\n'
-                )
+                context_progress: asyncio.Queue[dict] = asyncio.Queue()
 
-                # 执行查询
-                yield (
-                    json.dumps(
-                        {
-                            'type': 'processing',
-                            'message': '正在检索实体与关系',
-                            'detail': '正在构建与问题相关的局部知识上下文',
-                        },
-                        ensure_ascii=False,
-                    )
-                    + '\n'
-                )
-                context_progress: asyncio.Queue[dict[str, str]] = asyncio.Queue()
-
-                async def report_context_progress(message: str, detail: str) -> None:
-                    await context_progress.put({
+                async def report_context_progress(message: str, detail: str, data: dict | None = None) -> None:
+                    payload = {
                         'type': 'processing',
                         'message': message,
                         'detail': detail,
-                    })
+                    }
+                    if data:
+                        payload['data'] = data
+                    await context_progress.put(payload)
 
                 async def report_answer_delta(delta: str) -> None:
                     await context_progress.put({'type': 'answer_delta', 'delta': delta})
 
-                async def provide_conversation_context(context_text: str):
-                    return await chat_context_service.prepare(
-                        chat_library_uuid=obj.chat_library_uuid,
-                        current_message_uuid=obj.current_message_uuid,
-                        user_uuid=request.user.uuid,
-                        current_question=obj.message,
-                        knowledge_context=context_text,
-                        system_prompt=LOCAL_SEARCH_SYSTEM_PROMPT,
-                        api_key=api_key,
-                        base_url=base_url,
-                        model=model,
-                        progress_callback=report_context_progress,
-                    )
-
                 query_task = asyncio.create_task(
-                    knowledge_graph_service.query(
-                        knowledge_graph=data,
-                        query=obj.message,
-                        infer=obj.infer,
-                        depth=obj.depth,
-                        api_key=api_key,
-                        base_url=base_url,
-                        model=model,
-                        embedding_api_key=embedding_api_key,
-                        embedding_base_url=embedding_base_url,
-                        embedding_model=embedding_model,
-                        context_provider=provide_conversation_context if obj.chat_library_uuid else None,
+                    _run_knowledge_question(
+                        uuid=uuid,
+                        obj=obj,
+                        user_uuid=request.user.uuid,
+                        progress_callback=report_context_progress,
                         token_callback=report_answer_delta,
                     )
                 )
@@ -400,25 +393,12 @@ async def ask_knowledge_graph(request: Request, uuid: Annotated[str, Path(...)],
                         except asyncio.TimeoutError:
                             continue
                         yield json.dumps(progress, ensure_ascii=False) + '\n'
-                    response = await query_task
+                    response, _ = await query_task
                 finally:
                     if not query_task.done():
                         query_task.cancel()
                         with suppress(asyncio.CancelledError):
                             await query_task
-                yield (
-                    json.dumps(
-                        {
-                            'type': 'processing',
-                            'message': '正在整理回答',
-                            'detail': '知识检索完成，正在汇总回答与信息源',
-                        },
-                        ensure_ascii=False,
-                    )
-                    + '\n'
-                )
-
-                # 返回成功结果（保持原有 ResponseModel 格式）
                 yield json.dumps({'type': 'final_result', 'data': response, 'code': 200, 'msg': 'success'}) + '\n'
 
             except asyncio.TimeoutError:
@@ -440,6 +420,112 @@ async def ask_knowledge_graph(request: Request, uuid: Annotated[str, Path(...)],
 
     # 返回 StreamingResponse，保持 NDJSON 格式
     return StreamingResponse(generate_stream(), media_type='application/x-ndjson')
+
+
+@celery_app.task(bind=True, name='knowledge_graph.ask')
+async def ask_knowledge_graph_task(
+    self,
+    uuid: str,
+    user_uuid: str,
+    user_token: str,
+    obj_data: dict,
+):
+    try:
+        obj = AskKnowledgeGraphParam(**obj_data)
+        obj.user_token = user_token
+        progress_by_stage = {
+            '正在解析问题': 8,
+            '模型配置加载完成': 18,
+            '知识索引加载完成': 32,
+            '正在检索实体与关系': 48,
+            '实体检索完成': 58,
+            '关系检索完成': 66,
+            '信息源检索完成': 72,
+            '社区报告检索完成': 78,
+            '正在整理回答': 94,
+        }
+        partial_answer: list[str] = []
+        generation_started = False
+        last_partial_update = 0.0
+
+        async def report_progress(message: str, detail: str, data: dict | None = None) -> None:
+            progress = progress_by_stage.get(message, 62)
+            metrics = {'retrieval': data} if data else None
+            task_progress(self, message, progress, detail=detail, metrics=metrics)
+
+        async def report_answer_delta(delta: str) -> None:
+            nonlocal generation_started, last_partial_update
+            if not delta:
+                return
+            partial_answer.append(delta)
+            if not generation_started:
+                generation_started = True
+                task_progress(self, '正在生成回答', 82, detail='正在根据检索到的知识逐步生成回答')
+            now = asyncio.get_running_loop().time()
+            if now - last_partial_update < 0.18:
+                return
+            last_partial_update = now
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'type': 'answer_delta',
+                    'message': '正在生成回答',
+                    'detail': '正在根据检索到的知识逐步生成回答',
+                    'progress': 88,
+                    'partial_answer': ''.join(partial_answer),
+                    'logs': list(getattr(self, '_unigraph_progress_logs', [])),
+                },
+            )
+
+        response, model = await _run_knowledge_question(
+            uuid=uuid,
+            obj=obj,
+            user_uuid=user_uuid,
+            progress_callback=report_progress,
+            token_callback=report_answer_delta,
+        )
+        answer = str(response.get('results') or '')
+        assistant_message_uuid = None
+        if obj.chat_library_uuid and answer:
+            saved = await chat_library_service.append_message(
+                uuid=obj.chat_library_uuid,
+                user_uuid=user_uuid,
+                obj=AppendMessageParam(
+                    role='assistant',
+                    content=answer,
+                    knowledge_graph_uuid=uuid,
+                    model_name=model,
+                    effort=obj.effort,
+                    sources=response.get('context_data') or {},
+                ),
+            )
+            assistant_message_uuid = saved.get('message_uuid')
+
+        result_data = dict(response)
+        result_data['assistant_message_uuid'] = assistant_message_uuid
+        return task_result(
+            self,
+            '问答已完成',
+            data=result_data,
+            detail='回答与信息源已保存到当前对话',
+            metrics={'chat_library_uuid': obj.chat_library_uuid},
+        )
+    except Exception as exc:
+        logger.exception('Background knowledge graph question failed')
+        status_code, message = _safe_question_error(exc)
+        return task_error_result(
+            self,
+            {
+                'error': {
+                    'code': status_code,
+                    'message': message,
+                    'type': exc.__class__.__name__,
+                    'details': {'task_id': self.request.id},
+                },
+                'exc_type': f'{exc.__class__.__module__}.{exc.__class__.__name__}',
+                'exc_message': message,
+            },
+        )
 
 
 @celery_app.task(bind=True, name='knowledge_graph.build_index')
@@ -968,7 +1054,7 @@ async def infer_knowledge_graph(self, uuid: str, user_token: str):
     try:
         task_id = self.request.id
         # 初始化任务状态
-        task_progress(self, '准备执行知识推理', 3, detail='正在读取模型配置')
+        task_progress(self, '准备执行知识迁移', 3, detail='正在读取模型配置')
 
         # 获取用户信息和知识图谱
         api_key, base_url, model = await knowledge_graph_service.get_user_llm_info(user_token=user_token)
@@ -998,7 +1084,7 @@ async def infer_knowledge_graph(self, uuid: str, user_token: str):
         infer_kg = infer_graph['infer_kg']
         infer_total = len(infer_kg)
         task_progress(
-            self, '知识推理完成', 75, detail=f'得到 {infer_total} 条候选三元组', metrics={'triples': infer_total}
+            self, '知识迁移完成', 75, detail=f'得到 {infer_total} 条候选三元组', metrics={'triples': infer_total}
         )
         processed_triples = 0
         entity_names = set()
@@ -1082,7 +1168,7 @@ async def infer_knowledge_graph(self, uuid: str, user_token: str):
         # 完成任务
         return task_result(
             self,
-            '知识推理完成',
+            '知识迁移完成',
             detail=f'已处理 {infer_total} 条候选三元组，写入 {relationships_written} 条新关系',
             metrics={'triples': infer_total, 'entities': len(entity_names), 'relationships': relationships_written},
         )
@@ -1091,7 +1177,7 @@ async def infer_knowledge_graph(self, uuid: str, user_token: str):
         error_payload = {
             'error': {
                 'code': 'INTERNAL_ERROR',
-                'message': str(e) or '知识推理失败，请稍后重试',
+                    'message': str(e) or '知识迁移失败，请稍后重试',
                 'type': e.__class__.__name__,
                 'details': {'task_id': self.request.id, 'module': e.__class__.__module__},
             },

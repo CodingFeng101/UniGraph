@@ -23,6 +23,7 @@ class LlmProvider(Base):
     document_url: Mapped[Optional[str]] = mapped_column(String(512), comment='文档URL')
     llm_model_url: Mapped[Optional[str]] = mapped_column(String(512), comment='模型URL')
     status: Mapped[int] = mapped_column(default=1, comment='状态(0停用 1正常)')
+    sort_order: Mapped[int] = mapped_column(default=0, comment='用户自定义排序，值越小越靠前')
 
     # 关系定义
     models: Mapped[List['LlmModel']] = relationship(

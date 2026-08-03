@@ -38,7 +38,21 @@ export const Auth = window.Auth = {
 
   /** 设置用户信息 */
   setUserInfo(info) {
-    localStorage.setItem(USER_KEY, typeof info === 'string' ? info : JSON.stringify(info));
+    const incoming = typeof info === 'string' ? JSON.parse(info) : (info || {});
+    const cached = this.getUserInfo() || {};
+    const sameUser = Boolean(
+      (cached.uuid && incoming.uuid && cached.uuid === incoming.uuid) ||
+      (cached.user_uuid && incoming.user_uuid && cached.user_uuid === incoming.user_uuid) ||
+      (cached.id && incoming.id && cached.id === incoming.id) ||
+      (cached.username && incoming.username && cached.username === incoming.username)
+    );
+    const userInfo = {
+      ...cached,
+      ...incoming,
+      avatar: incoming.avatar || (sameUser ? cached.avatar : null),
+    };
+    localStorage.setItem(USER_KEY, JSON.stringify(userInfo));
+    window.dispatchEvent(new CustomEvent('unigraph:user-updated', { detail: userInfo }));
   },
 
   /** 获取用户信息 */

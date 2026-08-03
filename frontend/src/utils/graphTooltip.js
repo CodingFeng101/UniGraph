@@ -27,7 +27,7 @@ function getPlainLines(bodyHtml) {
 }
 
 function parseLine(line) {
-  const separatorIndex = line.search(/[:：]/);
+  const separatorIndex = line.search(/[:：=]/);
   if (separatorIndex < 0) {
     if (line.includes('→')) return { key: '实体', value: line };
     return { key: '信息', value: line };
@@ -44,19 +44,17 @@ function normalizeRows(bodyHtml, kind) {
   const fixedKeys = isRelationship
     ? new Set(['实体', '起始', '头实体', '目标', '尾实体', '类型', '来源', '描述', '定义'])
     : new Set(['属性', '来源', '关联关系']);
-  const attributeParts = [];
   const result = [];
 
   rows.forEach((row) => {
     if (!fixedKeys.has(row.key)) {
-      attributeParts.push(row.key + '：' + row.value);
+      result.push(row);
       return;
     }
     const keyMap = { '起始': '头实体', '目标': '尾实体', '描述': '定义' };
     result.push({ key: keyMap[row.key] || row.key, value: row.value });
   });
 
-  if (attributeParts.length) result.unshift({ key: '属性', value: attributeParts.join('；') });
   return result.slice(0, 5);
 }
 

@@ -11,6 +11,7 @@ from backend.app.admin.schema.llm_provider_schema import (
     LlmProviderListSchema,
     LlmProviderSchemaBase,
     LlmProviderSimpleSchema,
+    ReorderLlmProviderParam,
     UpdateLlmModelParam,
     UpdateLlmProviderParam,
 )
@@ -26,6 +27,7 @@ __all__ = [
     'LlmProviderListSchema',
     'LlmProviderSchemaBase',
     'LlmProviderSimpleSchema',
+    'ReorderLlmProviderParam',
     'UpdateLlmModelParam',
     'UpdateLlmProviderParam',
 ]

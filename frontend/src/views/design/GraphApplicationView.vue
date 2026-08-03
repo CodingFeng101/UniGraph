@@ -285,12 +285,12 @@
             <span class="pointer-events-none absolute left-1/2 bottom-full mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100" style="background:var(--claude-foreground);color:var(--claude-background);box-shadow:var(--claude-shadow-md);">上传附件（单个最大 50 MB）</span>
           </button>
 
-          <div class="relative min-w-[190px]">
-            <button type="button" data-role="kg-trigger" disabled @click="selectKnowledgeGraph()" class="h-8 w-[190px] flex items-center justify-between gap-2 px-2 text-[13px] transition-opacity disabled:cursor-not-allowed disabled:opacity-60" style="background:transparent;border:none;color:var(--claude-muted-foreground);" title="暂无可用索引">
+          <div class="relative w-[220px] shrink-0">
+            <button type="button" data-role="kg-trigger" disabled @click="selectKnowledgeGraph()" class="h-8 w-full flex items-center justify-between gap-2 px-2 text-[13px] transition-opacity disabled:cursor-not-allowed disabled:opacity-60" style="background:transparent;border:none;color:var(--claude-muted-foreground);" title="暂无可用索引">
               <span id="kg-selector-label" class="truncate">暂无可用索引</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
-            <div id="kg-selector-menu" class="hidden absolute left-0 bottom-full mb-2 w-[240px] max-h-56 overflow-y-auto rounded-xl p-1 z-50" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
+            <div id="kg-selector-menu" class="hidden absolute left-0 bottom-full mb-2 w-full max-h-56 overflow-y-auto rounded-xl p-1 z-50" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
           </div>
 
           <div class="flex-1"></div>
@@ -502,7 +502,7 @@ export default {
 @keyframes trace-pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
 @keyframes dot-blink { 0%,80%,100%{opacity:0.3;} 40%{opacity:1;} }
 @keyframes thinking-log-enter { from { opacity: 0; } to { opacity: 1; } }
-@keyframes thinking-spin { to { transform: rotate(360deg); } }
+@keyframes thinking-text-wave { 0%, 100% { background-position: 100% 50%; } 50% { background-position: 0 50%; } }
 #app-main { position: relative; }
 .chat-composer-shell { position: relative; z-index: 35; }
 .chat-composer { box-shadow: var(--claude-shadow-sm); will-change: transform, opacity; }
@@ -681,9 +681,18 @@ export default {
 .ai-thinking-summary::-webkit-details-marker { display: none; }
 .ai-thinking-summary__status { width: 15px; height: 15px; display: grid; flex: none; place-items: center; }
 .ai-thinking-summary__status svg { width: 14px; height: 14px; stroke-width: 1.7; }
-.ai-thinking[data-state="running"] .ai-thinking-summary__status svg { animation: thinking-spin 1.35s linear infinite; }
+.ai-thinking[data-state="running"] .ai-thinking-summary__status { color: var(--claude-primary); }
 .ai-thinking[data-state="error"] .ai-thinking-summary__status { color: var(--claude-destructive); }
 .ai-thinking-summary__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-thinking[data-state="running"] .ai-thinking-summary__text {
+  color: transparent;
+  background: linear-gradient(100deg, var(--claude-muted-foreground) 22%, var(--claude-foreground) 46%, var(--claude-primary) 52%, var(--claude-muted-foreground) 78%);
+  background-size: 240% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: thinking-text-wave 1.9s ease-in-out infinite;
+}
 .ai-thinking-summary__chevron { width: 13px; height: 13px; flex: none; transition: transform .16s ease; }
 .ai-thinking[open] .ai-thinking-summary__chevron { transform: rotate(90deg); }
 .ai-thinking-body { padding: 15px 0 2px 5px; }
@@ -740,6 +749,39 @@ export default {
   color: var(--claude-foreground);
   font-family: var(--claude-font-sans);
 }
+.ai-thinking-log__retrieval { margin-top: 7px; }
+.ai-thinking-log__retrieval > summary {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  gap: 5px;
+  list-style: none;
+  color: var(--claude-muted-foreground);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.ai-thinking-log__retrieval > summary::-webkit-details-marker { display: none; }
+.ai-thinking-log__retrieval > summary svg { width: 12px; height: 12px; flex: none; transition: transform .16s ease; }
+.ai-thinking-log__retrieval[open] > summary svg { transform: rotate(90deg); }
+.ai-thinking-retrieval__list {
+  width: min(100%, 590px);
+  max-height: 220px;
+  margin-top: 8px;
+  padding: 9px 11px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--claude-secondary) 72%, transparent);
+  scrollbar-gutter: stable;
+}
+.ai-thinking-retrieval__item + .ai-thinking-retrieval__item { margin-top: 10px; }
+.ai-thinking-retrieval__heading { display: flex; align-items: baseline; gap: 7px; min-width: 0; color: var(--claude-foreground); font-size: 12px; }
+.ai-thinking-retrieval__heading > span { overflow-wrap: anywhere; }
+.ai-thinking-retrieval__heading small { flex: none; color: var(--claude-muted-foreground); font-size: 10px; }
+.ai-thinking-retrieval__item p { margin: 3px 0 0; overflow-wrap: anywhere; color: var(--claude-muted-foreground); font-size: 11px; line-height: 1.55; }
+.ai-thinking-retrieval__more { margin-top: 10px; color: var(--claude-muted-foreground); font-size: 10px; }
 .ai-thinking-log__item.is-error .ai-thinking-log__detail { color: var(--claude-destructive); }
 .ai-answer-error {
   width: fit-content;
@@ -757,8 +799,38 @@ export default {
   line-height: 1.5;
 }
 .ai-answer-error svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
+.chat-assistant-actions { color: var(--claude-muted-foreground); }
+.chat-assistant-action {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--claude-muted-foreground);
+  font-family: var(--claude-font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  opacity: 1;
+  visibility: visible;
+  cursor: pointer;
+  transition: background-color .16s ease, color .16s ease, transform .16s ease;
+}
+.chat-assistant-action:hover { background: var(--claude-accent); color: var(--claude-foreground); }
+.chat-assistant-action:active { transform: scale(.96); }
+.chat-assistant-action:disabled { opacity: .45; cursor: wait; }
+.chat-assistant-action svg { width: 14px; height: 14px; flex: none; }
 @media (prefers-reduced-motion: reduce) {
-  .ai-thinking[data-state="running"] .ai-thinking-summary__status svg { animation: none; }
+  .ai-thinking[data-state="running"] .ai-thinking-summary__text {
+    color: var(--claude-muted-foreground);
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    animation: none;
+  }
 }
 .source-popup-row {
   display: block;

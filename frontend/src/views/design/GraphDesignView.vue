@@ -9,7 +9,6 @@
     <div class="flex items-center gap-2">
       <div class="relative" id="arch-dropdown-wrapper-top">
         <button id="arch-dropdown-trigger" type="button" disabled @click="toggleArchDropdown('arch-dropdown-top')" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors w-[240px] disabled:cursor-not-allowed disabled:opacity-60" style="background:var(--claude-accent);border:1px solid var(--claude-border);">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--claude-muted-foreground);opacity:0.4;"></span>
           <span class="text-xs font-medium truncate flex-1 text-left" style="color:var(--claude-muted-foreground);">暂无知识架构</span>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="2.5" class="shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
@@ -218,27 +217,8 @@
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">起始实体类型</label>
         <div class="relative">
-          <button type="button" @click="toggleDropdown('relation-source-dropdown')" class="w-full h-9 px-3 text-sm rounded-lg border flex items-center justify-between outline-none cursor-pointer" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);">
-            <span id="relation-source-value">数控机床</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="2" class="shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div id="relation-source-dropdown" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-full" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-            <div class="px-3 py-2 cursor-pointer transition-colors" style="background:var(--claude-accent);" @click="selectRelationSource($event.currentTarget,'数控机床')">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-medium" style="color:var(--claude-foreground);">数控机床</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-            </div>
-            <div class="px-3 py-2 cursor-pointer transition-colors hover:opacity-80" @click="selectRelationSource($event.currentTarget,'主轴')">
-              <span class="text-xs" style="color:var(--claude-muted-foreground);">主轴</span>
-            </div>
-            <div class="px-3 py-2 cursor-pointer transition-colors hover:opacity-80" @click="selectRelationSource($event.currentTarget,'刀具')">
-              <span class="text-xs" style="color:var(--claude-muted-foreground);">刀具</span>
-            </div>
-            <div class="px-3 py-2 cursor-pointer transition-colors hover:opacity-80" @click="selectRelationSource($event.currentTarget,'操作人员')">
-              <span class="text-xs" style="color:var(--claude-muted-foreground);">操作人员</span>
-            </div>
-          </div>
+          <input id="relation-source-input" type="text" autocomplete="off" placeholder="搜索或选择起始实体类型" @focus="showRelationEntityList('source')" @input="filterRelationEntityList('source')" class="w-full h-9 px-3 text-sm rounded-lg border outline-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);">
+          <div id="relation-source-dropdown" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-x-hidden overflow-y-auto overscroll-contain z-50 w-full max-h-52" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
         </div>
       </div>
       <div>
@@ -248,27 +228,8 @@
       <div>
         <label class="block text-xs font-medium mb-1.5" style="color:var(--claude-foreground);">目标实体类型</label>
         <div class="relative">
-          <button type="button" @click="toggleDropdown('relation-target-dropdown')" class="w-full h-9 px-3 text-sm rounded-lg border flex items-center justify-between outline-none cursor-pointer" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);">
-            <span id="relation-target-value">主轴</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-muted-foreground)" stroke-width="2" class="shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div id="relation-target-dropdown" class="hidden absolute left-0 top-full mt-1 rounded-lg overflow-hidden z-50 w-full" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-            <div class="px-3 py-2 cursor-pointer transition-colors" style="background:var(--claude-accent);" @click="selectRelationTarget($event.currentTarget,'主轴')">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-medium" style="color:var(--claude-foreground);">主轴</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-            </div>
-            <div class="px-3 py-2 cursor-pointer transition-colors hover:opacity-80" @click="selectRelationTarget($event.currentTarget,'数控机床')">
-              <span class="text-xs" style="color:var(--claude-muted-foreground);">数控机床</span>
-            </div>
-            <div class="px-3 py-2 cursor-pointer transition-colors hover:opacity-80" @click="selectRelationTarget($event.currentTarget,'刀具')">
-              <span class="text-xs" style="color:var(--claude-muted-foreground);">刀具</span>
-            </div>
-            <div class="px-3 py-2 cursor-pointer transition-colors hover:opacity-80" @click="selectRelationTarget($event.currentTarget,'操作人员')">
-              <span class="text-xs" style="color:var(--claude-muted-foreground);">操作人员</span>
-            </div>
-          </div>
+          <input id="relation-target-input" type="text" autocomplete="off" placeholder="搜索或选择目标实体类型" @focus="showRelationEntityList('target')" @input="filterRelationEntityList('target')" class="w-full h-9 px-3 text-sm rounded-lg border outline-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);">
+          <div id="relation-target-dropdown" class="hidden absolute left-0 bottom-full mb-1 rounded-lg overflow-x-hidden overflow-y-auto overscroll-contain z-50 w-full max-h-52" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);"></div>
         </div>
       </div>
       <div>
@@ -500,6 +461,12 @@ export default {
     },
     selectRelationTarget(...args) {
       return this.controller?.selectRelationTarget(...args);
+    },
+    filterRelationEntityList(...args) {
+      return this.controller?.filterRelationEntityList(...args);
+    },
+    showRelationEntityList(...args) {
+      return this.controller?.showRelationEntityList(...args);
     },
     showTooltip(...args) {
       return this.controller?.showTooltip(...args);
