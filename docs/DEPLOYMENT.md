@@ -286,6 +286,7 @@ mysqldump -uroot -p --single-transaction onlineunigraph > unigraph-backup.sql
 mysql -uroot -p onlineunigraph < backend/migrations/20260724_chat_history.sql
 mysql -uroot -p onlineunigraph < backend/migrations/20260728_chat_share.sql
 mysql -uroot -p onlineunigraph < backend/migrations/20260730_multi_user_constraints.sql
+mysql -uroot -p onlineunigraph < backend/migrations/20260803_llm_provider_sort_order.sql
 ```
 
 新数据库由 `deploy/mysql/init/01-schema.sql` 创建最终结构，不要再重复执行上述迁移。

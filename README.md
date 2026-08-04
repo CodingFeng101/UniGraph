@@ -182,6 +182,7 @@ docker compose --env-file .env.docker ps
 ```bash
 cp backend/.env.template backend/.env
 python -m venv .venv
+source .venv/bin/activate
 python -m pip install -r backend/requirements.txt
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
