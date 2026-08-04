@@ -47,7 +47,7 @@ class GraphIndexer(Indexer):
         entities = load_entities(entities=entities, communities=communities)
         if progress_callback:
             progress_callback('communities', len(communities), len(communities), communities)
-        logger.info('社区划分完成😊')
+        logger.info('Community detection completed')
 
         # 创建社区报告
         generator = CommunityReportGenerator(input_data=communities)
@@ -62,7 +62,7 @@ class GraphIndexer(Indexer):
             ),
         )
         reports = [asdict(item) for item in reports_list]
-        logger.info('社区报告生成完成😊')
+        logger.info('Community report generation completed')
 
         # 对实体信息进行嵌入
         embedder = AttributeEmbedder()
@@ -78,6 +78,6 @@ class GraphIndexer(Indexer):
             ),
         )
         entities = [asdict(item) for item in entities_list]
-        logger.info('实体信息嵌入完成😊')
+        logger.info('Entity information embedding completed')
 
         return entities, reports

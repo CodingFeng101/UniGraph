@@ -43,7 +43,7 @@ class LocalSearchMixedContext(LocalContextBuilder):
             kwargs.get('embedding_model', ''),
             k=10,
         )
-        logger.info('已匹配到实体😊')
+        logger.info('Entities matched')
 
         human_read_id = 0  # 用于替换复杂的ID,方便模型溯源
         final_context = list[str]()
@@ -61,7 +61,7 @@ class LocalSearchMixedContext(LocalContextBuilder):
         if community_context.strip() != '':
             final_context.append(str(community_context))
             final_context_data['Reports'] = community_context_data
-        logger.info('社区文本已检索完成😊')
+        logger.info('Community text retrieval completed')
 
         entity_context, entity_context_data, human_read_id = build_entity_context(
             selected_entities, token_encoder=token_encoder, human_read_id=human_read_id
@@ -70,7 +70,7 @@ class LocalSearchMixedContext(LocalContextBuilder):
         if entity_context.strip() != '':
             final_context.append(str(entity_context))
             final_context_data['Entities'] = entity_context_data
-        logger.info('实体文本已检索完成😊')
+        logger.info('Entity text retrieval completed')
 
         selected_relationships, relationship_context, relationship_context_data, human_read_id = (
             build_relationship_context(
@@ -85,7 +85,7 @@ class LocalSearchMixedContext(LocalContextBuilder):
         if relationship_context.strip() != '':
             final_context.append(str(relationship_context))
             final_context_data['Relationships'] = relationship_context_data
-        logger.info('关系文本已检索完成😊')
+        logger.info('Relationship text retrieval completed')
 
         source_context, source_context_data, human_read_id = build_source_context(
             selected_relationships=selected_relationships, token_encoder=token_encoder, human_read_id=human_read_id
@@ -94,6 +94,6 @@ class LocalSearchMixedContext(LocalContextBuilder):
         if source_context.strip() != '':
             final_context.append(str(source_context))
             final_context_data['Sources'] = source_context_data
-        logger.info('来源文本已检索完成😊')
+        logger.info('Source text retrieval completed')
 
         return '\n\n'.join(final_context), final_context_data

@@ -1,3 +1,4 @@
+import _env  # noqa: F401  # isort: skip
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 

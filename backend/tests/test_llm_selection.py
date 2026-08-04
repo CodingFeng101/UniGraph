@@ -1,3 +1,4 @@
+import _env  # noqa: F401  # isort: skip
 from types import SimpleNamespace
 
 import pytest

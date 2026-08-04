@@ -131,9 +131,7 @@ class SemanticKGInfer:
             try:
                 async with inference_slots:
                     result = await asyncio.wait_for(
-                        self._process_mask_triple(
-                            masked_triple, type_triple, attributes, api_key, base_url, model
-                        ),
+                        self._process_mask_triple(masked_triple, type_triple, attributes, api_key, base_url, model),
                         timeout=120,
                     )
                 return result, index, index_

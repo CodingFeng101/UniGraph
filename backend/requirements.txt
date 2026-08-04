@@ -79,7 +79,7 @@ colorama==0.4.6
     #   click
     #   loguru
     #   tqdm
-cryptography==48.0.1
+cryptography==50.0.0
     # via
     #   unigraph-backend (backend/pyproject.toml)
     #   pyjwt

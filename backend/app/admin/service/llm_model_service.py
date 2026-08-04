@@ -6,6 +6,7 @@ from backend.app.admin.crud.crud_llm_model import llm_model_dao
 from backend.app.admin.model.llm_model import LlmModel
 from backend.app.admin.model.llm_provider_model import LlmProvider
 from backend.app.admin.schema import CreateLlmModelParam, UpdateLlmModelParam
+from backend.common.log import log
 from backend.database.db_mysql import async_db_session
 
 
@@ -73,7 +74,8 @@ class LlmModelService:
                     raise
                 except Exception as e:
                     await db.rollback()
-                    raise ValueError(f'创建模型失败: {str(e)}') from e
+                    log.error(f'创建模型失败: {e}')
+                    raise ValueError('创建模型失败，请稍后重试') from e
 
     @staticmethod
     async def get_all(*, llm_provider_uuid: str = None, user_uuid: str | None = None) -> Sequence[LlmModel]:

@@ -36,12 +36,12 @@ async def build_index(
     """
     # 将实体和关系转换为KG格式(这里是一个格式的转换器)
     kg_data = transform_data(entities, relationships)
-    logger.info('KG数据转换成功😊')
+    logger.info('KG data conversion completed')
 
     # 对实体和关系的解析从KG中
     kg_processor = KGProcessor()
     entities, relationships = kg_processor.process_data(kg_data)
-    logger.info('KG数据解析成功😊')
+    logger.info('KG data parsing completed')
 
     # 构建索引
     indexer = GraphIndexer()
@@ -57,7 +57,7 @@ async def build_index(
         embedding_model,
         progress_callback=progress_callback,
     )
-    logger.info('索引构建成功😊')
+    logger.info('Index construction completed')
     return entities, community_reports
 
 
@@ -91,7 +91,7 @@ async def query_kg(
     """
     context_builder = LocalSearchMixedContext(entities, relationships, community_reports)
     search_engine = LocalSearch(context_builder, LOCAL_SEARCH_SYSTEM_PROMPT)
-    logger.info('搜索器初始化成功😊')
+    logger.info('Searcher initialization completed')
     results = await search_engine.search(
         query,
         level,

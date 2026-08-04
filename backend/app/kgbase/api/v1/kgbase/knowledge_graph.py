@@ -140,8 +140,8 @@ async def _run_knowledge_question(
         user_token=obj.user_token,
         model_uuid=obj.llm_model_uuid,
     )
-    embedding_api_key, embedding_base_url, embedding_model = (
-        await knowledge_graph_service.get_user_embedding_info(user_token=obj.user_token)
+    embedding_api_key, embedding_base_url, embedding_model = await knowledge_graph_service.get_user_embedding_info(
+        user_token=obj.user_token
     )
     await report('模型配置加载完成', f'将使用 {model} 生成回答')
 
@@ -1177,7 +1177,7 @@ async def infer_knowledge_graph(self, uuid: str, user_token: str):
         error_payload = {
             'error': {
                 'code': 'INTERNAL_ERROR',
-                    'message': str(e) or '知识迁移失败，请稍后重试',
+                'message': str(e) or '知识迁移失败，请稍后重试',
                 'type': e.__class__.__name__,
                 'details': {'task_id': self.request.id, 'module': e.__class__.__module__},
             },

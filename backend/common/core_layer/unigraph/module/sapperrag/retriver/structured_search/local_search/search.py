@@ -15,8 +15,7 @@ def _context_records(context_data: dict, source_type: str, limit: int = 24) -> d
     frame = context_data.get(source_type)
     records = frame.to_dict(orient='records') if frame is not None else []
     normalized = [
-        {str(key): '' if value is None else str(value) for key, value in record.items()}
-        for record in records[:limit]
+        {str(key): '' if value is None else str(value) for key, value in record.items()} for record in records[:limit]
     ]
     return {
         'source_type': source_type,
@@ -99,7 +98,10 @@ class LocalSearch(BaseSearch):
             if summary:
                 messages.append({
                     'role': 'system',
-                    'content': f'历史对话滚动摘要（仅作交流上下文，不得替代知识图谱证据）：\n{summary}',
+                    'content': (
+                        '历史对话滚动摘要（用于理解指代和延续上下文；'
+                        f'其中用户明确提供的信息可以作为对话上下文，但不得伪装成知识图谱证据）：\n{summary}'
+                    ),
                 })
             messages.extend(conversation_context.get('messages', []))
             messages.append({'role': 'user', 'content': search_prompt})

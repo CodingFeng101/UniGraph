@@ -1,3 +1,4 @@
+import _env  # noqa: F401  # isort: skip
 from backend.app.kgbase.api.v1.kgbase.schema_graph import _collect_entity_sources, _parse_json_value
 
 

@@ -35,6 +35,7 @@ TEST_ENV = {
     'REDIS_PASSWORD': 'test-password',
     'REDIS_DATABASE': '0',
     'TOKEN_SECRET_KEY': 'test-token-secret-that-is-long-enough',
+    'AUTH_AES_SECRET_KEY': 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=',
     'OPERA_LOG_ENCRYPT_SECRET_KEY': '0123456789abcdef0123456789abcdef',
     'OAUTH2_GITHUB_CLIENT_ID': 'test',
     'OAUTH2_GITHUB_CLIENT_SECRET': 'test',
@@ -62,6 +63,6 @@ assert type(FileContentGetterFactory.create('document.pdf')).__name__ == 'PdfCon
 assert LangChainSplitter(20, 2).split('hello world')
 assert os.path.isfile(IP2REGION_XDB)
 assert any(getattr(route, 'path', None) == '/knowg/v1/docs' for route in app.routes)
-assert any(getattr(route, 'path', None) == '/knowg/v1/health' for route in app.routes)
+assert app.url_path_for('health_check') == '/knowg/v1/health'
 
 print('Backend runtime import smoke test passed.')

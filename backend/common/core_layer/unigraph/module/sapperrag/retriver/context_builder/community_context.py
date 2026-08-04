@@ -42,7 +42,7 @@ def build_community_context(
     :return: 上下文文本, 上下文数据, human_read_id
     """
     sorted_community_reports = sort_community(community_reports, selected_entities, user_level, infer)
-    logger.info('已排序社区报告😊')
+    logger.info('Community reports sorted')
 
     def _is_included(report: community_reports) -> bool:
         return report.rating is not None and float(report.rating) >= min_community_rank
@@ -127,7 +127,7 @@ def sort_community(community_reports, selected_entities: List[Entity], user_leve
     for community in select_communities:
         del community.attributes['matches']  # type: ignore
     if infer:
-        logger.info(f'开始进行深度{infer}的推理')
+        logger.info(f'Starting inference with depth {infer}')
         select_communities = base_on_user_levels(select_communities, user_level)
     return select_communities
 

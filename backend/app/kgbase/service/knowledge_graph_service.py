@@ -494,7 +494,7 @@ class KnowledgeGraphService:
             entities = parse_json(json.dumps(entities), entity_mapping)
             relationships = parse_json(json.dumps(relationships), relationship_mapping)
             community_reports = parse_json(json.dumps(communities), community_report_mapping)
-            logger.info('数据解析完毕😀')
+            logger.info('Data parsing completed')
 
             results, context_text, context_data = await query_kg(
                 query=query,

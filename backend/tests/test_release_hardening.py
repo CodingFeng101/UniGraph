@@ -1,3 +1,4 @@
+import _env  # noqa: F401  # isort: skip
 import unittest
 
 from backend.app.kgbase.api.v1.kgbase.knowledge_graph import merge_async_generators

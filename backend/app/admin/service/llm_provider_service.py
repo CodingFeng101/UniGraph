@@ -46,13 +46,17 @@ class LlmProviderService:
             raise ValueError('模型列表包含重复项')
         async with async_db_session() as db:
             providers = (
-                await db.execute(
-                    select(LlmProvider).where(
-                        LlmProvider.user_uuid == user_uuid,
-                        LlmProvider.uuid.in_(provider_uuids),
+                (
+                    await db.execute(
+                        select(LlmProvider).where(
+                            LlmProvider.user_uuid == user_uuid,
+                            LlmProvider.uuid.in_(provider_uuids),
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             if len(providers) != len(provider_uuids):
                 raise ValueError('模型列表中包含无权访问的配置')
             provider_map = {provider.uuid: provider for provider in providers}

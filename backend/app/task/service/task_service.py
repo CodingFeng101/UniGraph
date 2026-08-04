@@ -127,9 +127,9 @@ class TaskService:
             if not uid:
                 raise ValueError('任务 ID 不能为空')
             celery_app.control.revoke(task_id=uid, terminate=True, signal='SIGTERM')
-            logger.info(f'任务 {uid} 已撤销')
+            logger.info(f'Task {uid} was revoked')
         except Exception as exc:
-            logger.error(f'撤销任务 {uid} 失败: {exc}')
+            logger.error(f'Failed to revoke task {uid}: {exc}')
             raise
 
 

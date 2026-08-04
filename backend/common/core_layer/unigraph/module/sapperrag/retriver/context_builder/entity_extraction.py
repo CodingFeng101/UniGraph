@@ -30,11 +30,11 @@ async def extract_entities_from_query(query, llm, api_key, base_url, model, max_
             extract_entities = await llm.get_response(
                 query=extract_prompt, api_key=api_key, base_url=base_url, model=model
             )
-            logger.debug(f'尝试 {attempt}: LLM 返回的响应 - {extract_entities}')
+            logger.debug(f'Attempt {attempt}: LLM response - {extract_entities}')
             extract_entities_list = json.loads(extract_entities)
             return extract_entities_list
         except json.JSONDecodeError as e:
-            logger.error(f'尝试 {attempt}: 解析 JSON 响应失败 - {e}')
+            logger.error(f'Attempt {attempt}: Failed to parse JSON response - {e}')
             if attempt < max_retries - 1:
                 continue
     return [f'{query}']

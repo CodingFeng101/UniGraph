@@ -14,5 +14,5 @@ logger = logging.getLogger(__name__)
 async def task_demo_async() -> str:
     await sleep(1)
     uid = uuid.uuid4().hex
-    logger.info('异步任务 %s 执行成功', uid)
+    logger.info('Async task %s completed successfully', uid)
     return uid

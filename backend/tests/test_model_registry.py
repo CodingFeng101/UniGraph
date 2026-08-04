@@ -1,3 +1,4 @@
+import _env  # noqa: F401  # isort: skip
 import backend.app.admin.model  # noqa: F401
 from backend.app.admin.model.sys_user import User
 from sqlalchemy.orm import configure_mappers

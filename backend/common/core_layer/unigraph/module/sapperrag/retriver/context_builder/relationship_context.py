@@ -39,7 +39,7 @@ def build_relationship_context(
     selected_relationships = _filter_relationships(
         selected_entities=selected_entities, relationships=relationships, top_k_relationships=top_k_relationships
     )
-    logger.info('已过滤关系😊')
+    logger.info('Relationships filtered')
 
     # 添加上下文标题
     current_context_text = f'-----{context_name}-----' + '\n'

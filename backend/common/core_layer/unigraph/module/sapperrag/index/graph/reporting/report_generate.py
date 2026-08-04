@@ -5,6 +5,7 @@ import logging
 from tqdm.asyncio import tqdm_asyncio
 
 from .......unigraph.ai_unit.llm.response_getter import GenericResponseGetter
+from .......unigraph.module.llm_output_checks import clamp_rating, strip_json_fences
 from ....index.graph.promt.report_generate import REPORT_GENERATE
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -40,20 +41,20 @@ class CommunityReportGenerator:
                 )
 
                 # 处理响应结果
-                clean_response = response.replace('json', ' ').replace('```', '')
+                clean_response = strip_json_fences(response)
                 report_data = json.loads(clean_response)
 
                 # 更新社区数据
                 self.input_data[index].full_content = clean_response
                 self.input_data[index].title = report_data.get('title', '')
-                self.input_data[index].rating = report_data.get('rating', 0)
+                self.input_data[index].rating = clamp_rating(report_data.get('rating', 0))
 
-                logger.info(f'处理社区 {index}: {community_df.id}')
+                logger.info(f'Processing community {index}: {community_df.id}')
                 return index, clean_response
 
             except Exception as e:
                 if attempt == max_retries - 1:
-                    logger.error(f'处理社区 {index} 失败: {str(e)}')
+                    logger.error(f'Failed to process community {index}: {str(e)}')
                     raise
                 await asyncio.sleep(backoff_factor * (2**attempt))
         return index, None
@@ -92,7 +93,7 @@ class CommunityReportGenerator:
                     index, _ = result
                     progress_callback(len(results), total, self.input_data[index])
         except Exception as e:
-            logger.critical(f'发生严重错误: {str(e)}', exc_info=True)
+            logger.critical(f'Critical error occurred: {str(e)}', exc_info=True)
             raise
 
         return self.input_data

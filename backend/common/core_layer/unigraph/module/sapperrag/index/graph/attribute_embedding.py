@@ -35,11 +35,11 @@ class AttributeEmbedder:
                     base_url=base_url,
                     model=model,
                 )
-                logger.info(f'嵌入成功: {attributes_text}')
+                logger.info(f'Embedding generated successfully: {attributes_text}')
                 return np.array(response)
             except Exception as e:
                 if attempt == max_retries - 1:
-                    logger.error(f'嵌入失败: {str(e)}')
+                    logger.error(f'Embedding generation failed: {str(e)}')
                     raise
                 await asyncio.sleep(backoff_factor * (2**attempt))
         return np.array([])
@@ -94,7 +94,7 @@ class AttributeEmbedder:
             completed += 1
             if error:
                 failures.append((index, error))
-                logger.error(f'处理实体 {index} 时出错: {str(error)}')
+                logger.error(f'Error processing entity {index}: {str(error)}')
             if progress_callback:
                 progress_callback(completed, total, entities[index], error)
 

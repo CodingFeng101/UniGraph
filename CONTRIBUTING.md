@@ -11,9 +11,10 @@ Thanks for improving UniGraph.
 4. Run the checks below before opening a pull request.
 
 ```bash
+python -m pip install ruff==0.15.20 -r backend/requirements-dev.txt
 ruff format --check backend
 ruff check backend
-python -m unittest discover -s backend/tests -v
+python -m pytest backend/tests -q
 python backend/tests/smoke_import.py
 pip-audit --requirement backend/requirements.txt --no-deps --disable-pip
 cd frontend

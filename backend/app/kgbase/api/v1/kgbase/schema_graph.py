@@ -58,11 +58,7 @@ def _collect_entity_sources(schema: list[dict]) -> dict[str, list[str]]:
             continue
 
         source_key = next(iter(source_mapping))
-        source_parts = (
-            [part.strip(' ()"\'') for part in source_key.split(',')]
-            if isinstance(source_key, str)
-            else []
-        )
+        source_parts = [part.strip(' ()"\'') for part in source_key.split(',')] if isinstance(source_key, str) else []
         source_parts = [part for part in source_parts if part]
         if len(source_parts) == 3:
             directional_source, directed_source = source_parts[0], source_parts[2]

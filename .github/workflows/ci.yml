@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install backend quality tools
-        run: python -m pip install ruff==0.15.20 -r backend/requirements.txt
+        run: python -m pip install ruff==0.15.20 -r backend/requirements-dev.txt
       - name: Check Python formatting and lint
         working-directory: backend
         run: |
@@ -25,7 +25,7 @@ jobs:
           ruff check .
       - name: Run security regression tests
         run: |
-          python -m unittest discover -s backend/tests -v
+          python -m pytest backend/tests -q
           python backend/tests/smoke_import.py
       - name: Audit locked backend dependencies
         run: |
@@ -45,6 +45,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
       - run: npm audit --audit-level=high
