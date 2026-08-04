@@ -93,7 +93,7 @@ email-validator==2.3.0
     # via unigraph-backend (backend/pyproject.toml)
 fast-captcha==0.3.2
     # via unigraph-backend (backend/pyproject.toml)
-fastapi==0.139.2
+fastapi==0.141.1
     # via
     #   unigraph-backend (backend/pyproject.toml)
     #   fastapi-limiter
