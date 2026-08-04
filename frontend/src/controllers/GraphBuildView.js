@@ -179,6 +179,18 @@ let selectedSchemaUuid = null;
 let selectedEntityUuids = { 'head-entity': null, 'tail-entity': null };
 let allEntitiesForDropdown = [];
 let currentGraphStyle = 'database';
+let loadModeFullyExpanded = false;
+
+function syncLoadExpandButton(loading = false) {
+  var button = document.getElementById('load-expand-all-button');
+  var label = document.getElementById('load-expand-all-label');
+  if (!button || !label) return;
+  var visible = currentGraphStyle === 'load';
+  button.classList.toggle('hidden', !visible);
+  button.classList.toggle('inline-flex', visible);
+  button.disabled = loading || loadModeFullyExpanded;
+  label.textContent = loading ? '展开中' : loadModeFullyExpanded ? '已全部展开' : '全部展开';
+}
 
 function getCurrentSchemaUuid() {
   if (graphData.schema_graph && graphData.schema_graph.uuid) return graphData.schema_graph.uuid;
@@ -662,7 +674,7 @@ function renderGraph(viewState) {
   }
   cy = GraphRenderer.init('graph-canvas', graphData.entities, graphData.relationships, {
     mode: currentGraphStyle,
-    serverExploration: currentGraphStyle === 'load',
+    serverExploration: currentGraphStyle === 'load' && !loadModeFullyExpanded,
     positions: viewState?.positions,
     anchorPosition: viewState?.anchorPosition,
     viewport: viewState?.viewport,
@@ -671,7 +683,7 @@ function renderGraph(viewState) {
       showElementDetail(data, 'node');
     },
     onNodeDoubleClick: function(data) {
-      if (currentGraphStyle === 'load') loadExplorationNeighbors(data.id);
+      if (currentGraphStyle === 'load' && !loadModeFullyExpanded) loadExplorationNeighbors(data.id);
     },
     onClusterDoubleClick: function(data) {
       loadExplorationType(data.type);
@@ -697,6 +709,8 @@ function renderGraph(viewState) {
 }
 
 async function loadExplorationOverview() {
+  loadModeFullyExpanded = false;
+  syncLoadExpandButton();
   var response = await KgBaseAPI.knowledgeGraph.getExplorationOverview(currentGraphUuid);
   if (response.code !== 200) throw new Error(response.msg || '加载图谱概览失败');
   graphData = {
@@ -725,6 +739,34 @@ async function loadExplorationOverview() {
   renderGraph();
 }
 
+async function expandLoadGraph() {
+  if (currentGraphStyle !== 'load' || !currentGraphUuid || loadModeFullyExpanded) return;
+  syncLoadExpandButton(true);
+  try {
+    var response = await KgBaseAPI.knowledgeGraph.getDetail(currentGraphUuid);
+    if (response.code !== 200 || !response.data) {
+      throw new Error(response.msg || '加载完整图谱失败');
+    }
+    graphData = {
+      entities: response.data.entities || [],
+      relationships: response.data.relationships || [],
+      schema_graph: response.data.schema_graph || null,
+    };
+    fullGraphData = {
+      entities: graphData.entities.slice(),
+      relationships: graphData.relationships.slice(),
+      schema_graph: graphData.schema_graph,
+    };
+    loadModeFullyExpanded = true;
+    renderGraph();
+    showToast(`已显示全部 ${graphData.entities.length} 个实体和 ${graphData.relationships.length} 条关系`);
+  } catch (error) {
+    showToast(error.message || '加载完整图谱失败');
+  } finally {
+    syncLoadExpandButton();
+  }
+}
+
 async function changeGraphStyle(style) {
   currentGraphStyle = style;
   if (style === 'load') {
@@ -751,6 +793,7 @@ async function changeGraphStyle(style) {
     button.style.background = active ? 'var(--claude-primary)' : 'transparent';
     button.style.color = active ? 'var(--claude-primary-foreground)' : 'var(--claude-muted-foreground)';
   });
+  syncLoadExpandButton();
   showToast('已切换图谱样式');
 }
 
@@ -1274,6 +1317,7 @@ loadGraphList();
     deleteSelected,
     editSelected,
     exportGraphIndex,
+    expandLoadGraph,
     filterGraph,
     filterEntityTypeList,
     filterRelationTypeList,

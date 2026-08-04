@@ -191,6 +191,7 @@ export default {
 .task-panel {
   position: fixed;
   z-index: 2147483000;
+  --task-running-color: #3b82f6;
 }
 
 .task-fab {
@@ -292,8 +293,8 @@ export default {
 .task-running-count {
   padding: 4px 9px;
   border-radius: 999px;
-  color: var(--claude-brand-500);
-  background: color-mix(in srgb, var(--claude-brand-500) 9%, var(--claude-card));
+  color: var(--task-running-color);
+  background: color-mix(in srgb, var(--task-running-color) 9%, var(--claude-card));
   font-size: 10px;
   line-height: 1;
   font-weight: 500;
@@ -308,7 +309,9 @@ export default {
   flex-direction: column;
   gap: 6px;
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
   overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .task-empty {
@@ -319,6 +322,7 @@ export default {
 }
 
 :deep(.task-card) {
+  flex: 0 0 auto;
   overflow: hidden;
   border-radius: 12px;
   background: var(--claude-background);

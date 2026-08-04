@@ -1,5 +1,11 @@
 <template>
-  <main class="shared-chat-page" @click="handlePageClick" @pointerout="handleCitationPointerOut">
+  <main
+    class="shared-chat-page"
+    @click="handlePageClick"
+    @focusin="handleCitationFocusIn"
+    @pointerover="handleCitationPointerOver"
+    @pointerout="handleCitationPointerOut"
+  >
     <header class="shared-chat-header">
       <a class="shared-chat-brand" href="/unigraph/login" aria-label="返回 UniGraph">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -76,6 +82,7 @@ const error = ref('');
 const share = ref({ conversation: [] });
 const originalTitle = document.title;
 let robotsMeta = null;
+const citationCloseTimers = new WeakMap();
 
 function formatDate(value) {
   if (!value) return '未知时间';
@@ -87,11 +94,82 @@ function formatMessageTime(value) {
   return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+function isCitationPopoverOpen(popup) {
+  try {
+    return popup.matches(':popover-open');
+  } catch {
+    return false;
+  }
+}
+
+function positionCitationPopup(citation) {
+  const popup = citation?.querySelector('.source-popup');
+  if (!popup) return;
+  const page = document.querySelector('.shared-chat-content')?.getBoundingClientRect();
+  const boundary = {
+    left: Math.max(12, page?.left || 0) + 12,
+    right: Math.min(window.innerWidth - 12, page?.right || window.innerWidth) - 12,
+    top: Math.max(12, page?.top || 0) + 12,
+    bottom: Math.min(window.innerHeight - 12, page?.bottom || window.innerHeight) - 12,
+  };
+  const citationRect = citation.getBoundingClientRect();
+  const heightCap = citation.classList.contains('citation-tag--overview') ? 320 : 300;
+  const spaceAbove = Math.max(0, citationRect.top - boundary.top - 8);
+  const spaceBelow = Math.max(0, boundary.bottom - citationRect.bottom - 8);
+
+  popup.style.position = 'fixed';
+  popup.style.transform = 'none';
+  popup.style.maxWidth = Math.max(220, boundary.right - boundary.left) + 'px';
+  const desiredHeight = Math.min(popup.scrollHeight, heightCap);
+  const showBelow = desiredHeight > spaceAbove && spaceBelow > spaceAbove;
+  popup.style.maxHeight = Math.max(96, Math.min(heightCap, Math.floor(showBelow ? spaceBelow : spaceAbove))) + 'px';
+
+  const popupRect = popup.getBoundingClientRect();
+  const left = Math.min(Math.max(citationRect.left, boundary.left), boundary.right - popupRect.width);
+  const top = showBelow ? citationRect.bottom + 8 : citationRect.top - popupRect.height - 8;
+  popup.style.left = Math.round(Math.max(boundary.left, left)) + 'px';
+  popup.style.top = Math.round(Math.min(Math.max(top, boundary.top), boundary.bottom - popupRect.height)) + 'px';
+  popup.style.right = 'auto';
+  popup.style.bottom = 'auto';
+}
+
+function openCitation(citation) {
+  const popup = citation?.querySelector('.source-popup');
+  if (!popup) return;
+  const timer = citationCloseTimers.get(citation);
+  if (timer) {
+    window.clearTimeout(timer);
+    citationCloseTimers.delete(citation);
+  }
+  citation.classList.add('is-open');
+  citation.setAttribute('aria-expanded', 'true');
+  if (typeof popup.showPopover === 'function' && !isCitationPopoverOpen(popup)) {
+    try {
+      popup.showPopover();
+    } catch {
+      // Browsers without Popover API support use the existing positioned panel.
+    }
+  }
+  positionCitationPopup(citation);
+}
+
+function closeCitation(citation) {
+  const popup = citation?.querySelector('.source-popup');
+  citation.classList.remove('is-open');
+  citation.setAttribute('aria-expanded', 'false');
+  if (popup && typeof popup.hidePopover === 'function' && isCitationPopoverOpen(popup)) {
+    try {
+      popup.hidePopover();
+    } catch {
+      // The browser may already have dismissed the panel.
+    }
+  }
+}
+
 function closeCitations(except) {
   document.querySelectorAll('[data-citation].is-open').forEach((citation) => {
     if (citation === except) return;
-    citation.classList.remove('is-open');
-    citation.setAttribute('aria-expanded', 'false');
+    closeCitation(citation);
   });
 }
 
@@ -100,24 +178,34 @@ function handlePageClick(event) {
   if (citation && !event.target.closest('.source-popup')) {
     const shouldOpen = !citation.classList.contains('is-open');
     closeCitations();
-    if (shouldOpen) {
-      citation.classList.add('is-open');
-      citation.setAttribute('aria-expanded', 'true');
-    }
+    if (shouldOpen) openCitation(citation);
     return;
   }
   if (!event.target.closest('.source-popup')) closeCitations();
 }
 
+function handleCitationPointerOver(event) {
+  const citation = event.target.closest('[data-citation]');
+  if (citation) openCitation(citation);
+}
+
+function handleCitationFocusIn(event) {
+  const citation = event.target.closest('[data-citation]');
+  if (citation) openCitation(citation);
+}
+
 function handleCitationPointerOut(event) {
   const citation = event.target.closest('[data-citation]');
   if (!citation || citation.contains(event.relatedTarget)) return;
-  window.setTimeout(() => {
+  const existingTimer = citationCloseTimers.get(citation);
+  if (existingTimer) window.clearTimeout(existingTimer);
+  const timer = window.setTimeout(() => {
+    citationCloseTimers.delete(citation);
     if (citation.matches(':hover') || citation.contains(document.activeElement)) return;
-    citation.classList.remove('is-open');
-    citation.setAttribute('aria-expanded', 'false');
+    closeCitation(citation);
     citation.blur();
   }, 180);
+  citationCloseTimers.set(citation, timer);
 }
 
 onMounted(async () => {

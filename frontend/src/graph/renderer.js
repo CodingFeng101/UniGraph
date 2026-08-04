@@ -147,10 +147,12 @@ export const GraphRenderer = window.GraphRenderer = {
     } else {
       return {
         name: 'fcose',
-        quality: 'draft',
+        quality: nodeCount <= 400 ? 'default' : 'draft',
         randomize: true,
-        idealEdgeLength: 120,
-        nodeRepulsion: 7000,
+        idealEdgeLength: nodeCount <= 400 ? 220 : 190,
+        nodeRepulsion: nodeCount <= 400 ? 18000 : 15000,
+        componentSpacing: nodeCount <= 400 ? 200 : 160,
+        gravity: 0.08,
         avoidOverlap: true,
         animate: false,
         fit: true,

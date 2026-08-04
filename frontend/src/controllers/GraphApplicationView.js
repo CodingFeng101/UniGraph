@@ -595,6 +595,12 @@ async function streamAnswer(requestText, savedMessage, titlePromise) {
   var thinkingQueueTail = Promise.resolve();
   var answerRevealUnlocked = false;
   var pendingAnswer = '';
+  foregroundAskView = {
+    aiDiv: aiDiv,
+    chatUuid: taskChatUuid,
+    messageUuid: savedMessage?.message_uuid || null,
+    taskUid: null,
+  };
 
   function enqueueThinkingStep(step, unlockAnswer = false) {
     var interval = step.metrics?.retrieval ? 760 : 620;
@@ -672,6 +678,8 @@ async function streamAnswer(requestText, savedMessage, titlePromise) {
       },
     );
     askTaskUid = submitted.uid;
+    aiDiv.dataset.askTaskUid = askTaskUid;
+    if (foregroundAskView?.aiDiv === aiDiv) foregroundAskView.taskUid = askTaskUid;
     var result = await submitted.completion;
     pendingAnswer = result?.results || pendingAnswer || finalAnswer;
     finalSources = result?.context_data || {};
@@ -697,6 +705,7 @@ async function streamAnswer(requestText, savedMessage, titlePromise) {
     renderAskFailure(error.message || '请求失败');
   } finally {
     window.removeEventListener('unigraph:task-updated', handleAskTaskUpdate);
+    if (foregroundAskView?.aiDiv === aiDiv) foregroundAskView = null;
     isStreaming = false;
   }
 }
@@ -909,6 +918,7 @@ var knowledgeGraphList = [];
 var chatHistoryItems = [];
 var chatSortAscending = false;
 var isStreaming = false;
+var foregroundAskView = null;
 var resumedAskViews = new Map();
 var controllerDestroyed = false;
 var pendingAttachments = [];
@@ -1814,10 +1824,25 @@ function resumeActiveAskForCurrentChat() {
     .forEach(renderResumedAskTask);
 }
 
+function isForegroundAskTask(task) {
+  var view = foregroundAskView;
+  if (!view?.aiDiv?.isConnected) return false;
+  var taskData = task?.kwargs?.obj_data || {};
+  if (taskData.chat_library_uuid !== view.chatUuid) return false;
+  if (view.messageUuid && taskData.current_message_uuid !== view.messageUuid) return false;
+  if (view.taskUid && view.taskUid !== task.uid) return false;
+  if (!view.taskUid) {
+    view.taskUid = task.uid;
+    view.aiDiv.dataset.askTaskUid = task.uid;
+  }
+  return true;
+}
+
 function handleBackgroundAskTaskUpdate(event) {
   var task = event.detail?.task;
   var taskChatUuid = task?.kwargs?.obj_data?.chat_library_uuid;
   if (task?.name !== 'knowledge_graph.ask' || !taskChatUuid || taskChatUuid !== currentChatUuid) return;
+  if (isForegroundAskTask(task)) return;
   if (isRunningAskTask(task)) {
     renderResumedAskTask(task);
     return;

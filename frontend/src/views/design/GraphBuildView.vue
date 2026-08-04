@@ -55,6 +55,10 @@
         <button data-build-graph-style="minimal" type="button" @click="changeGraphStyle('minimal')" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;color:var(--claude-muted-foreground);border:none;">简约</button>
         <button data-build-graph-style="colorful" type="button" @click="changeGraphStyle('colorful')" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;color:var(--claude-muted-foreground);border:none;">多彩</button>
         <button data-build-graph-style="load" type="button" @click="changeGraphStyle('load')" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;color:var(--claude-muted-foreground);border:none;">负载</button>
+        <button id="load-expand-all-button" type="button" @click="expandLoadGraph()" class="hidden items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-[background-color,color,opacity,transform] duration-200 hover:opacity-80 active:scale-[0.98] disabled:cursor-default disabled:opacity-60 cursor-pointer" style="background:var(--claude-secondary);color:var(--claude-foreground);border:none;" aria-label="显示全部实体与关系" title="显示全部实体与关系">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          <span id="load-expand-all-label">全部展开</span>
+        </button>
       </div>
       <svg viewBox="0 0 960 600" width="100%" height="100%" style="font-family:var(--claude-font-sans);background:var(--claude-background);display:none;">
         <defs>
@@ -504,6 +508,9 @@ export default {
     },
     changeGraphStyle(...args) {
       return this.controller?.changeGraphStyle(...args);
+    },
+    expandLoadGraph(...args) {
+      return this.controller?.expandLoadGraph(...args);
     },
     selectRelationType(...args) {
       return this.controller?.selectRelationType(...args);

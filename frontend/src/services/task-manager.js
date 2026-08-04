@@ -15,6 +15,7 @@ export const TaskManager = window.TaskManager = (() => {
   let tasks = load();
   const expandedTasks = new Set();
   const renderedStepCounts = new Map();
+  const timelineScrollStates = new Map();
 
   function storageKey() {
     const userUuid = Auth.getUserInfo()?.uuid || 'anonymous';
@@ -126,7 +127,7 @@ export const TaskManager = window.TaskManager = (() => {
   function stateColor(state) {
     if (state === 'SUCCESS') return 'var(--claude-success-500)';
     if (['FAILURE', 'REVOKE', 'REVOKED'].includes(state)) return 'var(--claude-destructive)';
-    return 'var(--claude-brand-500)';
+    return 'var(--task-running-color, #3b82f6)';
   }
 
   function formatTaskTime(value) {
@@ -179,7 +180,7 @@ export const TaskManager = window.TaskManager = (() => {
     const fabBadge = document.querySelector('[data-task-fab-count]');
     const fab = document.getElementById('task-fab-wrapper');
     if (fab) {
-      const palette = ['#b7d8bf', '#91cda3', '#69bb89', '#48a973', '#2f915e', '#21764c', '#185f3d'];
+      const palette = ['#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8', '#1e40af'];
       const level = Math.min(running.length, palette.length - 1);
       const duration = Math.max(1.25, 3.4 - running.length * 0.34);
       fab.style.setProperty('--task-orb-color', palette[level]);
@@ -199,6 +200,15 @@ export const TaskManager = window.TaskManager = (() => {
     }
 
     const previousScrollTop = container.scrollTop;
+    container.querySelectorAll('.task-card').forEach((card) => {
+      const timeline = card.querySelector('.task-detail:not(.hidden) .task-timeline');
+      if (!timeline) return;
+      const distanceFromBottom = timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop;
+      timelineScrollStates.set(card.dataset.taskId, {
+        scrollTop: timeline.scrollTop,
+        followLatest: distanceFromBottom <= 24,
+      });
+    });
     container.innerHTML = visibleTasks.slice().reverse().map((task) => {
       const progress = Math.max(0, Math.min(100, Number(task.progress) || 0));
       const canCancel = ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state);
@@ -252,7 +262,19 @@ export const TaskManager = window.TaskManager = (() => {
     requestAnimationFrame(() => {
       container.scrollTop = previousScrollTop;
       container.querySelectorAll('.task-detail:not(.hidden) .task-timeline').forEach((timeline) => {
-        timeline.scrollTop = timeline.scrollHeight;
+        const taskId = timeline.closest('.task-card')?.dataset.taskId;
+        const saved = timelineScrollStates.get(taskId);
+        const maxScrollTop = Math.max(0, timeline.scrollHeight - timeline.clientHeight);
+        timeline.scrollTop = !saved || saved.followLatest
+          ? maxScrollTop
+          : Math.min(saved.scrollTop, maxScrollTop);
+        timeline.addEventListener('scroll', () => {
+          const distanceFromBottom = timeline.scrollHeight - timeline.clientHeight - timeline.scrollTop;
+          timelineScrollStates.set(taskId, {
+            scrollTop: timeline.scrollTop,
+            followLatest: distanceFromBottom <= 24,
+          });
+        }, { passive: true });
       });
     });
   }
@@ -283,7 +305,13 @@ export const TaskManager = window.TaskManager = (() => {
         const container = card.closest('[data-task-list]');
         if (!container) return;
         const timeline = card.querySelector('.task-timeline');
-        if (timeline) timeline.scrollTop = timeline.scrollHeight;
+        if (timeline) {
+          timeline.scrollTop = timeline.scrollHeight;
+          timelineScrollStates.set(card.dataset.taskId, {
+            scrollTop: timeline.scrollTop,
+            followLatest: true,
+          });
+        }
         const target = card.offsetTop + card.offsetHeight - container.clientHeight;
         container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
       });
@@ -450,6 +478,7 @@ export const TaskManager = window.TaskManager = (() => {
     const wasExpanded = expandedTasks.delete(uid);
     completionById.delete(uid);
     renderedStepCounts.delete(uid);
+    timelineScrollStates.delete(uid);
 
     task.uid = newUid;
     task.state = 'PENDING';
@@ -490,6 +519,8 @@ export const TaskManager = window.TaskManager = (() => {
     if (['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)) await cancel(uid);
     tasks = tasks.filter((item) => item.uid !== uid);
     expandedTasks.delete(uid);
+    renderedStepCounts.delete(uid);
+    timelineScrollStates.delete(uid);
     persistAndRender();
   }
 
