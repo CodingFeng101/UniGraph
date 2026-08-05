@@ -16,23 +16,23 @@
   <nav class="px-3 pt-1 pb-2 space-y-0">
     <a href="/unigraph/workspace" data-title="图知识库列表" class="sidebar-nav-item flex items-center justify-center gap-2.5 px-3 py-[7px] rounded-lg transition-colors" style="background:var(--claude-accent);color:var(--claude-foreground);text-decoration:none;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="shrink-0"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <span class="sidebar-text flex-1 text-left">图知识库列表</span>
+      <span class="sidebar-text flex-1 text-left">{{ $t('nav.knowledgeBases') }}</span>
     </a>
     <a id="workspace-info-link" href="/unigraph/workspace" data-title="信息" class="sidebar-nav-item flex items-center justify-center gap-2.5 px-3 py-[7px] rounded-lg transition-colors" style="color:var(--claude-muted-foreground);text-decoration:none;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-      <span class="sidebar-text flex-1 text-left">信息</span>
+      <span class="sidebar-text flex-1 text-left">{{ $t('nav.info') }}</span>
     </a>
     <a id="workspace-design-link" href="/unigraph/workspace" data-title="设计" class="sidebar-nav-item flex items-center justify-center gap-2.5 px-3 py-[7px] rounded-lg transition-colors" style="color:var(--claude-muted-foreground);text-decoration:none;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="shrink-0"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/><line x1="8" y1="19" x2="16" y2="19"/></svg>
-      <span class="sidebar-text flex-1 text-left">设计</span>
+      <span class="sidebar-text flex-1 text-left">{{ $t('nav.design') }}</span>
     </a>
     <a id="workspace-build-link" href="/unigraph/workspace" data-title="构建" class="sidebar-nav-item flex items-center justify-center gap-2.5 px-3 py-[7px] rounded-lg transition-colors" style="color:var(--claude-muted-foreground);text-decoration:none;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="shrink-0"><polygon points="12,2 22,20 2,20"/></svg>
-      <span class="sidebar-text flex-1 text-left">构建</span>
+      <span class="sidebar-text flex-1 text-left">{{ $t('nav.build') }}</span>
     </a>
     <a id="workspace-app-link" href="/unigraph/workspace" data-title="新建对话" @click="handleNewChat" class="sidebar-nav-item flex items-center justify-center gap-2.5 px-3 py-[7px] rounded-lg transition-colors hover:bg-[var(--claude-secondary)]" style="color:var(--claude-muted-foreground);text-decoration:none;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="shrink-0"><circle cx="12" cy="12" r="10" fill="var(--claude-muted)" stroke="none"/><line x1="12" y1="7" x2="12" y2="17" stroke="white" stroke-width="2.5"/><line x1="7" y1="12" x2="17" y2="12" stroke="white" stroke-width="2.5"/></svg>
-      <span class="sidebar-text flex-1 text-left">新建对话</span>
+      <span class="sidebar-text flex-1 text-left">{{ $t('nav.newChat') }}</span>
     </a>
   </nav>
 
@@ -181,45 +181,45 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--claude-muted-foreground);flex-shrink:0;" class="sidebar-collapsed-hide"><polyline points="6 9 12 15 18 9"/></svg>
     </button>
     <div id="user-dropdown" class="hidden absolute bottom-full left-3 w-[236px] mb-2 rounded-xl overflow-visible z-50" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
-      <div class="px-4 py-3" style="border-bottom:1px solid var(--claude-border);"><p class="text-xs truncate" style="color:var(--claude-muted-foreground);">{{ userInfo.email || '未设置邮箱' }}</p></div>
+      <div class="px-4 py-3" style="border-bottom:1px solid var(--claude-border);"><p class="text-xs truncate" style="color:var(--claude-muted-foreground);">{{ userInfo.email || $t('settings.emailUnset') }}</p></div>
       <div class="py-1">
         <a href="/unigraph/usercenter" class="user-menu-item flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" style="color:var(--claude-foreground);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          个人中心
+          {{ $t('nav.profile') }}
         </a>
         <a href="/unigraph/tutorial" class="user-menu-item flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" style="color:var(--claude-foreground);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-          视频教程
+          {{ $t('nav.tutorials') }}
         </a>
         <a href="/unigraph/docs" class="user-menu-item flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" style="color:var(--claude-foreground);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          技术文档
+          {{ $t('nav.docs') }}
         </a>
         <div style="border-top:1px solid var(--claude-border);margin:4px 0;"></div>
         <a href="/unigraph/settings" class="user-menu-item flex items-center gap-3 px-4 py-2.5 text-sm transition-colors" style="color:var(--claude-foreground);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          设置
+          {{ $t('nav.settings') }}
         </a>
         <div class="relative" @mouseenter="openThemeSubmenu()" @mouseleave="closeThemeSubmenu()">
           <button type="button" @click="toggleThemeSubmenu()" class="user-menu-item w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
             <span class="flex items-center gap-3">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-              主题
+              {{ $t('settings.theme') }}
             </span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--claude-muted-foreground);"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
           <div id="theme-submenu" class="hidden absolute left-full bottom-0 ml-1 rounded-xl overflow-hidden z-50 p-1" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);min-width:150px;">
             <button type="button" @click="setTheme('light')" class="claude-menu-item w-full flex items-center gap-2 px-3.5 py-2 text-sm rounded-lg transition-colors cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
               <svg data-theme-check="light" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              <span>亮色</span>
+              <span>{{ $t('settings.light') }}</span>
             </button>
             <button type="button" @click="setTheme('dark')" class="claude-menu-item w-full flex items-center gap-2 px-3.5 py-2 text-sm rounded-lg transition-colors cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
               <svg data-theme-check="dark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              <span>暗色</span>
+              <span>{{ $t('settings.dark') }}</span>
             </button>
             <button type="button" @click="setTheme('system')" class="claude-menu-item w-full flex items-center gap-2 px-3.5 py-2 text-sm rounded-lg transition-colors cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
               <svg data-theme-check="system" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              <span>跟随系统</span>
+              <span>{{ $t('settings.system') }}</span>
             </button>
           </div>
         </div>
@@ -227,25 +227,25 @@
           <button type="button" @click="toggleLangSubmenu()" class="user-menu-item w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
             <span class="flex items-center gap-3">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              语言
+              {{ $t('settings.language') }}
             </span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--claude-muted-foreground);"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
           <div id="lang-submenu" class="hidden absolute left-full top-0 ml-1 rounded-xl overflow-hidden z-50 p-1" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);min-width:150px;">
             <button type="button" @click="setLang('zh')" class="claude-menu-item w-full flex items-center gap-2 px-3.5 py-2 text-sm rounded-lg transition-colors cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
               <svg data-lang-check="zh" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              中文
+              {{ $t('settings.chinese') }}
             </button>
             <button type="button" @click="setLang('en')" class="claude-menu-item w-full flex items-center gap-2 px-3.5 py-2 text-sm rounded-lg transition-colors cursor-pointer" style="background:none;border:none;color:var(--claude-foreground);">
               <svg data-lang-check="en" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              English
+              {{ $t('settings.english') }}
             </button>
           </div>
         </div>
         <div style="border-top:1px solid var(--claude-border);margin:4px 0;"></div>
         <button type="button" @click="handleLogout" class="user-menu-item w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer" style="background:transparent;border:none;color:var(--claude-destructive);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          退出登录
+          {{ $t('nav.logout') }}
         </button>
       </div>
     </div>
@@ -257,6 +257,9 @@
 import { Auth } from '@/api/runtime/auth';
 import { KgBaseAPI } from '@/api';
 import { resolveImageUrl } from '@/utils/image-url';
+import { mapState } from 'pinia';
+import { useUserStore } from '@/stores/user';
+import { setLocale } from '@/services/i18n';
 
 export default {
   name: 'AppSidebar',
@@ -265,7 +268,6 @@ export default {
   },
   data() {
     return {
-      userInfo: Auth.getUserInfo() || {},
       avatarImageLoaded: false,
       avatarRetryCount: 0,
       avatarRevision: Date.now(),
@@ -274,6 +276,9 @@ export default {
     };
   },
   computed: {
+    ...mapState(useUserStore, {
+      userInfo: (store) => store.profile || {},
+    }),
     userName() {
       return this.userInfo.nickname || this.userInfo.username || '用户';
     },
@@ -281,7 +286,7 @@ export default {
       return this.userName.slice(0, 2).toUpperCase();
     },
     userRole() {
-      return this.userInfo.is_superuser ? '管理员' : '用户';
+      return this.userInfo.is_superuser ? this.$t('settings.administrator') : this.$t('settings.user');
     },
     avatarSrc() {
       const path = this.userInfo.avatar;
@@ -291,6 +296,14 @@ export default {
       const url = new URL(resolved);
       url.searchParams.set('avatar_v', String(this.avatarRevision));
       return url.href;
+    },
+  },
+  watch: {
+    'userInfo.avatar'(nextAvatar, previousAvatar) {
+      if (nextAvatar === previousAvatar) return;
+      this.avatarImageLoaded = false;
+      this.avatarRetryCount = 0;
+      this.avatarRevision = Date.now();
     },
   },
   async mounted() {
@@ -307,15 +320,11 @@ export default {
       if (!this.defaultKnowledgeBaseUuid) await this.resolveDefaultKnowledgeBase();
     }
     window.TaskManager?.render();
-    window.addEventListener('unigraph:user-updated', this.syncUserInfo);
     window.addEventListener('unigraph:knowledge-base-default', this.handleDefaultKnowledgeBase);
-    window.addEventListener('storage', this.handleUserStorage);
     this.refreshUserInfo();
   },
   beforeUnmount() {
-    window.removeEventListener('unigraph:user-updated', this.syncUserInfo);
     window.removeEventListener('unigraph:knowledge-base-default', this.handleDefaultKnowledgeBase);
-    window.removeEventListener('storage', this.handleUserStorage);
     if (this.avatarRetryTimer) window.clearTimeout(this.avatarRetryTimer);
   },
   updated() {
@@ -330,21 +339,6 @@ export default {
         }
       } catch {
         // Keep the cached user when the profile endpoint is temporarily unavailable.
-      }
-    },
-    syncUserInfo(event) {
-      const nextUser = event.detail || Auth.getUserInfo() || {};
-      const mergedUser = {
-        ...this.userInfo,
-        ...nextUser,
-        avatar: nextUser.avatar || this.userInfo.avatar || null,
-      };
-      const avatarChanged = mergedUser.avatar !== this.userInfo.avatar;
-      this.userInfo = mergedUser;
-      if (avatarChanged) {
-        this.avatarImageLoaded = false;
-        this.avatarRetryCount = 0;
-        this.avatarRevision = Date.now();
       }
     },
     handleAvatarLoad() {
@@ -365,9 +359,6 @@ export default {
         this.avatarRetryTimer = null;
       }, Math.min(5000, 500 * this.avatarRetryCount));
     },
-    handleUserStorage(event) {
-      if (event.key === 'user') this.syncUserInfo({ detail: Auth.getUserInfo() });
-    },
     handleDefaultKnowledgeBase(event) {
       this.defaultKnowledgeBaseUuid = event.detail?.uuid || '';
       this.$nextTick(this.updateNavigation);
@@ -380,6 +371,7 @@ export default {
       event.preventDefault();
       if (this.$route.name === 'graph-application' && typeof window.newConversation === 'function') {
         window.newConversation();
+        window.ChatSidebar?.render();
         return;
       }
       const uuid = this.$route.params.uuid || this.defaultKnowledgeBaseUuid || await this.resolveDefaultKnowledgeBase();
@@ -388,6 +380,9 @@ export default {
         return;
       }
       await this.$router.push(`/unigraphs/${uuid}/qa`);
+      await this.$nextTick();
+      await window.ChatSidebar?.load();
+      window.ChatSidebar?.render();
     },
     async resolveDefaultKnowledgeBase() {
       try {
@@ -450,14 +445,13 @@ export default {
     setLang(lang, notify = true) {
       const names = { zh: '中文', en: 'English' };
       if (!names[lang]) return;
-      localStorage.setItem('unigraph-language', lang);
+      setLocale(lang);
       document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
       document.documentElement.dataset.language = lang;
       document.querySelectorAll('[data-lang-check]').forEach((icon) => {
         icon.style.visibility = icon.dataset.langCheck === lang ? 'visible' : 'hidden';
       });
       document.getElementById('lang-submenu')?.classList.add('hidden');
-      window.dispatchEvent(new CustomEvent('unigraph:language-change', { detail: { lang } }));
       if (notify) this.showToast(lang === 'zh' ? `语言已切换为：${names[lang]}` : 'Language changed to English');
     },
     setTheme(theme, notify = true) {

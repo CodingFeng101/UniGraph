@@ -83,7 +83,7 @@ export default {
     },
   },
   mounted() {
-    const saved = JSON.parse(localStorage.getItem('unigraph-task-fab-position') || 'null');
+    const saved = JSON.parse(localStorage.getItem('unigraph-task-fab-position-v2') || 'null');
     this.position = saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)
       ? this.clampPosition(saved.x, saved.y)
       : this.clampPosition(window.innerWidth - 40, window.innerHeight - 76);
@@ -172,7 +172,7 @@ export default {
       window.removeEventListener('pointermove', this.drag);
       const dockLeft = this.position.x + 24 < window.innerWidth / 2;
       this.position.x = dockLeft ? -12 : window.innerWidth - 40;
-      localStorage.setItem('unigraph-task-fab-position', JSON.stringify(this.position));
+      localStorage.setItem('unigraph-task-fab-position-v2', JSON.stringify(this.position));
     },
     handleResize() {
       this.position = this.clampPosition(this.position.x, this.position.y);

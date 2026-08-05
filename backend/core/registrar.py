@@ -10,12 +10,13 @@ from fastapi_pagination import add_pagination
 from starlette.middleware.authentication import AuthenticationMiddleware
 
 from backend.app.router import route
+from backend.common.clients import openai_client_registry
 from backend.common.exception.exception_handler import register_exception
 from backend.common.log import set_customize_logfile, setup_logging
 from backend.core.conf import settings
 from backend.core.path_conf import FILES_DIR, STATIC_DIR
-from backend.database.db_mysql import create_table
 from backend.database.db_redis import redis_client
+from backend.database.schema_version import ensure_database_schema_current
 from backend.middleware.jwt_auth_middleware import JwtAuthMiddleware
 from backend.middleware.opera_log_middleware import OperaLogMiddleware
 from backend.middleware.state_middleware import StateMiddleware
@@ -33,12 +34,13 @@ async def register_init(app: FastAPI):
     :return:
     """
 
-    await create_table()
+    await ensure_database_schema_current()
     # 连接 redis
     await redis_client.open()
     await FastAPILimiter.init(redis_client, prefix=settings.REQUEST_LIMITER_REDIS_PREFIX)
     yield
 
+    await openai_client_registry.close_all()
     # 关闭 redis 连接
     await redis_client.close()
 

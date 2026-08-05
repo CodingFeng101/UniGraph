@@ -40,6 +40,6 @@ class KgBase(Base):
 
     chat_library: Mapped[list['ChatLibrary']] = relationship(
         'ChatLibrary',
-        cascade='all, delete-orphan',
+        passive_deletes=True,
         init=False,
     )

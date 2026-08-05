@@ -1,10 +1,11 @@
 import { Auth } from '@/api/runtime/auth';
 import { KgBaseAPI } from '@/api';
 import { displayChatName } from '@/utils/chat-name';
+import { pinia } from '@/stores';
+import { useChatStore } from '@/stores/chat';
 
 export const ChatSidebar = window.ChatSidebar = (() => {
-  let items = [];
-  let sortAscending = false;
+  const chatStore = useChatStore(pinia);
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -17,7 +18,10 @@ export const ChatSidebar = window.ChatSidebar = (() => {
   }
 
   function hrefFor(item) {
-    return `/unigraph/unigraphs/${encodeURIComponent(item.kg_base_uuid)}/qa?chat=${encodeURIComponent(item.uuid)}`;
+    const baseUuid = item.kg_base_uuid || item.navigation_base_uuid;
+    return baseUuid
+      ? `/unigraph/unigraphs/${encodeURIComponent(baseUuid)}/qa?chat=${encodeURIComponent(item.uuid)}`
+      : '#';
   }
 
   function row(item) {
@@ -25,7 +29,7 @@ export const ChatSidebar = window.ChatSidebar = (() => {
     const name = displayChatName(item.name);
     return `
       <div class="group relative px-3 py-2 rounded-lg transition-colors hover:bg-[var(--claude-accent)]"${active ? ' style="background:var(--claude-accent);"' : ''}>
-        <a href="${hrefFor(item)}" class="block" style="text-decoration:none;">
+        <a href="${hrefFor(item)}" data-chat-link data-chat-uuid="${escapeHtml(item.uuid)}" class="block" style="text-decoration:none;">
           <p class="text-[15px] leading-[22px] font-normal truncate pr-7" style="color:var(--claude-foreground);">${escapeHtml(name)}</p>
         </a>
         <button type="button" onclick="event.stopPropagation();ChatSidebar.toggleMenu(this)" class="absolute right-2 top-1.5 flex w-6 h-6 items-center justify-center rounded-md claude-menu-item opacity-55 group-hover:opacity-100 transition-opacity" style="background:transparent;border:none;color:var(--claude-muted-foreground);font-size:18px;line-height:1;" aria-label="对话菜单">⋮</button>
@@ -40,10 +44,10 @@ export const ChatSidebar = window.ChatSidebar = (() => {
   function render() {
     const container = document.querySelector('#app-sidebar .sidebar-content .space-y-0\\.5');
     if (!container) return;
-    const sorted = items.slice().sort((a, b) => {
+    const sorted = chatStore.items.slice().sort((a, b) => {
       const left = new Date(a.updated_time || a.created_time || 0);
       const right = new Date(b.updated_time || b.created_time || 0);
-      return sortAscending ? left - right : right - left;
+      return chatStore.sortAscending ? left - right : right - left;
     });
     const starred = sorted.filter((item) => item.is_favorite);
     const recent = sorted.filter((item) => !item.is_favorite);
@@ -52,15 +56,33 @@ export const ChatSidebar = window.ChatSidebar = (() => {
       ? `${starred.length ? `<div class="px-3 pt-1 pb-1 text-[13px] font-normal" style="color:var(--claude-muted-foreground);">Starred</div>${starred.map(row).join('')}` : ''}
          ${recentHeading}${recent.map(row).join('')}`
       : '<div class="px-3 py-2 text-[12px]" style="color:var(--claude-muted-foreground);">暂无历史对话</div>';
+    bindChatLinks(container);
     renderSearch(sorted);
+  }
+
+  function bindChatLinks(container) {
+    const routeMatch = location.pathname.match(/^\/unigraph\/unigraphs\/([^/]+)\/qa\/?$/);
+    if (!routeMatch || typeof window.switchChat !== 'function') return;
+    const currentBaseUuid = decodeURIComponent(routeMatch[1]);
+    container.querySelectorAll('[data-chat-link]').forEach((link) => {
+      const item = chatStore.items.find((entry) => entry.uuid === link.dataset.chatUuid);
+      const targetBaseUuid = item?.kg_base_uuid || item?.navigation_base_uuid;
+      if (!item || targetBaseUuid !== currentBaseUuid) return;
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        window.switchChat(item.uuid, displayChatName(item.name));
+        document.getElementById('search-modal')?.classList.add('hidden');
+      });
+    });
   }
 
   function renderSearch(list) {
     const container = document.querySelector('#search-modal .max-h-\\[50vh\\]');
     if (!container) return;
     container.innerHTML = list.length
-      ? `<div class="px-2 py-2">${list.map((item) => `<a href="${hrefFor(item)}" class="chat-search-item block px-3 py-2.5 rounded-lg claude-menu-item text-sm" style="color:var(--claude-foreground);">${escapeHtml(displayChatName(item.name))}</a>`).join('')}</div>`
+      ? `<div class="px-2 py-2">${list.map((item) => `<a href="${hrefFor(item)}" data-chat-link data-chat-uuid="${escapeHtml(item.uuid)}" class="chat-search-item block px-3 py-2.5 rounded-lg claude-menu-item text-sm" style="color:var(--claude-foreground);">${escapeHtml(displayChatName(item.name))}</a>`).join('')}</div>`
       : '<div class="px-4 py-8 text-center text-sm" style="color:var(--claude-muted-foreground);">暂无历史对话</div>';
+    bindChatLinks(container);
   }
 
   function filterSearch(query) {
@@ -88,23 +110,25 @@ export const ChatSidebar = window.ChatSidebar = (() => {
   async function load() {
     if (!Auth.isLogin()) return;
     try {
-      const basesResponse = await KgBaseAPI.kgBase.getAll();
+      const [basesResponse, chatsResponse] = await Promise.all([
+        KgBaseAPI.kgBase.getAll(),
+        KgBaseAPI.chatLibrary.getAllForUser(),
+      ]);
       if (basesResponse.code !== 200) throw new Error(basesResponse.msg || '加载知识库失败');
+      if (chatsResponse.code !== 200) throw new Error(chatsResponse.msg || '加载历史对话失败');
       const bases = Array.isArray(basesResponse.data) ? basesResponse.data : [];
+      const fallbackBaseUuid = bases[0]?.uuid || null;
+      const chats = Array.isArray(chatsResponse.data)
+        ? chatsResponse.data.map((item) => ({ ...item, navigation_base_uuid: fallbackBaseUuid }))
+        : [];
       const baseContexts = await Promise.all(bases.map(async (base) => {
         try {
-          const [chatResponse, graphResponse] = await Promise.all([
-            KgBaseAPI.chatLibrary.getAll(base.uuid),
-            KgBaseAPI.knowledgeGraph.getAll(base.uuid),
-          ]);
-          const chats = chatResponse.code === 200 && Array.isArray(chatResponse.data)
-            ? chatResponse.data.map((item) => ({ ...item, kg_base_uuid: base.uuid }))
-            : [];
+          const graphResponse = await KgBaseAPI.knowledgeGraph.getAll(base.uuid);
           const hasIndex = graphResponse.code === 200 && Array.isArray(graphResponse.data)
             && graphResponse.data.some((graph) => Number(graph.index_status) === 1);
-          return { base, chats, hasIndex };
+          return { base, hasIndex };
         } catch {
-          return { base, chats: [], hasIndex: false };
+          return { base, hasIndex: false };
         }
       }));
       if (bases.length && !location.pathname.includes('/unigraphs/')) {
@@ -118,7 +142,7 @@ export const ChatSidebar = window.ChatSidebar = (() => {
           }));
         }
       }
-      items = baseContexts.flatMap((context) => context.chats);
+      chatStore.replaceItems(chats);
       await hydrateUser();
       const searchInput = document.getElementById('search-input');
       if (searchInput) searchInput.oninput = () => filterSearch(searchInput.value);
@@ -136,12 +160,12 @@ export const ChatSidebar = window.ChatSidebar = (() => {
   }
 
   function toggleSort() {
-    sortAscending = !sortAscending;
+    chatStore.sortAscending = !chatStore.sortAscending;
     render();
   }
 
   async function rename(uuid) {
-    const item = items.find((entry) => entry.uuid === uuid);
+    const item = chatStore.items.find((entry) => entry.uuid === uuid);
     if (!item) return;
     const name = window.prompt('请输入新的对话名称', item.name || '');
     if (!name || name === item.name) return;
@@ -160,13 +184,13 @@ export const ChatSidebar = window.ChatSidebar = (() => {
   async function favorite(uuid, isFavorite) {
     const response = await KgBaseAPI.chatLibrary.setFavorite(uuid, isFavorite);
     if (response.code !== 200) return notify(response.msg || '收藏失败');
-    const item = items.find((entry) => entry.uuid === uuid);
+    const item = chatStore.items.find((entry) => entry.uuid === uuid);
     if (item) item.is_favorite = isFavorite;
     render();
   }
 
   async function remove(uuid) {
-    const item = items.find((entry) => entry.uuid === uuid);
+    const item = chatStore.items.find((entry) => entry.uuid === uuid);
     if (typeof window.confirmAction !== 'function') {
       notify('确认组件未就绪，请稍后重试');
       return;
@@ -182,8 +206,9 @@ export const ChatSidebar = window.ChatSidebar = (() => {
     if (!confirmed) return;
     const response = await KgBaseAPI.chatLibrary.delete(uuid);
     if (response.code !== 200) return notify(response.msg || '删除失败');
-    items = items.filter((item) => item.uuid !== uuid);
+    chatStore.removeItem(uuid);
     render();
+    window.dispatchEvent(new CustomEvent('unigraph:chat-deleted', { detail: { uuid } }));
   }
 
   document.addEventListener('DOMContentLoaded', load);

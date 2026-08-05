@@ -168,13 +168,12 @@ class ChatContextService:
         current_message_uuid: str | None,
         user_uuid: str,
     ) -> tuple[dict[str, Any], list[ChatMessage]]:
-        from backend.app.kgbase.model.kg_base import KgBase
-
         async with async_db_session() as db:
             library_result = await db.execute(
-                select(ChatLibrary)
-                .join(KgBase, ChatLibrary.kg_base_uuid == KgBase.uuid)
-                .where(ChatLibrary.uuid == chat_library_uuid, KgBase.user_uuid == user_uuid)
+                select(ChatLibrary).where(
+                    ChatLibrary.uuid == chat_library_uuid,
+                    ChatLibrary.user_uuid == user_uuid,
+                )
             )
             library = library_result.scalars().first()
             if not library:
@@ -207,13 +206,13 @@ class ChatContextService:
         summary: str,
         summarized_through_sequence: int,
     ) -> None:
-        from backend.app.kgbase.model.kg_base import KgBase
-
         async with async_db_session.begin() as db:
             result = await db.execute(
                 select(ChatLibrary)
-                .join(KgBase, ChatLibrary.kg_base_uuid == KgBase.uuid)
-                .where(ChatLibrary.uuid == chat_library_uuid, KgBase.user_uuid == user_uuid)
+                .where(
+                    ChatLibrary.uuid == chat_library_uuid,
+                    ChatLibrary.user_uuid == user_uuid,
+                )
                 .with_for_update()
             )
             library = result.scalars().first()

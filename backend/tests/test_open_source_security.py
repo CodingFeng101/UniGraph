@@ -8,6 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SKIPPED_DIRS = {
     '.git',
     '.cache',
+    '.venv',
     '.run-venv.local',
     'node_modules',
     'dist',
@@ -49,6 +50,8 @@ def dependency_names(decorator: ast.Call) -> set[str]:
 
 class OpenSourceSecurityTests(unittest.TestCase):
     def test_sensitive_runtime_files_are_not_tracked(self):
+        if not (REPO_ROOT / '.git').exists():
+            self.skipTest('Git metadata is unavailable in this source archive')
         sensitive_paths = [
             'backend/.env',
             'backend/.env.dev',

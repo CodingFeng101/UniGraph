@@ -1,5 +1,5 @@
 [Unit]
-Description=UniGraph Celery worker
+Description=UniGraph default Celery worker
 After=network-online.target mysql.service redis-server.service unigraph-backend.service
 Wants=network-online.target
 
@@ -9,7 +9,7 @@ User=unigraph
 Group=unigraph
 WorkingDirectory=/opt/unigraph
 EnvironmentFile=/etc/unigraph/unigraph.env
-ExecStart=/opt/unigraph/.venv/bin/celery -A backend.app.task.celery:celery_app worker --loglevel=info
+ExecStart=/opt/unigraph/.venv/bin/celery -A backend.app.task.celery:celery_app worker --queues=default --concurrency=${CELERY_DEFAULT_CONCURRENCY} --loglevel=info
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=60

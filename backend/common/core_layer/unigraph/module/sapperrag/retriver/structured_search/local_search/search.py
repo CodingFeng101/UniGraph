@@ -90,7 +90,13 @@ class LocalSearch(BaseSearch):
         answer_context = (
             conversation_context.get('knowledge_context', context_text) if conversation_context else context_text
         )
-        search_prompt = self.system_prompt.format(context_data=answer_context, query=query, response_type='plain')
+        question_context = conversation_context.get('question_context', '') if conversation_context else ''
+        answer_query = f'{query}{question_context}'
+        search_prompt = self.system_prompt.format(
+            context_data=answer_context,
+            query=answer_query,
+            response_type='plain',
+        )
         response_kwargs = {'api_key': api_key, 'base_url': base_url, 'model': model}
         if conversation_context:
             messages = [{'role': 'system', 'content': '你是知识图谱领域专家。'}]

@@ -25,7 +25,16 @@ class TaskSettings(BaseSettings):
     CELERY_BACKEND_REDIS_PREFIX: str = 'fba:celery'
     CELERY_BACKEND_REDIS_TIMEOUT: float = 5.0
     CELERY_TASK_OWNER_TTL_SECONDS: int = 7 * 24 * 60 * 60
+    CELERY_TASK_SUBMISSION_GRACE_SECONDS: int = 5 * 60
     CELERY_WORKER_CONCURRENCY: int = 4
+    CELERY_DEFAULT_QUEUE: str = 'default'
+    CELERY_QA_QUEUE: str = 'qa'
+    CELERY_INDEXING_QUEUE: str = 'indexing'
+    CELERY_MIGRATION_QUEUE: str = 'migration'
+    CELERY_DEFAULT_CONCURRENCY: int = 4
+    CELERY_QA_CONCURRENCY: int = 8
+    CELERY_INDEXING_CONCURRENCY: int = 2
+    CELERY_MIGRATION_CONCURRENCY: int = 2
 
     # 这里需要添加新增的包路径
     CELERY_TASKS_PACKAGES: list[str] = [

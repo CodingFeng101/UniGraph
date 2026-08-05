@@ -1,7 +1,45 @@
 import DOMPurify from 'dompurify';
+import hljs from 'highlight.js/lib/core';
+import bash from 'highlight.js/lib/languages/bash';
+import css from 'highlight.js/lib/languages/css';
+import javascript from 'highlight.js/lib/languages/javascript';
+import json from 'highlight.js/lib/languages/json';
+import python from 'highlight.js/lib/languages/python';
+import sql from 'highlight.js/lib/languages/sql';
+import typescript from 'highlight.js/lib/languages/typescript';
+import xml from 'highlight.js/lib/languages/xml';
+import yaml from 'highlight.js/lib/languages/yaml';
 import MarkdownIt from 'markdown-it';
 
-const markdown = new MarkdownIt({ breaks: true, linkify: true });
+[
+  ['bash', bash], ['css', css], ['javascript', javascript], ['json', json],
+  ['python', python], ['sql', sql], ['typescript', typescript], ['xml', xml], ['yaml', yaml],
+].forEach(([name, language]) => hljs.registerLanguage(name, language));
+
+const languageAliases = {
+  html: 'xml', js: 'javascript', jsx: 'javascript', shell: 'bash', sh: 'bash',
+  ts: 'typescript', tsx: 'typescript', yml: 'yaml',
+};
+
+const markdown = new MarkdownIt({
+  breaks: true,
+  linkify: true,
+  highlight(code, language) {
+    if (String(language || '').trim().toLowerCase() === 'mermaid') {
+      return `<pre class="chat-mermaid" data-mermaid-source="${escapeHtml(encodeURIComponent(code))}"></pre>`;
+    }
+    try {
+      const normalizedLanguage = languageAliases[String(language || '').toLowerCase()] || String(language || '').toLowerCase();
+      const result = normalizedLanguage && hljs.getLanguage(normalizedLanguage)
+        ? hljs.highlight(code, { language: normalizedLanguage, ignoreIllegals: true })
+        : { value: escapeHtml(code) };
+      const languageClass = normalizedLanguage ? ` language-${escapeHtml(normalizedLanguage)}` : '';
+      return `<pre class="chat-code-block"><code class="hljs${languageClass}">${result.value}</code></pre>`;
+    } catch {
+      return `<pre class="chat-code-block"><code>${escapeHtml(code)}</code></pre>`;
+    }
+  },
+});
 
 const sourceLabels = {
   Reports: '整体知识概览',
@@ -84,6 +122,27 @@ function findSourceRecord(sources, type, recordId) {
   return sourceRecords(sources[type]).find((record) => String(record?.id ?? '').trim() === normalizedId);
 }
 
+function entityAttributeFields(value) {
+  const parsed = parseSourceContent(value);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return Object.entries(parsed)
+      .filter(([key]) => !['id', 'name', 'entity_name', 'entity_type'].includes(String(key).toLowerCase()))
+      .map(([key, fieldValue]) => [key, fieldValue == null || fieldValue === 'None' ? '—' : fieldValue]);
+  }
+
+  const text = String(parsed || '').trim();
+  if (!text) return [];
+  const matches = Array.from(text.matchAll(/(?:^|\s)([\p{L}\p{N}_/·-]+)\s*[:：]\s*/gu));
+  if (!matches.length) return [['知识属性', text]];
+  return matches.map((match, index) => {
+    const key = match[1];
+    const start = match.index + match[0].length;
+    const end = index + 1 < matches.length ? matches[index + 1].index : text.length;
+    const fieldValue = text.slice(start, end).trim().replace(/[;；]+$/, '').trim();
+    return [key, !fieldValue || fieldValue === 'None' ? '—' : fieldValue];
+  }).filter(([key]) => !['name', 'entity_name', 'entity_type'].includes(String(key).toLowerCase()));
+}
+
 function sourceRecordFields(type, record) {
   if (!record) return [['记录状态', '未在本次检索上下文中找到对应记录']];
   if (type === 'Relationships') {
@@ -97,7 +156,7 @@ function sourceRecordFields(type, record) {
     return [
       ['实体类型', record.entity_type],
       ['实体名称', record.entity_name],
-      ['知识属性', record.text],
+      ...entityAttributeFields(record.text),
     ].filter((field) => field[1] != null && String(field[1]).trim() !== '');
   }
   return [['原文片段', record.text || '该记录没有可展示的文本片段']];

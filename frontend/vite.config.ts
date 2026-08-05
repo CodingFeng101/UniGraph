@@ -33,7 +33,7 @@ export default defineConfig({
           if (/\/node_modules\/(vue|vue-router|@vue)\//.test(moduleId)) return 'vue';
           if (/\/node_modules\/(markdown-it|dompurify)\//.test(moduleId)) return 'content';
           if (moduleId.includes('/node_modules/lucide/')) return 'icons';
-          return 'vendor';
+          return undefined;
         },
       },
     },

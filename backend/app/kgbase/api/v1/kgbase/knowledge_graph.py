@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from backend.app.file.file import MAX_UPLOAD_SIZE
 from backend.app.kgbase.schema import GetIndexDetail, GetKnowledgeGraphDetail, GetSchemaGraphDetail
 from backend.app.kgbase.schema.chat_library import AppendMessageParam
-from backend.app.kgbase.schema.community import AddCommunityParam, UpdateCommunityParam
+from backend.app.kgbase.schema.community import UpdateCommunityParam
 from backend.app.kgbase.schema.embedding import EmbeddingBase
 from backend.app.kgbase.schema.knowledge_entity import AddKnowledgeEntityParam
 from backend.app.kgbase.schema.knowledge_graph import (
@@ -25,10 +25,12 @@ from backend.app.kgbase.schema.knowledge_graph import (
     UpdateKnowledgeGraphParam,
 )
 from backend.app.kgbase.schema.knowledge_relationship import AddKnowledgeRelationshipParam
+from backend.app.kgbase.service.chat_attachment_service import chat_attachment_service
 from backend.app.kgbase.service.chat_context_service import chat_context_service
 from backend.app.kgbase.service.chat_library_service import chat_library_service
 from backend.app.kgbase.service.community_service import community_service
 from backend.app.kgbase.service.embedding_service import embedding_service
+from backend.app.kgbase.service.index_persistence_service import index_persistence_service
 from backend.app.kgbase.service.knowledge_entity_service import knowledge_entity_service
 from backend.app.kgbase.service.knowledge_graph_service import knowledge_graph_service
 from backend.app.kgbase.service.knowledge_relationship_service import knowledge_relationship_service
@@ -136,6 +138,9 @@ async def _run_knowledge_question(
             await progress_callback(message, detail, data)
 
     await report('正在解析问题', '正在识别查询意图并准备检索上下文')
+    attachment_context = await chat_attachment_service.build_context(obj.attachments)
+    if attachment_context:
+        await report('附件解析完成', f'已读取 {len(obj.attachments)} 个附件，并加入本轮回答上下文')
     api_key, base_url, model = await knowledge_graph_service.get_user_llm_info(
         user_token=obj.user_token,
         model_uuid=obj.llm_model_uuid,
@@ -154,7 +159,7 @@ async def _run_knowledge_question(
     await report('正在检索实体与关系', '正在构建与问题相关的局部知识上下文')
 
     async def provide_conversation_context(context_text: str):
-        return await chat_context_service.prepare(
+        conversation_context = await chat_context_service.prepare(
             chat_library_uuid=obj.chat_library_uuid,
             current_message_uuid=obj.current_message_uuid,
             user_uuid=user_uuid,
@@ -166,6 +171,8 @@ async def _run_knowledge_question(
             model=model,
             progress_callback=progress_callback,
         )
+        conversation_context['question_context'] = attachment_context
+        return conversation_context
 
     response = await knowledge_graph_service.query(
         knowledge_graph=data,
@@ -609,57 +616,33 @@ async def build_index(self, uuid: str, user_token: str, depth: int = 4):
         # 处理索引结果
         entities = index_result.get('entities', [])
         community_reports = index_result.get('community_reports', [])
-        triple_community_hash_table = {}
-
-        # 删除旧的社区数据
-        await community_service.delete_all(knowledge_graph_uuid=uuid)
-
-        # 添加社区数据
         report_total = len(community_reports)
-        for report_index, item in enumerate(community_reports, start=1):
-            community_uuid = await community_service.add(
-                obj=AddCommunityParam(
-                    title=item.get('title', ''),
-                    content=item.get('full_content', ''),
-                    level=str(item.get('level', '')),
-                    rating=str(item.get('rating', '')),
-                    attributes=item.get('attributes', ''),
-                    knowledge_graph_uuid=uuid,
-                )
-            )
-            triple_community_hash_table[item['id']] = community_uuid
-            if should_report(report_index, report_total, checkpoints=10):
+        embedding_total = len(entities)
+
+        def report_persistence_progress(stage: str, completed: int, total: int) -> None:
+            if stage == 'communities':
                 task_progress(
                     self,
                     '正在保存社区报告',
-                    scaled_progress(report_index, report_total, 83, 89),
-                    detail=f'已保存 {report_index}/{report_total} 份社区报告',
-                    metrics={'reports_saved': report_index, 'reports_total': report_total},
+                    scaled_progress(completed, total, 83, 89),
+                    detail=f'已保存 {completed}/{total} 份社区报告',
+                    metrics={'reports_saved': completed, 'reports_total': total},
                 )
-
-        # 添加实体和嵌入数据
-        embedding_total = len(entities)
-        for embedding_index, entity in enumerate(entities, start=1):
-            entity_uuid = entity.get('id')
-            vector = entity.get('attributes_embedding')
-            await embedding_service.add(obj=EmbeddingBase(knowledge_entity_uuid=entity_uuid, vector=json.dumps(vector)))
-            entity_community = []
-            if entity.get('community_ids', '{}'):
-                entity_community = json.loads(json.dumps(entity.get('community_ids', '[]')))
-            for community in entity_community:
-                community_uuid = triple_community_hash_table.get(community, None)
-                if community_uuid:
-                    await knowledge_entity_service.add_community_relation(
-                        knowledge_entity_uuid=entity_uuid, community_uuid=community_uuid
-                    )
-            if should_report(embedding_index, embedding_total, checkpoints=12):
+            elif stage in {'embeddings', 'relations'}:
                 task_progress(
                     self,
                     '正在写入实体索引',
-                    scaled_progress(embedding_index, embedding_total, 90, 98),
-                    detail=f'已写入 {embedding_index}/{embedding_total} 个实体向量及社区映射',
-                    metrics={'entities_saved': embedding_index, 'entities_total': embedding_total},
+                    scaled_progress(completed, total, 90, 98),
+                    detail=f'已批量写入 {completed}/{total} 条{stage}',
+                    metrics={f'{stage}_saved': completed, f'{stage}_total': total},
                 )
+
+        await index_persistence_service.replace(
+            knowledge_graph_uuid=uuid,
+            community_reports=community_reports,
+            entities=entities,
+            progress_callback=report_persistence_progress,
+        )
 
         # 更新索引状态和深度
         await knowledge_graph_service.update_index_status(uuid=uuid, index_status=1)

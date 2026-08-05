@@ -56,7 +56,7 @@
 }
 .source-popup-record { display: grid; gap: 6px; }
 .source-popup-fields { display: grid; gap: 8px; }
-.source-popup-field { display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 10px; }
+.source-popup-field { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px; }
 .source-popup-field__label { color: var(--claude-muted-foreground); font-size: 10px; line-height: 1.55; }
 .source-popup-field__value { overflow-wrap: anywhere; color: var(--claude-foreground); font-size: 11px; font-weight: 400; line-height: 1.55; white-space: pre-wrap; }
 .citation-tag--overview .source-popup-title { margin-bottom: 10px; }
@@ -131,3 +131,111 @@
 .citation-tag.is-missing { color: var(--claude-muted-foreground); }
 .citation-tag:hover,
 .citation-tag:focus-visible { background: var(--claude-accent); transform: translateY(-1px); }
+.ai-answer .chat-code-block,
+.shared-chat-answer .chat-code-block {
+  max-width: 100%;
+  margin: 14px 0;
+  overflow-x: auto;
+  border: 1px solid var(--claude-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--claude-secondary) 72%, var(--claude-background));
+  color: var(--claude-foreground);
+  font-family: var(--claude-font-mono);
+  font-size: 13px;
+  line-height: 1.65;
+  text-align: left;
+  tab-size: 2;
+}
+
+.ai-answer .chat-code-block code,
+.shared-chat-answer .chat-code-block code {
+  display: block;
+  min-width: max-content;
+  padding: 14px 16px;
+  background: transparent;
+  color: inherit;
+  white-space: pre;
+}
+
+.ai-answer :not(pre) > code,
+.shared-chat-answer :not(pre) > code {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--claude-secondary);
+  color: var(--claude-foreground);
+  font-family: var(--claude-font-mono);
+  font-size: .9em;
+}
+
+.chat-code-block .hljs-keyword,
+.chat-code-block .hljs-selector-tag,
+.chat-code-block .hljs-literal { color: #b42318; }
+.chat-code-block .hljs-string,
+.chat-code-block .hljs-attribute,
+.chat-code-block .hljs-addition { color: #067647; }
+.chat-code-block .hljs-number,
+.chat-code-block .hljs-symbol,
+.chat-code-block .hljs-bullet { color: #175cd3; }
+.chat-code-block .hljs-title,
+.chat-code-block .hljs-section,
+.chat-code-block .hljs-function { color: #6941c6; }
+.chat-code-block .hljs-comment,
+.chat-code-block .hljs-quote { color: var(--claude-muted-foreground); font-style: italic; }
+
+.chat-code-block,
+.chat-mermaid { position: relative; }
+.chat-code-block::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 8px;
+  right: 68px;
+  color: var(--claude-muted-foreground);
+  font-family: var(--claude-font-sans);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.chat-content-copy {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  z-index: 2;
+  padding: 4px 8px;
+  border: 1px solid var(--claude-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--claude-card) 92%, transparent);
+  color: var(--claude-muted-foreground);
+  font-family: var(--claude-font-sans);
+  font-size: 10px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+.chat-content-copy:hover { color: var(--claude-foreground); background: var(--claude-accent); }
+.ai-answer .chat-code-block code,
+.shared-chat-answer .chat-code-block code { padding-top: 38px; }
+.chat-mermaid {
+  max-width: 100%;
+  margin: 14px 0;
+  padding: 38px 14px 14px;
+  overflow: auto;
+  border: 1px solid var(--claude-border);
+  border-radius: 10px;
+  background: var(--claude-card);
+}
+.chat-mermaid__canvas { min-width: 320px; text-align: center; }
+.chat-mermaid__canvas svg { width: auto; max-width: 100%; height: auto; }
+.chat-mermaid__source { margin: 0; color: var(--claude-muted-foreground); font-family: var(--claude-font-mono); font-size: 12px; white-space: pre; }
+.ai-answer table,
+.shared-chat-answer table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 14px 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-family: var(--claude-font-sans);
+  font-size: 13px;
+}
+.ai-answer th, .ai-answer td,
+.shared-chat-answer th, .shared-chat-answer td { padding: 8px 12px; border: 1px solid var(--claude-border); text-align: left; }
+.ai-answer th,
+.shared-chat-answer th { background: var(--claude-secondary); font-weight: 600; }

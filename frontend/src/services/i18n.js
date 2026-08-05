@@ -1,3 +1,5 @@
+import { i18n, setI18nLocale } from '@/i18n';
+
 const messages = {
   '图知识库列表': 'Knowledge bases',
   '信息': 'Info',
@@ -772,7 +774,10 @@ function getLocale() {
   return localStorage.getItem('unigraph-language') === 'en' ? 'en' : 'zh';
 }
 
-function t(source, fallback = source) {
+function t(source, fallbackOrParams = source, params = undefined) {
+  const fallback = typeof fallbackOrParams === 'string' ? fallbackOrParams : source;
+  const interpolation = typeof fallbackOrParams === 'object' ? fallbackOrParams : params;
+  if (i18n.global.te(source)) return i18n.global.t(source, interpolation || {});
   if (getLocale() !== 'en') return fallback;
   return translateValue(source, 'en') || fallback;
 }
@@ -810,6 +815,7 @@ function translateElement(element, lang) {
 
 function applyLanguage(lang = getLocale()) {
   const next = lang === 'en' ? 'en' : 'zh';
+  setI18nLocale(next);
   document.documentElement.dataset.language = next;
   document.documentElement.lang = next === 'en' ? 'en' : 'zh-CN';
   const currentTitle = document.title.trim();
@@ -825,6 +831,7 @@ function applyLanguage(lang = getLocale()) {
 function setLocale(lang) {
   const next = lang === 'en' ? 'en' : 'zh';
   localStorage.setItem('unigraph-language', next);
+  setI18nLocale(next);
   window.dispatchEvent(new CustomEvent('unigraph:language-change', { detail: { lang: next } }));
   applyLanguage(next);
 }

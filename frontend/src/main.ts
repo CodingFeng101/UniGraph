@@ -39,8 +39,16 @@ import './services/i18n';
 import { t } from './services/i18n';
 import './graph/renderer';
 import { installFeedback } from './utils/feedback';
+import { pinia } from './stores';
+import { useUserStore } from './stores/user';
+import { i18n } from './i18n';
 
 installFeedback();
+
+const userStore = useUserStore(pinia);
+window.addEventListener('storage', (event) => {
+  if (event.key === 'user' || event.key === 'access_token') userStore.syncFromStorage();
+});
 
 const lucideIcons = {
   ContactRound,
@@ -124,12 +132,14 @@ const reportGlobalError = (error: unknown) => {
   console.error('Unhandled application error:', error);
   const now = Date.now();
   if (now - lastGlobalErrorAt > 2000) {
-    window.showToast?.(t('页面发生异常，请重试；若问题持续请刷新页面'));
+    window.showToast?.(t('errors.page'));
     lastGlobalErrorAt = now;
   }
 };
 app.config.errorHandler = (error) => reportGlobalError(error);
 window.addEventListener('error', (event) => reportGlobalError(event.error || event.message));
 window.addEventListener('unhandledrejection', (event) => reportGlobalError(event.reason));
+app.use(pinia);
+app.use(i18n);
 app.use(router);
 app.mount('#app');

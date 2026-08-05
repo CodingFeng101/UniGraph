@@ -7,12 +7,15 @@ import { KgBaseAPI } from '@/api';
 import { getLocale, t } from '@/services/i18n';
 import { getTaskNotificationPreferences } from '@/services/preferences';
 import { gsap } from 'gsap';
+import { pinia } from '@/stores';
+import { useTaskStore } from '@/stores/task';
 
 export const TaskManager = window.TaskManager = (() => {
   const LEGACY_STORAGE_KEY = 'unigraph_task_queue';
+  const QUESTION_STALE_MS = 15 * 60 * 1000;
   const completionById = new Map();
   let audioContext = null;
-  let tasks = load();
+  const taskStore = useTaskStore(pinia);
   const expandedTasks = new Set();
   const renderedStepCounts = new Map();
   const timelineScrollStates = new Map();
@@ -28,20 +31,19 @@ export const TaskManager = window.TaskManager = (() => {
     return safe;
   }
 
-  function load() {
-    try {
-      const value = JSON.parse(localStorage.getItem(storageKey()) || '[]');
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
-      return Array.isArray(value)
-        ? value.map((task) => ({ ...task, kwargs: sanitizeKwargs(task.kwargs) }))
-        : [];
-    } catch (error) {
-      return [];
-    }
+  function taskTimestamp(value) {
+    const timestamp = Date.parse(value || '');
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function isQuestionTaskStale(task) {
+    if (task?.name !== 'knowledge_graph.ask') return false;
+    const checkpoint = taskTimestamp(task.lastProgressAt || task.createdAt);
+    return checkpoint > 0 && Date.now() - checkpoint > QUESTION_STALE_MS;
   }
 
   function save() {
-    localStorage.setItem(storageKey(), JSON.stringify(tasks));
+    taskStore.persist((task) => ({ ...task, kwargs: sanitizeKwargs(task.kwargs) }));
   }
 
   function escapeHtml(value) {
@@ -104,23 +106,28 @@ export const TaskManager = window.TaskManager = (() => {
   }
 
   function notifyCompletion(task) {
-    if (task.completionNotified) return;
+    if (task.completionNotified) return false;
     task.completionNotified = true;
     save();
     playCompletionSound();
     sendDesktopNotification(task);
+    return true;
+  }
+
+  function isSharedChatPage() {
+    return /\/share\/[^/]+\/?$/.test(window.location.pathname);
   }
 
   function stateLabel(state) {
     return t({
-      PENDING: '等待中',
-      STARTED: '执行中',
-      PROGRESS: '执行中',
-      RETRY: '重试中',
-      SUCCESS: '已完成',
-      FAILURE: '失败',
-      REVOKE: '已撤销',
-      REVOKED: '已撤销',
+      PENDING: 'task.pending',
+      STARTED: 'task.running',
+      PROGRESS: 'task.running',
+      RETRY: 'task.retrying',
+      SUCCESS: 'task.succeeded',
+      FAILURE: 'task.failed',
+      REVOKE: 'task.revoked',
+      REVOKED: 'task.revoked',
     }[state] || state);
   }
 
@@ -172,10 +179,10 @@ export const TaskManager = window.TaskManager = (() => {
     const panel = document.getElementById('task-panel');
     if (!panel) return;
 
-    const visibleTasks = tasks.filter(isTaskCenterVisible);
+    const visibleTasks = taskStore.tasks.filter(isTaskCenterVisible);
     const running = visibleTasks.filter((task) => ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state));
     const headerBadge = panel.querySelector('[data-task-running-count]');
-    if (headerBadge) headerBadge.textContent = t(`${running.length} 进行中`);
+    if (headerBadge) headerBadge.textContent = t('task.runningCount', { count: running.length });
 
     const fabBadge = document.querySelector('[data-task-fab-count]');
     const fab = document.getElementById('task-fab-wrapper');
@@ -195,7 +202,7 @@ export const TaskManager = window.TaskManager = (() => {
     if (!container) return;
 
     if (!visibleTasks.length) {
-      container.innerHTML = `<div class="task-empty">${escapeHtml(t('暂无后台任务'))}</div>`;
+      container.innerHTML = `<div class="task-empty">${escapeHtml(t('task.empty'))}</div>`;
       return;
     }
 
@@ -334,12 +341,17 @@ export const TaskManager = window.TaskManager = (() => {
 
   function updateFromStatus(task, status) {
     const meta = status.meta || {};
+    const previousState = task.state;
+    const previousProgress = Number(task.progress) || 0;
     const previousMessage = task.message;
     task.state = status.state || task.state;
     if (task.state === 'SUCCESS' && (meta.type === 'error' || meta.error)) task.state = 'FAILURE';
     task.progress = task.state === 'SUCCESS' ? 100 : Number(meta.progress ?? task.progress ?? 0);
     const errorMessage = typeof meta.error === 'string' ? meta.error : meta.error?.message;
     task.message = meta.message || errorMessage || stateLabel(task.state);
+    if (task.state !== previousState || task.progress !== previousProgress || task.message !== previousMessage || (Array.isArray(meta.logs) && meta.logs.length !== (task.steps?.length || 0))) {
+      task.lastProgressAt = new Date().toISOString();
+    }
     if (typeof meta.partial_answer === 'string') task.partialAnswer = meta.partial_answer;
     if (task.state === 'SUCCESS' && typeof meta.data?.results === 'string') {
       task.partialAnswer = meta.data.results;
@@ -374,6 +386,13 @@ export const TaskManager = window.TaskManager = (() => {
   async function poll(task, taskUid = task.uid) {
     let statusFailures = 0;
     while (task.uid === taskUid && ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)) {
+      if (isQuestionTaskStale(task)) {
+        task.state = 'FAILURE';
+        task.message = '问答任务长时间没有进展，已自动结束，请重新提问';
+        persistAndRender();
+        emitTaskUpdate(task);
+        break;
+      }
       await new Promise((resolve) => setTimeout(resolve, task.name === 'knowledge_graph.ask' ? 500 : 1500));
       if (task.uid !== taskUid) return null;
       let response;
@@ -402,10 +421,15 @@ export const TaskManager = window.TaskManager = (() => {
         throw new Error(task.message);
       }
       updateFromStatus(task, response.data);
+      if (['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state) && isQuestionTaskStale(task)) {
+        task.state = 'FAILURE';
+        task.message = '问答任务长时间没有进展，已自动结束，请重新提问';
+        persistAndRender();
+        emitTaskUpdate(task);
+      }
     }
     if (task.state === 'SUCCESS') {
-      notifyCompletion(task);
-      notify(t(`${task.displayName}已完成`));
+      if (notifyCompletion(task)) notify(t(`${task.displayName}已完成`));
       return task.result;
     }
     if (task.state === 'REVOKE' || task.state === 'REVOKED') return null;
@@ -414,7 +438,8 @@ export const TaskManager = window.TaskManager = (() => {
 
   async function submit(name, displayName, objectName, kwargs) {
     const safeKwargs = sanitizeKwargs(kwargs);
-    const response = await KgBaseAPI.task.submit(name, safeKwargs);
+    const requiresUserToken = Object.prototype.hasOwnProperty.call(kwargs || {}, 'user_token');
+    const response = await KgBaseAPI.task.submit(name, kwargs || {});
     if (response.code !== 200 || !response.data?.task_id) {
       throw new Error(response.msg || '任务提交失败');
     }
@@ -424,6 +449,7 @@ export const TaskManager = window.TaskManager = (() => {
       displayName,
       objectName,
       kwargs: safeKwargs,
+      requiresUserToken,
       state: 'PENDING',
       progress: 0,
       message: '任务已创建',
@@ -432,10 +458,11 @@ export const TaskManager = window.TaskManager = (() => {
       steps: [],
       result: null,
       completionNotified: false,
+      lastProgressAt: new Date().toISOString(),
       partialAnswer: '',
     };
     task.steps.push({ label: task.message, time: formatTaskTime(task.createdAt), progress: 0 });
-    tasks.push(task);
+    taskStore.tasks.push(task);
     persistAndRender();
     emitTaskUpdate(task);
     notify(t(`${displayName}任务已提交`));
@@ -450,7 +477,7 @@ export const TaskManager = window.TaskManager = (() => {
   }
 
   async function cancel(uid) {
-    const task = tasks.find((item) => item.uid === uid);
+    const task = taskStore.tasks.find((item) => item.uid === uid);
     if (!task) return;
     const response = await KgBaseAPI.task.revoke(uid);
     if (response.code !== 200) throw new Error(response.msg || '撤销失败');
@@ -464,12 +491,14 @@ export const TaskManager = window.TaskManager = (() => {
   }
 
   async function retry(uid) {
-    const task = tasks.find((item) => item.uid === uid);
+    const task = taskStore.tasks.find((item) => item.uid === uid);
     if (!task) return;
     if (['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)) {
       await cancel(uid);
     }
-    const response = await KgBaseAPI.task.submit(task.name, task.kwargs || {});
+    const retryKwargs = { ...(task.kwargs || {}) };
+    if (task.requiresUserToken) retryKwargs.user_token = Auth.getToken();
+    const response = await KgBaseAPI.task.submit(task.name, retryKwargs);
     if (response.code !== 200 || !response.data?.task_id) {
       throw new Error(response.msg || '任务重启失败');
     }
@@ -489,6 +518,7 @@ export const TaskManager = window.TaskManager = (() => {
     task.steps = [{ label: task.message, time: formatTaskTime(task.createdAt), progress: 0 }];
     task.result = null;
     task.completionNotified = false;
+    task.lastProgressAt = new Date().toISOString();
     if (wasExpanded) expandedTasks.add(newUid);
     persistAndRender();
     notify(t(`${task.displayName}已重新启动`));
@@ -503,7 +533,7 @@ export const TaskManager = window.TaskManager = (() => {
 
   async function pause(uid) {
     await cancel(uid);
-    const task = tasks.find((item) => item.uid === uid);
+    const task = taskStore.tasks.find((item) => item.uid === uid);
     if (task) {
       task.message = '任务已暂停，可点击重启重新执行';
       task.updatedAt = new Date().toLocaleString();
@@ -514,10 +544,10 @@ export const TaskManager = window.TaskManager = (() => {
   }
 
   async function remove(uid) {
-    const task = tasks.find((item) => item.uid === uid);
+    const task = taskStore.tasks.find((item) => item.uid === uid);
     if (!task) return;
     if (['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)) await cancel(uid);
-    tasks = tasks.filter((item) => item.uid !== uid);
+    taskStore.tasks = taskStore.tasks.filter((item) => item.uid !== uid);
     expandedTasks.delete(uid);
     renderedStepCounts.delete(uid);
     timelineScrollStates.delete(uid);
@@ -525,32 +555,44 @@ export const TaskManager = window.TaskManager = (() => {
   }
 
   function resume() {
-    tasks.filter((task) => ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state)).forEach((task) => {
-      if (completionById.has(task.uid)) return;
-      const taskUid = task.uid;
-      const completion = poll(task, taskUid).catch(() => null);
-      completionById.set(taskUid, completion);
-      completion.then(
-        () => completionById.delete(taskUid),
-        () => completionById.delete(taskUid),
-      );
-    });
+    taskStore.tasks
+      .filter((task) => ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state))
+      .forEach((task) => {
+        if (completionById.has(task.uid)) return;
+        const taskUid = task.uid;
+        const completion = poll(task, taskUid).catch(() => null);
+        completionById.set(taskUid, completion);
+        completion.then(
+          () => completionById.delete(taskUid),
+          () => completionById.delete(taskUid),
+        );
+      });
   }
 
   function init() {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    taskStore.hydrate(storageKey(), (task) => ({
+      ...task,
+      kwargs: sanitizeKwargs(task.kwargs),
+    }));
     render();
     document.addEventListener('pointerdown', primeAudio, { once: true });
     window.addEventListener('unigraph:preferences-changed', primeAudio);
     window.addEventListener('unigraph:language-change', render);
-    if (typeof Auth !== 'undefined' && Auth.isLogin()) resume();
+    if (typeof Auth !== 'undefined' && Auth.isLogin() && !isSharedChatPage()) resume();
   }
 
   document.addEventListener('DOMContentLoaded', init);
   if (document.readyState !== 'loading') init();
 
   function getTasks() {
-    return tasks.map((task) => ({ ...task, kwargs: sanitizeKwargs(task.kwargs) }));
+    return taskStore.tasks.map((task) => ({ ...task, kwargs: sanitizeKwargs(task.kwargs) }));
   }
 
-  return { submit, cancel, pause, retry, remove, toggle, render, resume, getTasks };
+  function isActive(uid) {
+    const task = taskStore.tasks.find((item) => item.uid === uid);
+    return Boolean(task && ['PENDING', 'STARTED', 'PROGRESS', 'RETRY'].includes(task.state) && !isQuestionTaskStale(task));
+  }
+
+  return { submit, cancel, pause, retry, remove, toggle, render, resume, getTasks, isActive };
 })();

@@ -52,7 +52,12 @@
 .graph-hover-card__body {
   display: grid;
   gap: 6px;
+  max-height: min(320px, 45vh);
   margin-top: 13px;
+  padding-right: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .graph-hover-card__row {
@@ -71,6 +76,19 @@
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--claude-foreground);
+}
+
+.graph-hover-card__row--source {
+  margin-top: 2px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: var(--claude-secondary);
+  line-height: 1.55;
+}
+
+.graph-hover-card__row--source .graph-hover-card__key {
+  color: var(--claude-primary);
+  font-weight: 500;
 }
 
 .graph-hover-card__actions {

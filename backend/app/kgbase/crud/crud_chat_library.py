@@ -52,7 +52,7 @@ class CRUDLibrary(CRUDPlus[ChatLibrary]):
     #     result = await db.execute(query)
     #     return result.scalars().all()
 
-    async def create(self, db: AsyncSession, obj: LibraryBase) -> str:
+    async def create(self, db: AsyncSession, obj: LibraryBase, *, user_uuid: str) -> str:
         """
         创建架构图谱
 
@@ -61,7 +61,7 @@ class CRUDLibrary(CRUDPlus[ChatLibrary]):
         :return: 无返回值
         """
         dict_obj = obj.model_dump()
-        new_library = self.model(**dict_obj)
+        new_library = self.model(**dict_obj, user_uuid=user_uuid)
         db.add(new_library)
         return new_library.uuid
 

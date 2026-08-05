@@ -1,6 +1,7 @@
-import { getGraphExpansionDepth } from '@/services/preferences';
 import { renderGraphTooltipContent } from '@/utils/graphTooltip';
 import { validateUploadFiles } from '@/utils/upload';
+import { createGraphExplorationController } from '@/features/graph/graph-exploration';
+import { createGraphEditorController } from '@/features/graph/graph-editor';
 
 /* Generated from pages/graph-build.html; keep behavior changes in the source controller during migration. */
 export function createGraphBuildViewController() {
@@ -708,529 +709,73 @@ function renderGraph(viewState) {
   });
 }
 
-async function loadExplorationOverview() {
-  loadModeFullyExpanded = false;
-  syncLoadExpandButton();
-  var response = await KgBaseAPI.knowledgeGraph.getExplorationOverview(currentGraphUuid);
-  if (response.code !== 200) throw new Error(response.msg || '加载图谱概览失败');
-  graphData = {
-    entities: (response.data?.clusters || []).map(function(cluster) {
-      return {
-        uuid: '__server_cluster__' + encodeURIComponent(cluster.type),
-        name: cluster.type + ' · ' + cluster.count,
-        type: cluster.type,
-        attributes: {},
-        is_cluster: true,
-        cluster_count: cluster.count,
-      };
-    }),
-    relationships: (response.data?.relationships || []).map(function(item, index) {
-      return {
-        uuid: '__server_cluster_edge__' + index,
-        name: String(item.count),
-        type: 'cluster',
-        source_entity_uuid: '__server_cluster__' + encodeURIComponent(item.source_type),
-        target_entity_uuid: '__server_cluster__' + encodeURIComponent(item.target_type),
-        attributes: {},
-      };
-    }),
-    schema_graph: null,
-  };
-  renderGraph();
-}
+const {
+  changeGraphStyle,
+  expandLoadGraph,
+  loadExplorationNeighbors,
+  loadExplorationOverview,
+  loadExplorationType,
+} = createGraphExplorationController({
+  api: KgBaseAPI.knowledgeGraph,
+  getCy: () => cy,
+  getFullGraphData: () => fullGraphData,
+  getGraphData: () => graphData,
+  getGraphStyle: () => currentGraphStyle,
+  getGraphUuid: () => currentGraphUuid,
+  isFullyExpanded: () => loadModeFullyExpanded,
+  loadGraphDetail,
+  notify: showToast,
+  renderer: GraphRenderer,
+  renderGraph,
+  setFullyExpanded: (value) => { loadModeFullyExpanded = value; },
+  setFullGraphData: (value) => { fullGraphData = value; },
+  setGraphData: (value) => { graphData = value; },
+  setGraphStyle: (value) => { currentGraphStyle = value; },
+  syncExpandButton: syncLoadExpandButton,
+});
 
-async function expandLoadGraph() {
-  if (currentGraphStyle !== 'load' || !currentGraphUuid || loadModeFullyExpanded) return;
-  syncLoadExpandButton(true);
-  try {
-    var response = await KgBaseAPI.knowledgeGraph.getDetail(currentGraphUuid);
-    if (response.code !== 200 || !response.data) {
-      throw new Error(response.msg || '加载完整图谱失败');
-    }
-    graphData = {
-      entities: response.data.entities || [],
-      relationships: response.data.relationships || [],
-      schema_graph: response.data.schema_graph || null,
-    };
-    fullGraphData = {
-      entities: graphData.entities.slice(),
-      relationships: graphData.relationships.slice(),
-      schema_graph: graphData.schema_graph,
-    };
-    loadModeFullyExpanded = true;
-    renderGraph();
-    showToast(`已显示全部 ${graphData.entities.length} 个实体和 ${graphData.relationships.length} 条关系`);
-  } catch (error) {
-    showToast(error.message || '加载完整图谱失败');
-  } finally {
-    syncLoadExpandButton();
-  }
-}
+const {
+  deleteSelected,
+  editSelected,
+  loadEntitiesForDropdowns,
+  onUpdateFileSelected,
+  scheduleTooltipHide,
+  showElementDetail,
+  submitEntity,
+  submitRelation,
+  submitUpdateGraph,
+  triggerUpdateFile,
+} = createGraphEditorController({
+  api: KgBaseAPI,
+  closeModal,
+  getState: () => ({
+    allEntities: allEntitiesForDropdown,
+    editingEntityUuid,
+    editingRelationshipUuid,
+    fullGraphData,
+    graphData,
+    graphList,
+    graphUuid: currentGraphUuid,
+    selectedElement,
+    selectedEntityUuids,
+  }),
+  getToken: () => Auth.getToken(),
+  hideTooltip,
+  loadGraphDetail,
+  notify: showToast,
+  openModal,
+  selectEntity,
+  selectEntityType,
+  selectRelationType,
+  setAllEntities: (value) => { allEntitiesForDropdown = value; },
+  setEditingEntityUuid: (value) => { editingEntityUuid = value; },
+  setEditingRelationshipUuid: (value) => { editingRelationshipUuid = value; },
+  taskManager: TaskManager,
+  uploadFile: (file) => API.uploadFile(file),
+  addEntityAttribute,
+});
 
-async function changeGraphStyle(style) {
-  currentGraphStyle = style;
-  if (style === 'load') {
-    try {
-      await loadExplorationOverview();
-    } catch (error) {
-      showToast(error.message || '加载图谱概览失败');
-      return;
-    }
-  } else {
-    if (!fullGraphData.entities.length) {
-      await loadGraphDetail(currentGraphUuid);
-    } else {
-    graphData = {
-      entities: fullGraphData.entities.slice(),
-      relationships: fullGraphData.relationships.slice(),
-      schema_graph: fullGraphData.schema_graph,
-    };
-    renderGraph();
-    }
-  }
-  document.querySelectorAll('[data-build-graph-style]').forEach(function(button) {
-    var active = button.dataset.buildGraphStyle === style;
-    button.style.background = active ? 'var(--claude-primary)' : 'transparent';
-    button.style.color = active ? 'var(--claude-primary-foreground)' : 'var(--claude-muted-foreground)';
-  });
-  syncLoadExpandButton();
-  showToast('已切换图谱样式');
-}
-
-function captureExplorationView(anchorUuid) {
-  if (!cy) return null;
-  return GraphRenderer.captureView(cy, anchorUuid);
-}
-
-function mergeExplorationData(data, removeType, anchorUuid) {
-  var clusterUuid = removeType ? '__server_cluster__' + encodeURIComponent(removeType) : null;
-  var viewState = captureExplorationView(anchorUuid || clusterUuid);
-  var existingIds = new Set(graphData.entities.map(function(entity) { return entity.uuid; }));
-  var entities = graphData.entities.filter(function(entity) {
-    return !(entity.is_cluster && entity.type === removeType);
-  });
-  var entityMap = new Map(entities.map(function(entity) { return [entity.uuid, entity]; }));
-  (data.entities || []).forEach(function(entity) { entityMap.set(entity.uuid, entity); });
-  var relationshipMap = new Map(graphData.relationships.map(function(item) { return [item.uuid, item]; }));
-  (data.relationships || []).forEach(function(item) { relationshipMap.set(item.uuid, item); });
-  if (clusterUuid) {
-    relationshipMap.forEach(function(item, uuid) {
-      if (item.source_entity_uuid === clusterUuid || item.target_entity_uuid === clusterUuid) {
-        relationshipMap.delete(uuid);
-      }
-    });
-  }
-  graphData.entities = Array.from(entityMap.values());
-  graphData.relationships = Array.from(relationshipMap.values());
-  renderGraph(viewState);
-  if (cy?._engine === 'vis-network') {
-    window.requestAnimationFrame(function() {
-      cy?.refreshConnections?.();
-    });
-    return;
-  }
-  var newNodes = cy.nodes().filter(function(node) { return !existingIds.has(node.id()); });
-  if (newNodes.length) {
-    var anchorPosition = viewState.anchorPosition;
-    newNodes.forEach(function(node) {
-      var targetPosition = node.position();
-      node.position(anchorPosition);
-      node.style('opacity', 0);
-      node.animate({
-        position: targetPosition,
-        style: { opacity: 1 },
-        duration: 520,
-        easing: 'ease-out-cubic',
-      });
-    });
-    window.setTimeout(function() {
-      if (!cy || cy.destroyed()) return;
-      cy.elements().filter((element) => element.visible()).layout({
-        name: 'fcose',
-        quality: 'draft',
-        randomize: false,
-        animate: true,
-        animationDuration: 650,
-        animationEasing: 'ease-out-cubic',
-        fit: false,
-        idealEdgeLength: 120,
-        nodeRepulsion: 7200,
-        gravity: 0.18,
-        avoidOverlap: true,
-      }).run();
-    }, 540);
-  }
-}
-
-async function loadExplorationType(type) {
-  try {
-    var response = await KgBaseAPI.knowledgeGraph.getExplorationType(currentGraphUuid, type);
-    if (response.code !== 200) throw new Error(response.msg || '展开实体类型失败');
-    mergeExplorationData(response.data || {}, type);
-  } catch (error) {
-    showToast(error.message || '展开实体类型失败');
-  }
-}
-
-async function loadExplorationNeighbors(entityUuid) {
-  try {
-    var response = await KgBaseAPI.knowledgeGraph.getExplorationNeighbors(
-      currentGraphUuid,
-      entityUuid,
-      getGraphExpansionDepth()
-    );
-    if (response.code !== 200) throw new Error(response.msg || '展开邻居失败');
-    mergeExplorationData(response.data || {}, null, entityUuid);
-  } catch (error) {
-    showToast(error.message || '展开邻居失败');
-  }
-}
-
-function normalizeGraphAttributes(value) {
-  if (!value) return {};
-  if (typeof value === 'object') return value;
-  try {
-    var parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (error) {
-    return {};
-  }
-}
-
-function resolveKnowledgeEntityName(uuid, preferredName) {
-  var explicitName = String(preferredName || '').trim();
-  if (explicitName && explicitName !== uuid) return explicitName;
-  var pools = [graphData.entities, fullGraphData.entities, allEntitiesForDropdown];
-  for (var index = 0; index < pools.length; index += 1) {
-    var entity = (pools[index] || []).find(function(item) { return item.uuid === uuid; });
-    if (entity && entity.name) return entity.name;
-  }
-  return '未知实体';
-}
-
-// ===== Show element detail panel =====
-function showElementDetail(data, type, position) {
-  var t = document.getElementById('canvas-tooltip');
-  if (!t) return;
-  var title = data.label || data.name || '';
-  var typeLabel = type === 'node' ? (data.type || '实体') + ' (实体)' : (data.type || data.label || '关系') + ' (关系)';
-  var bodyHtml = '';
-  if (type === 'node' && data.raw) {
-    var attrs = normalizeGraphAttributes(data.raw.attributes);
-    if (attrs && typeof attrs === 'object') {
-      Object.keys(attrs).forEach(function(key) {
-        bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">' + key + ' = ' + attrs[key] + '</p>';
-      });
-    }
-    if (data.raw.source) bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">来源: ' + data.raw.source + '</p>';
-  } else if (type === 'edge' && data.raw) {
-    var srcName = resolveKnowledgeEntityName(data.raw.source_entity_uuid, data.raw.source_entity_name);
-    var tgtName = resolveKnowledgeEntityName(data.raw.target_entity_uuid, data.raw.target_entity_name);
-    bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">头实体: ' + srcName + '</p>';
-    bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">尾实体: ' + tgtName + '</p>';
-    if (data.raw.type) bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">类型: ' + data.raw.type + '</p>';
-    if (data.raw.source) bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">来源: ' + data.raw.source + '</p>';
-  }
-  renderGraphTooltipContent(title, typeLabel, bodyHtml);
-  t.classList.remove('hidden');
-  var parent = t.parentElement;
-  var x = position ? position.x + 16 : parent.clientWidth - t.offsetWidth - 12;
-  var y = position ? position.y - 18 : 12;
-  if (x + t.offsetWidth + 12 > parent.clientWidth) x = Math.max(12, x - t.offsetWidth - 32);
-  if (y + t.offsetHeight > parent.clientHeight) y = Math.max(12, parent.clientHeight - t.offsetHeight - 12);
-  t.style.right = 'auto';
-  t.style.left = Math.max(12, x) + 'px';
-  t.style.top = Math.max(12, y) + 'px';
-}
-
-function scheduleTooltipHide() {
-  window.setTimeout(function() {
-    var tooltip = document.getElementById('canvas-tooltip');
-    if (tooltip && !tooltip.matches(':hover')) hideTooltip();
-  }, 140);
-}
-
-// Reload graph after CRUD
-async function reloadGraph() {
-  if (!currentGraphUuid) return;
-  await loadGraphDetail(currentGraphUuid);
-}
-
-// ===== Entity CRUD =====
-async function submitEntity() {
-  var nameInput = document.getElementById('entity-name-input');
-  if (!nameInput) return;
-  var name = nameInput.value.trim();
-  if (!name) {
-    showToast('请输入实体名称');
-    return;
-  }
-  var type = document.getElementById('entity-type-input').dataset.value || '';
-  if (!type) {
-    showToast('当前架构没有可用的实体类型');
-    return;
-  }
-  var attributes = {};
-  var attrRows = document.querySelectorAll('#entity-attributes > div');
-  attrRows.forEach(function(row) {
-    var inputs = row.querySelectorAll('input');
-    if (inputs.length >= 2 && inputs[0].value.trim()) {
-      attributes[inputs[0].value.trim()] = inputs[1].value.trim();
-    }
-  });
-  try {
-    var res;
-    if (editingEntityUuid) {
-      res = await KgBaseAPI.knowledgeEntity.update(editingEntityUuid, { name: name, attributes: JSON.stringify(attributes), type: type });
-    } else {
-      res = await KgBaseAPI.knowledgeEntity.create({ knowledge_graph_uuid: currentGraphUuid, name: name, type: type, attributes: JSON.stringify(attributes) });
-    }
-    if (res.code === 200) {
-      showToast(editingEntityUuid ? '实体已更新' : '实体已创建');
-      closeModal('modal-entity-build');
-      await reloadGraph();
-    } else {
-      showToast(res.msg || '操作失败');
-    }
-  } catch (err) {
-    console.error('Entity submit error:', err);
-    showToast('操作失败');
-  }
-}
-
-// Edit entity (open modal in edit mode)
-function editEntity(entity) {
-  editingEntityUuid = entity.uuid;
-  openModal('modal-entity-build');
-  document.getElementById('entity-name-input').value = entity.name || '';
-  if (entity.type) selectEntityType(entity.type);
-  // Render attributes
-  var container = document.getElementById('entity-attributes');
-  container.innerHTML = '';
-  var attributes = normalizeGraphAttributes(entity.attributes);
-  if (Object.keys(attributes).length) {
-    Object.keys(attributes).forEach(function(key) {
-      var div = document.createElement('div');
-      div.className = 'flex items-center gap-1.5';
-      div.innerHTML = '<input type="text" class="flex-1 min-w-0 h-8 px-2 text-xs rounded-lg border outline-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);" placeholder="属性名"><span class="shrink-0 text-xs" style="color:var(--claude-muted-foreground);">=</span><input type="text" class="flex-1 min-w-0 h-8 px-2 text-xs rounded-lg border outline-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);" placeholder="属性值"><button type="button" onclick="this.parentElement.remove()" class="w-7 h-7 shrink-0 flex items-center justify-center rounded cursor-pointer transition-colors hover:opacity-80" style="background:var(--claude-primary);border:none;color:var(--claude-primary-foreground);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
-      var inputs = div.querySelectorAll('input');
-      inputs[0].value = key;
-      inputs[1].value = attributes[key];
-      container.appendChild(div);
-    });
-  }
-  if (container.children.length === 0) addEntityAttribute();
-  var title = document.querySelector('#modal-entity-build h3');
-  if (title) title.textContent = '编辑实体';
-  var submitBtn = document.querySelector('#modal-entity-build .flex.justify-end button:last-child');
-  if (submitBtn) submitBtn.textContent = '保存';
-}
-
-// Delete entity
-async function deleteEntity(uuid) {
-  if (!uuid) return;
-  if (!await window.confirmAction({ title: '删除实体', message: '确定要删除该实体吗？' })) return;
-  try {
-    var res = await KgBaseAPI.knowledgeEntity.delete(uuid);
-    if (res.code === 200) {
-      showToast('实体已删除');
-      hideTooltip();
-      await reloadGraph();
-    } else {
-      showToast(res.msg || '删除实体失败');
-    }
-  } catch (err) {
-    console.error('Delete entity error:', err);
-    showToast('删除失败');
-  }
-}
-
-// ===== Relationship CRUD =====
-// Load entities for dropdowns
-async function loadEntitiesForDropdowns() {
-  try {
-    var res = await KgBaseAPI.knowledgeEntity.getAll(currentGraphUuid);
-    if (res.code === 200 && res.data) {
-      allEntitiesForDropdown = Array.isArray(res.data) ? res.data : (res.data.entities || res.data.list || []);
-    } else {
-      allEntitiesForDropdown = graphData.entities || [];
-    }
-  } catch (err) {
-    allEntitiesForDropdown = graphData.entities || [];
-  }
-  renderEntityDropdown('head-entity');
-  renderEntityDropdown('tail-entity');
-}
-
-// Render entity dropdown list
-function renderEntityDropdown(prefix) {
-  var list = document.getElementById(prefix + '-list');
-  if (!list) return;
-  list.innerHTML = '';
-  allEntitiesForDropdown.forEach(function(entity) {
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'w-full px-3 py-2 text-sm text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]';
-    btn.style.cssText = 'background:none;border:none;color:var(--claude-foreground);';
-    btn.textContent = entity.name || entity.uuid;
-    btn.onclick = function() { selectEntity(prefix, entity.name || entity.uuid, entity.uuid); };
-    list.appendChild(btn);
-  });
-}
-
-// Submit relationship
-async function submitRelation() {
-  var type = document.getElementById('relation-type-input').dataset.value || '';
-  if (!type) {
-    showToast('请选择关系类型');
-    return;
-  }
-  var name = document.getElementById('relation-name-input').value.trim();
-  if (!name) {
-    showToast('请输入关系名称');
-    return;
-  }
-  var description = document.getElementById('relation-description-input').value.trim();
-  var headUuid = selectedEntityUuids['head-entity'];
-  var tailUuid = selectedEntityUuids['tail-entity'];
-  if (!headUuid || !tailUuid) {
-    showToast('请选择头实体和尾实体');
-    return;
-  }
-  try {
-    var payload = {
-      knowledge_graph_uuid: currentGraphUuid,
-      source_entity_uuid: headUuid,
-      target_entity_uuid: tailUuid,
-      name: name,
-      type: type,
-      attributes: JSON.stringify(description ? { description: description } : {})
-    };
-    var res = editingRelationshipUuid
-      ? await KgBaseAPI.knowledgeRelationship.update(editingRelationshipUuid, payload)
-      : await KgBaseAPI.knowledgeRelationship.create(payload);
-    if (res.code === 200) {
-      showToast(editingRelationshipUuid ? '关系已更新' : '关系已创建');
-      closeModal('modal-relation-build');
-      await reloadGraph();
-    } else {
-      showToast(res.msg || '保存关系失败');
-    }
-  } catch (err) {
-    console.error('Relation submit error:', err);
-    showToast('操作失败');
-  }
-}
-
-function editRelationship(relationship) {
-  editingRelationshipUuid = relationship.uuid;
-  openModal('modal-relation-build');
-  selectRelationType(relationship.type || relationship.name || '关联');
-  document.getElementById('relation-name-input').value = relationship.name || '';
-  var relationAttributes = normalizeGraphAttributes(relationship.attributes);
-  document.getElementById('relation-description-input').value = relationAttributes.description || '';
-  var source = graphData.entities.find(function(entity) { return entity.uuid === relationship.source_entity_uuid; });
-  var target = graphData.entities.find(function(entity) { return entity.uuid === relationship.target_entity_uuid; });
-  selectEntity('head-entity', source ? source.name : relationship.source_entity_uuid, relationship.source_entity_uuid);
-  selectEntity('tail-entity', target ? target.name : relationship.target_entity_uuid, relationship.target_entity_uuid);
-  var title = document.querySelector('#modal-relation-build h3');
-  if (title) title.textContent = '编辑关系';
-  var button = document.querySelector('#modal-relation-build .flex.justify-end button:last-child');
-  if (button) button.textContent = '保存';
-}
-
-// Delete relationship
-async function deleteRelationship(uuid) {
-  if (!uuid) return;
-  if (!await window.confirmAction({ title: '删除关系', message: '确定要删除该关系吗？' })) return;
-  try {
-    var res = await KgBaseAPI.knowledgeRelationship.delete(uuid);
-    if (res.code === 200) {
-      showToast('关系已删除');
-      hideTooltip();
-      await reloadGraph();
-    } else {
-      showToast(res.msg || '删除关系失败');
-    }
-  } catch (err) {
-    console.error('Delete relationship error:', err);
-    showToast('删除失败');
-  }
-}
-
-// ===== Tooltip actions =====
-function editSelected() {
-  if (!selectedElement) return;
-  if (selectedElement.type === 'node' && selectedElement.data.raw) {
-    editEntity(selectedElement.data.raw);
-  } else if (selectedElement.type === 'edge' && selectedElement.data.raw) {
-    editRelationship(selectedElement.data.raw);
-  }
-}
-
-function deleteSelected() {
-  if (!selectedElement) return;
-  if (selectedElement.type === 'node') {
-    deleteEntity(selectedElement.data.id);
-  } else {
-    deleteRelationship(selectedElement.data.id);
-  }
-}
-
-// ===== Update graph (file upload) =====
-function triggerUpdateFile() {
-  var fileInput = document.getElementById('update-graph-file');
-  if (fileInput) fileInput.click();
-}
-
-function onUpdateFileSelected(input) {
-  var label = document.getElementById('update-graph-file-label');
-  if (label && input.files && input.files.length > 0) {
-    label.textContent = input.files[0].name;
-  }
-}
-
-async function submitUpdateGraph() {
-  var fileInput = document.getElementById('update-graph-file');
-  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-    showToast('请选择文件');
-    return;
-  }
-  var file = fileInput.files[0];
-  try {
-    validateUploadFiles([file]);
-    var res = await API.uploadFile(file);
-    if (res.code !== 200 || !res.data || !res.data.url) {
-      throw new Error(res.msg || '文件上传失败');
-    }
-    var schemaUuid = graphData.schema_graph && graphData.schema_graph.uuid
-      ? graphData.schema_graph.uuid
-      : (graphList.find(function(item) { return item.uuid === currentGraphUuid; }) || {}).schema_graph_uuid;
-    var task = await TaskManager.submit(
-      'knowledge_graph.update_knowledge_graph',
-      '更新知识图谱',
-      graphList.find(function(item) { return item.uuid === currentGraphUuid; })?.name || currentGraphUuid,
-      {
-        uuid: currentGraphUuid,
-        user_token: Auth.getToken(),
-        obj_data: {
-          file_paths: [res.data.url],
-          data: { schema_graph_uuid: schemaUuid || '' }
-        }
-      }
-    );
-    document.getElementById('modal-update-graph').classList.add('hidden');
-    fileInput.value = '';
-    var label = document.getElementById('update-graph-file-label');
-    if (label) label.textContent = '上传 PDF/Word/TXT 文档';
-    await task.completion;
-    await reloadGraph();
-  } catch (err) {
-    console.error('Update graph error:', err);
-    showToast(err.message || '更新失败');
-  }
-}
-
+ // ===== Zoom controls =====
 // ===== Zoom controls =====
 function zoomIn() {
   if (cy) GraphRenderer.zoom(cy, 0.18);

@@ -26,16 +26,19 @@ CREATE TABLE `chat_library` (
   `id` int NOT NULL AUTO_INCREMENT COMMENT '主键id',
   `uuid` varchar(50) NOT NULL,
   `name` varchar(255) NOT NULL COMMENT 'Chat Message Name',
-  `kg_base_uuid` varchar(50) NOT NULL,
+  `user_uuid` varchar(50) NOT NULL,
+  `kg_base_uuid` varchar(50) DEFAULT NULL,
   `messages` json DEFAULT NULL,
   `is_favorite` tinyint(1) NOT NULL DEFAULT '0',
   `created_time` datetime NOT NULL COMMENT '创建时间',
   `updated_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uuid` (`uuid`),
+  KEY `ix_chat_library_user_uuid` (`user_uuid`),
   KEY `kg_base_uuid` (`kg_base_uuid`),
   KEY `ix_chat_library_id` (`id`),
-  CONSTRAINT `chat_library_ibfk_1` FOREIGN KEY (`kg_base_uuid`) REFERENCES `kg_base` (`uuid`)
+  CONSTRAINT `fk_chat_library_user` FOREIGN KEY (`user_uuid`) REFERENCES `sys_user` (`uuid`),
+  CONSTRAINT `fk_chat_library_kg_base` FOREIGN KEY (`kg_base_uuid`) REFERENCES `kg_base` (`uuid`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -308,6 +311,7 @@ CREATE TABLE `llm_provider` (
   `document_url` varchar(512) DEFAULT NULL,
   `status` int DEFAULT '1',
   `llm_model_url` varchar(512) DEFAULT NULL,
+  `sort_order` int NOT NULL DEFAULT '0',
   `created_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),

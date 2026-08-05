@@ -25,7 +25,7 @@ class FileContentGetterFactory:
             return DocxContentGetter()
         elif file_path.endswith('.pdf'):
             return PdfContentGetter()
-        elif file_path.endswith('.txt'):
+        elif file_path.endswith(('.csv', '.json', '.md', '.txt')):
             return TxtContentGetter()
         else:
             raise ValueError('Unsupported file type')

@@ -34,10 +34,15 @@ class TaskService:
     def _task_owner_key(uid: str) -> str:
         return f'unigraph:task-owner:{uid}'
 
+    @staticmethod
+    def _task_submission_key(uid: str) -> str:
+        return f'unigraph:task-submitted:{uid}'
+
     @classmethod
     def register_owner(cls, uid: str, user_uuid: str) -> None:
         client = cls._get_redis_client(task_settings.CELERY_BACKEND_REDIS_DATABASE)
         client.setex(cls._task_owner_key(uid), task_settings.CELERY_TASK_OWNER_TTL_SECONDS, user_uuid)
+        client.setex(cls._task_submission_key(uid), task_settings.CELERY_TASK_SUBMISSION_GRACE_SECONDS, '1')
 
     @classmethod
     def require_owner(cls, uid: str, user_uuid: str) -> None:
@@ -52,6 +57,11 @@ class TaskService:
         broker_redis = cls._get_redis_client(task_settings.CELERY_BROKER_REDIS_DATABASE)
 
         if result_redis.exists(cls._result_backend_key(uid)):
+            return True
+
+        # A worker can reserve a task before Celery writes its STARTED result.
+        # Keep newly submitted tasks alive during that short broker/backend gap.
+        if result_redis.exists(cls._task_submission_key(uid)):
             return True
 
         uid_bytes = uid.encode('utf-8')

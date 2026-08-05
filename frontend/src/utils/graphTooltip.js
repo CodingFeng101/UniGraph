@@ -55,7 +55,7 @@ function normalizeRows(bodyHtml, kind) {
     result.push({ key: keyMap[row.key] || row.key, value: row.value });
   });
 
-  return result.slice(0, 5);
+  return result;
 }
 
 export function renderGraphTooltipContent(title, type, bodyHtml) {
@@ -70,7 +70,7 @@ export function renderGraphTooltipContent(title, type, bodyHtml) {
   typeElement.textContent = String(type || '').replace(/\s*\((?:实体|关系)\)\s*$/, '') || kind;
   badgeElement.textContent = kind;
   bodyElement.innerHTML = normalizeRows(bodyHtml, kind).map((row) => (
-    '<div class="graph-hover-card__row">' +
+    '<div class="graph-hover-card__row' + (/^来源(?:\s+\d+)?$/.test(row.key) ? ' graph-hover-card__row--source' : '') + '">' +
       '<span class="graph-hover-card__key">' + escapeHtml(row.key) + '</span>' +
       '<span class="graph-hover-card__value">' + escapeHtml(row.value || '—') + '</span>' +
     '</div>'

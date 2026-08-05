@@ -49,7 +49,29 @@
           <template v-if="message.role === 'user'">
             <div class="shared-chat-user-row">
               <div class="shared-chat-user-shell">
-                <div class="shared-chat-user-bubble" v-html="renderChatMarkdown(message.content)"></div>
+                <div v-if="parseMessageAttachments(message.content).attachments.length" class="shared-chat-attachments">
+                  <a
+                    v-for="attachment in parseMessageAttachments(message.content).attachments"
+                    :key="attachment.url"
+                    class="shared-chat-file"
+                    :href="attachmentHref(attachment.url)"
+                    target="_blank"
+                    rel="noopener"
+                    :title="attachment.name"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <path d="M14 2v6h6M8 13h8M8 17h6" />
+                    </svg>
+                    <span class="shared-chat-file__name">{{ attachment.name }}</span>
+                    <span class="shared-chat-file__type">{{ attachment.extension }}</span>
+                  </a>
+                </div>
+                <div
+                  v-if="parseMessageAttachments(message.content).body"
+                  class="shared-chat-user-bubble shared-chat-user-text"
+                  v-html="renderChatMarkdown(parseMessageAttachments(message.content).body)"
+                ></div>
               </div>
             </div>
             <span class="shared-chat-message__time">{{ formatMessageTime(message.created_time) }}</span>
@@ -71,10 +93,12 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { KgBaseAPI } from '@/api';
 import { renderAnswerWithCitations, renderChatMarkdown } from '@/utils/chat-content';
+import { enhanceChatContent } from '@/features/chat/chat-content-enhancer';
+import { parseMessageAttachments } from '@/features/chat/message-attachments';
 
 const route = useRoute();
 const loading = ref(true);
@@ -92,6 +116,11 @@ function formatDate(value) {
 function formatMessageTime(value) {
   if (!value) return '';
   return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function attachmentHref(path) {
+  if (/^https?:\/\//i.test(path)) return path;
+  return (window.AppConfig?.SHOW_IMAGE_API || '') + String(path || '').replace(/^\/+/, '');
 }
 
 function isCitationPopoverOpen(popup) {
@@ -217,6 +246,9 @@ onMounted(async () => {
     const response = await KgBaseAPI.chatLibrary.getPublicShare(String(route.params.publicId));
     if (response.code !== 200 || !response.data) throw new Error(response.msg || '分享链接不存在或已失效');
     share.value = response.data;
+    loading.value = false;
+    await nextTick();
+    document.querySelectorAll('.shared-chat-answer').forEach(enhanceChatContent);
     document.title = `${response.data.title || '共享对话'} · UniGraph`;
   } catch (requestError) {
     error.value = requestError.message || '分享链接不存在或已失效';
@@ -324,7 +356,60 @@ onUnmounted(() => {
   font-size: 15px;
   line-height: 1.625;
 }
-.shared-chat-user-bubble :deep(p) { margin: 0; white-space: pre-wrap; }
+.shared-chat-user-text :deep(p) { margin: 0; white-space: pre-wrap; }
+.shared-chat-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.shared-chat-attachments { margin-bottom: 10px; }
+.shared-chat-file {
+  width: 148px;
+  min-height: 82px;
+  padding: 11px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: 9px;
+  border: 1px solid var(--claude-border);
+  border-radius: 12px;
+  color: var(--claude-foreground);
+  background: var(--claude-card);
+  box-shadow: var(--claude-shadow-xs);
+  text-decoration: none;
+  transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+.shared-chat-file:hover {
+  border-color: color-mix(in srgb, var(--claude-primary) 45%, var(--claude-border));
+  box-shadow: var(--claude-shadow-sm);
+  transform: translateY(-1px);
+}
+.shared-chat-file svg {
+  grid-row: 1 / 3;
+  align-self: start;
+  width: 24px;
+  height: 24px;
+  color: var(--claude-muted-foreground);
+}
+.shared-chat-file__name {
+  min-width: 0;
+  overflow: hidden;
+  align-self: start;
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shared-chat-file__type {
+  justify-self: start;
+  padding: 2px 5px;
+  border: 1px solid var(--claude-border);
+  border-radius: 5px;
+  color: var(--claude-muted-foreground);
+  font-size: 9px;
+  line-height: 1;
+}
 .shared-chat-message__time {
   display: block;
   margin-top: 6px;

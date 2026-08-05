@@ -15,7 +15,10 @@ class ChatLibrary(Base):
     id: Mapped[id_key] = mapped_column(init=False)
     uuid: Mapped[str] = mapped_column(String(50), init=False, default_factory=uuid4_str, unique=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, comment='Chat Message Name')
-    kg_base_uuid: Mapped[str] = mapped_column(ForeignKey('kg_base.uuid'), nullable=False)
+    user_uuid: Mapped[str] = mapped_column(ForeignKey('sys_user.uuid'), nullable=False, index=True)
+    kg_base_uuid: Mapped[str | None] = mapped_column(
+        ForeignKey('kg_base.uuid', ondelete='SET NULL'), nullable=True, default=None
+    )
     messages: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=True, default_factory=dict)
     is_favorite: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 

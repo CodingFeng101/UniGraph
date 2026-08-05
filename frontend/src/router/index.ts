@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { isLogin } from '@/utils/auth';
+import { clearChunkRecoveryMarker, recoverFromChunkError } from './chunk-recovery';
 
 async function loadGraphRuntime() {
   const { ensureGraphRuntime } = await import('@/graph/runtime');
@@ -66,6 +67,18 @@ router.beforeEach((to) => {
   }
   if (!isLogin()) return { name: 'login', query: { redirect: to.fullPath } };
   return true;
+});
+
+router.onError((error) => {
+  recoverFromChunkError(error);
+});
+
+router.afterEach(() => {
+  clearChunkRecoveryMarker();
+});
+
+window.addEventListener('vite:preloadError', (event) => {
+  if (recoverFromChunkError(event.payload)) event.preventDefault();
 });
 
 export default router;

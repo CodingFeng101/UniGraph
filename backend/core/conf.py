@@ -44,6 +44,13 @@ class Settings(BaseSettings):
         }
     )
     LLM_MAX_CONCURRENCY: int = Field(default=8, ge=1, le=64)
+    LLM_HTTP_MAX_CLIENTS: int = Field(default=32, ge=1, le=256)
+    LLM_HTTP_MAX_CONNECTIONS: int = Field(default=100, ge=1, le=500)
+    LLM_HTTP_MAX_KEEPALIVE_CONNECTIONS: int = Field(default=20, ge=1, le=200)
+    LLM_HTTP_CONNECT_TIMEOUT: float = Field(default=10.0, ge=1, le=120)
+    LLM_HTTP_READ_TIMEOUT: float = Field(default=600.0, ge=10, le=3600)
+    EMBEDDING_BATCH_SIZE: int = Field(default=32, ge=1, le=256)
+    EMBEDDING_BATCH_CONCURRENCY: int = Field(default=4, ge=1, le=32)
     ALLOW_PRIVATE_LLM_ENDPOINTS: bool = False
     ENABLE_PUBLIC_PASSWORD_RESET: bool = False
 
@@ -182,6 +189,16 @@ class Settings(BaseSettings):
             raise ValueError('COOKIE_SECURE must be true in production')
         if not self.CORS_ALLOWED_ORIGINS or '*' in self.CORS_ALLOWED_ORIGINS:
             raise ValueError('CORS_ALLOWED_ORIGINS must list explicit trusted origins in production')
+        invalid_origins = [
+            origin
+            for origin in self.CORS_ALLOWED_ORIGINS
+            if not origin.startswith(('https://', 'http://')) or 'localhost' in origin.lower() or '127.0.0.1' in origin
+        ]
+        if invalid_origins:
+            raise ValueError(
+                'CORS_ALLOWED_ORIGINS must contain production origins only; '
+                f'invalid values: {", ".join(invalid_origins)}'
+            )
         return self
 
     DATETIME_TIMEZONE: str = 'Asia/Shanghai'

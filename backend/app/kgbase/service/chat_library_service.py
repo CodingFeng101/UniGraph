@@ -35,14 +35,11 @@ class ChatLibraryService:
         *,
         for_update: bool = False,
     ) -> ChatLibrary:
-        from backend.app.kgbase.model.kg_base import KgBase
-
         statement = (
             select(ChatLibrary)
-            .join(KgBase, ChatLibrary.kg_base_uuid == KgBase.uuid)
             .where(
                 ChatLibrary.uuid == chat_library_uuid,
-                KgBase.user_uuid == user_uuid,
+                ChatLibrary.user_uuid == user_uuid,
             )
         )
         if for_update:
@@ -59,7 +56,7 @@ class ChatLibraryService:
     async def add(*, obj: LibraryBase, user_uuid: str) -> str:
         async with async_db_session.begin() as db:
             await ChatLibraryService._get_owned_kg_base(db, obj.kg_base_uuid, user_uuid)
-            return await library_dao.create(db, obj)
+            return await library_dao.create(db, obj, user_uuid=user_uuid)
 
     @staticmethod
     async def update(*, uuid: str, user_uuid: str, obj: LibraryDetail) -> int:
@@ -113,6 +110,11 @@ class ChatLibraryService:
             await ChatLibraryService._get_owned_kg_base(db, kg_base_uuid, user_uuid)
             library = await library_dao.get_list(db, kg_base_uuid=kg_base_uuid)
             return library
+
+    @staticmethod
+    async def get_all_for_user(*, user_uuid: str) -> list[ChatLibrary]:
+        async with async_db_session() as db:
+            return await library_dao.get_user_sources(db, user_uuid)
 
     @staticmethod
     async def get_conversation(*, uuid: str, user_uuid: str) -> dict:

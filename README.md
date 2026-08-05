@@ -157,7 +157,7 @@ Set-Location UniGraph
 Copy-Item .env.docker.example .env.docker
 ```
 
-编辑 `.env.docker`，替换数据库密码以及所有 `replace-with-...` 密钥，然后启动：
+编辑 `.env.docker`，替换数据库密码、所有 `replace-with-...` 密钥，以及包含 `changeme` 的开发用 Base64 密钥，然后启动：
 
 ```bash
 docker compose --env-file .env.docker up -d --build
@@ -177,20 +177,24 @@ docker compose --env-file .env.docker ps
 
 <br>
 
-要求 Python 3.11–3.12、Node.js 20+、MySQL 8.x 和 Redis 7.x。
+要求 Python 3.11–3.12、Node.js 22.22.2+、MySQL 8.x 和 Redis 7.x。
 
 ```bash
 cp backend/.env.template backend/.env
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r backend/requirements.txt
+python -m alembic -c backend/alembic.ini upgrade head
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
-另开终端启动 Celery：
+另开四个终端启动隔离的 Celery 队列（并发数可通过环境变量调整）：
 
 ```bash
-celery -A backend.app.task.celery:celery_app worker --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q default --concurrency=4 --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q qa --concurrency=8 --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q indexing --concurrency=2 --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q migration --concurrency=2 --loglevel=info
 ```
 
 启动前端：
@@ -262,10 +266,11 @@ python -m pytest backend/tests -q
 cd frontend
 npm run lint
 npm run typecheck
+npm test
 npm run build
 ```
 
-CI 会执行后端格式、测试和依赖审计，前端类型、构建和依赖审计，以及 Compose 配置检查。
+CI 会执行后端格式、测试、迁移头检查和依赖审计，前端单元测试、类型、构建和依赖审计，以及完整 Docker 健康冒烟。
 
 ## 安全
 

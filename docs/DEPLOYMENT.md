@@ -9,7 +9,10 @@
 
 - `frontend`：Vue 3 + Vite 前端
 - `backend`：FastAPI 后端
-- `celery`：异步任务 worker
+- `celery-default`：轻量后台任务 worker
+- `celery-qa`：知识问答 worker
+- `celery-indexing`：索引构建 worker
+- `celery-migration`：知识迁移 worker
 - `mysql`：业务数据库
 - `redis`：缓存与任务队列
 
@@ -18,7 +21,7 @@
 建议环境：
 
 - Python 3.11
-- Node.js 20+
+- Node.js 22.22.2+
 - MySQL 8.x
 - Redis 7.x
 - Docker 24+ 与 Docker Compose v2（仅 Docker 部署需要）
@@ -72,6 +75,7 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cd ..
+python -m alembic -c backend/alembic.ini upgrade head
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -83,6 +87,7 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 cd ..
+python -m alembic -c backend/alembic.ini upgrade head
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -96,16 +101,22 @@ python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 Linux / macOS：
 
 ```bash
-celery -A backend.app.task.celery:celery_app worker --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q default --concurrency=${CELERY_DEFAULT_CONCURRENCY:-4} --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q qa --concurrency=${CELERY_QA_CONCURRENCY:-8} --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q indexing --concurrency=${CELERY_INDEXING_CONCURRENCY:-2} --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q migration --concurrency=${CELERY_MIGRATION_CONCURRENCY:-2} --loglevel=info
 ```
 
 Windows：
 
 ```powershell
-celery -A backend.app.task.celery:celery_app worker --pool=solo --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q default --pool=solo --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q qa --pool=solo --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q indexing --pool=solo --loglevel=info
+celery -A backend.app.task.celery:celery_app worker -Q migration --pool=solo --loglevel=info
 ```
 
-如果你希望 Windows 上同时跑多个任务，可以再额外开几个 worker 窗口。
+Windows 的 `solo` 池单进程执行，每条队列应使用独立窗口；生产环境建议使用 Linux 的 prefork worker。
 
 ### 3.4 前端启动
 
@@ -165,19 +176,23 @@ window.FRONTEND_CONFIG = {
 
 ### 3.7 Linux systemd 托管
 
-仓库提供两个可修改的服务文件：
+仓库提供五个可修改的服务文件：
 
 - `deploy/systemd/unigraph-backend.service`
 - `deploy/systemd/unigraph-celery.service`
+- `deploy/systemd/unigraph-celery-qa.service`
+- `deploy/systemd/unigraph-celery-indexing.service`
+- `deploy/systemd/unigraph-celery-migration.service`
 
 默认假设代码位于 `/opt/unigraph`、虚拟环境位于 `/opt/unigraph/.venv`、运行用户为 `unigraph`、环境文件位于 `/etc/unigraph/unigraph.env`。
 
 ```bash
 sudo install -m 0644 deploy/systemd/unigraph-backend.service /etc/systemd/system/
 sudo install -m 0644 deploy/systemd/unigraph-celery.service /etc/systemd/system/
+sudo install -m 0644 deploy/systemd/unigraph-celery-{qa,indexing,migration}.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now unigraph-backend unigraph-celery
-sudo systemctl status unigraph-backend unigraph-celery
+sudo systemctl enable --now unigraph-backend unigraph-celery unigraph-celery-{qa,indexing,migration}
+sudo systemctl status unigraph-backend unigraph-celery unigraph-celery-{qa,indexing,migration}
 ```
 
 环境文件权限应限制为运行用户和管理员可读：
@@ -228,7 +243,11 @@ docker compose --env-file .env.docker -f compose.yaml -f deploy/compose.prod.yam
 
 - `frontend`：Nginx 托管前端并代理 `/knowg/`
 - `backend`：FastAPI
-- `celery`：Celery worker
+- `migrate`：启动前执行 Alembic 数据库升级，成功后退出
+- `celery-default`：轻量后台任务
+- `celery-qa`：知识问答
+- `celery-indexing`：索引构建
+- `celery-migration`：知识迁移
 - `mysql`：MySQL 8.4
 - `redis`：Redis 7
 
@@ -257,7 +276,7 @@ docker compose --env-file .env.docker logs -f
 
 ```bash
 docker compose --env-file .env.docker logs -f backend
-docker compose --env-file .env.docker logs -f celery
+docker compose --env-file .env.docker logs -f celery-default celery-qa celery-indexing celery-migration
 docker compose --env-file .env.docker logs -f frontend
 ```
 
@@ -275,14 +294,13 @@ docker compose --env-file .env.docker down -v
 
 ## 5. 持久化目录
 
-升级已有数据库时，请按文件名顺序执行 `backend/migrations/` 中尚未应用的 SQL。首次启动的新数据库无需重复执行这些迁移。
+数据库版本由 Alembic 统一管理。后端启动时只做版本一致性检查，不会静默修改结构；版本落后时会拒绝启动并给出升级命令。Docker 的 `migrate` 服务会在 API 和 worker 之前自动升级。
 
-`20260730_multi_user_constraints.sql` 会把知识库和模型提供商名称约束调整为“用户内唯一”，并扩大模型密钥字段以保存密文。旧的明文模型密钥会在首次实际使用时自动改写为密文。
-
-升级已有数据库前先备份，然后按文件名顺序只执行尚未应用的迁移：
+升级已有数据库前先备份，然后执行：
 
 ```bash
 mysqldump -uroot -p --single-transaction onlineunigraph > unigraph-backup.sql
+python -m alembic -c backend/alembic.ini upgrade head
 mysql -uroot -p onlineunigraph < backend/migrations/20260724_chat_history.sql
 mysql -uroot -p onlineunigraph < backend/migrations/20260728_chat_share.sql
 mysql -uroot -p onlineunigraph < backend/migrations/20260730_multi_user_constraints.sql

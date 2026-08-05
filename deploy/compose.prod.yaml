@@ -4,7 +4,22 @@ services:
     environment:
       ENVIRONMENT: pro
 
-  celery:
+  celery-default:
+    restart: always
+    environment:
+      ENVIRONMENT: pro
+
+  celery-qa:
+    restart: always
+    environment:
+      ENVIRONMENT: pro
+
+  celery-indexing:
+    restart: always
+    environment:
+      ENVIRONMENT: pro
+
+  celery-migration:
     restart: always
     environment:
       ENVIRONMENT: pro

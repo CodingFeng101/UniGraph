@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from openai import AsyncOpenAI
+from backend.common.clients import openai_client_registry
 
 # semaphore = asyncio.Semaphore(100)  # 控制最大并发任务数为 100
 
@@ -58,8 +58,8 @@ class GenericResponseGetter(ResponseGetter):
         request = GenericResponseGetter._chat_request(
             query=query, model=model, messages=messages, max_tokens=max_tokens
         )
-        async with AsyncOpenAI(api_key=api_key, base_url=base_url) as async_client:
-            completion = await async_client.chat.completions.create(**request)
+        async_client = await openai_client_registry.get(api_key=api_key, base_url=base_url)
+        completion = await async_client.chat.completions.create(**request)
         return completion.choices[0].message.content
 
     @staticmethod
@@ -75,14 +75,14 @@ class GenericResponseGetter(ResponseGetter):
         request = GenericResponseGetter._chat_request(
             query=query, model=model, messages=messages, max_tokens=max_tokens
         )
-        async with AsyncOpenAI(api_key=api_key, base_url=base_url) as async_client:
-            stream = await async_client.chat.completions.create(**request, stream=True)
-            async for chunk in stream:
-                if not chunk.choices:
-                    continue
-                content = chunk.choices[0].delta.content
-                if content:
-                    yield content
+        async_client = await openai_client_registry.get(api_key=api_key, base_url=base_url)
+        stream = await async_client.chat.completions.create(**request, stream=True)
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            content = chunk.choices[0].delta.content
+            if content:
+                yield content
 
     @staticmethod
     async def get_vector(
@@ -99,10 +99,26 @@ class GenericResponseGetter(ResponseGetter):
         :param base_url: API地址
         """
 
-        # 初始化异步Embedding客户端
-        async with AsyncOpenAI(api_key=api_key, base_url=base_url) as async_embedding_client:
-            completion = await async_embedding_client.embeddings.create(model=model, input=[query])
-        return completion.data[0].embedding
+        vectors = await GenericResponseGetter.get_vectors(
+            queries=[query], model=model, api_key=api_key, base_url=base_url
+        )
+        return vectors[0]
+
+    @staticmethod
+    async def get_vectors(
+        queries: list[str],
+        model: str = 'text-embedding-3-small',
+        api_key: str = '',
+        base_url: str = '',
+    ) -> list[list[float]]:
+        if not queries:
+            return []
+        async_embedding_client = await openai_client_registry.get(api_key=api_key, base_url=base_url)
+        completion = await async_embedding_client.embeddings.create(model=model, input=queries)
+        ordered = sorted(completion.data, key=lambda item: item.index)
+        if len(ordered) != len(queries):
+            raise RuntimeError(f'嵌入模型返回 {len(ordered)} 个向量，预期 {len(queries)} 个')
+        return [item.embedding for item in ordered]
 
 
 class ResponseGetterFactory:

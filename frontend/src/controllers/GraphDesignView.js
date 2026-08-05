@@ -1,6 +1,6 @@
 import { getGraphExpansionDepth } from '@/services/preferences';
 import { renderGraphTooltipContent } from '@/utils/graphTooltip';
-import { validateUploadFiles } from '@/utils/upload';
+import { createSchemaDocumentController } from '@/features/schema/schema-documents';
 
 /* Generated from pages/graph-design.html; keep behavior changes in the source controller during migration. */
 export function createGraphDesignViewController() {
@@ -14,7 +14,6 @@ var relationTargetUuid = null;
 var kgBaseUuid = null;
 var schemaList = [];
 var editingSchemaElement = null;
-var pendingArchUpdatePaths = [];
 var selectedElement = null;
 var currentGraphStyle = 'database';
 
@@ -511,13 +510,23 @@ function resolveSchemaEntityName(uuid, preferredName) {
   return entity && entity.name ? entity.name : '未知实体';
 }
 
-function formatSchemaSource(value) {
+function formatSchemaAttributes(value) {
+  if (Array.isArray(value)) return value.join(', ');
+  if (value && typeof value === 'object') return Object.keys(value).join(', ');
+  return String(value || '');
+}
+
+function formatSchemaSources(value) {
   function collect(source) {
     if (source === null || source === undefined || source === '') return [];
     if (Array.isArray(source)) return source.flatMap(collect);
     if (typeof source === 'object') {
-      var values = Object.values(source).flatMap(collect);
-      return values.length ? values : Object.keys(source).flatMap(collect);
+      return Object.entries(source).flatMap(function(entry) {
+        var key = String(entry[0] || '').trim();
+        var detail = collect(entry[1]).join('；');
+        if (key && detail) return [key + '：' + detail];
+        return key ? [key] : (detail ? [detail] : []);
+      });
     }
     if (typeof source === 'string') {
       try {
@@ -531,10 +540,7 @@ function formatSchemaSource(value) {
     return text ? [text] : [];
   }
 
-  var sources = Array.from(new Set(collect(value)));
-  if (!sources.length) return '';
-  var visible = sources.slice(0, 3).join('；');
-  return sources.length > 3 ? visible + '；等 ' + sources.length + ' 条' : visible;
+  return Array.from(new Set(collect(value)));
 }
 
 function escapeTooltipText(value) {
@@ -547,8 +553,11 @@ function escapeTooltipText(value) {
 }
 
 function appendSchemaSource(bodyHtml, raw) {
-  var source = formatSchemaSource(raw?.source);
-  return source ? bodyHtml + '<br>来源: ' + escapeTooltipText(source) : bodyHtml;
+  var sources = formatSchemaSources(raw?.source);
+  if (!sources.length) return bodyHtml;
+  return bodyHtml + sources.map(function(source, index) {
+    return '<br>来源 ' + (index + 1) + ': ' + escapeTooltipText(source);
+  }).join('');
 }
 
 // Render schema graph using GraphRenderer (Cytoscape.js)
@@ -580,15 +589,7 @@ function renderSchemaGraph(detail) {
     mode: currentGraphStyle,
     onNodeClick: function(data) {
       selectedElement = { type: 'entity', uuid: data.id, data: data };
-      var attrs = data.attributes;
-      var attrStr = '';
-      if (Array.isArray(attrs)) {
-        attrStr = attrs.join(', ');
-      } else if (attrs && typeof attrs === 'object') {
-        attrStr = Object.keys(attrs).join(', ');
-      } else if (attrs) {
-        attrStr = String(attrs);
-      }
+      var attrStr = formatSchemaAttributes(data.attributes);
       showTooltipByPos(
         data.label || '实体类型',
         '实体类型',
@@ -612,9 +613,7 @@ function renderSchemaGraph(detail) {
     },
     onNodeHover: function(data, node, position) {
       selectedElement = { type: 'entity', uuid: data.id, data: data };
-      var attrs = data.attributes && typeof data.attributes === 'object'
-        ? Object.keys(data.attributes).join(', ')
-        : String(data.attributes || '');
+      var attrs = formatSchemaAttributes(data.attributes);
       showTooltipByPos(
         data.label || '实体类型',
         '实体类型',
@@ -779,288 +778,30 @@ function populateEntityDropdowns() {
   buildOptions(targetDropdown, false);
 }
 
-// Generate architecture suggestion via export API
-// Save architecture suggestion (modify_info + modify_suggestion)
-// Upload architecture file
-function parseJsonObject(value, fallback) {
-  if (!value) return fallback;
-  if (typeof value === 'object') return value;
-  try {
-    return JSON.parse(value);
-  } catch (error) {
-    return fallback;
-  }
-}
-
-function appendSuggestionInput(group, value) {
-  if (!group) return;
-  var wrapper = document.createElement('span');
-  wrapper.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-md';
-  wrapper.style.cssText = 'background:var(--claude-secondary);border:1px solid var(--claude-border);';
-  var input = document.createElement('input');
-  input.type = 'text';
-  input.value = value || '';
-  input.className = 'w-24 bg-transparent border-none outline-none text-[11px]';
-  input.style.color = 'var(--claude-foreground)';
-  var remove = document.createElement('button');
-  remove.type = 'button';
-  remove.textContent = '×';
-  remove.className = 'cursor-pointer';
-  remove.style.cssText = 'background:none;border:none;color:var(--claude-muted-foreground);';
-  remove.onclick = function() { wrapper.remove(); };
-  wrapper.appendChild(input);
-  wrapper.appendChild(remove);
-  group.appendChild(wrapper);
-}
-
-function populateArchSuggestionForm(detail) {
-  var modal = document.getElementById('modal-update-arch');
-  if (!modal) return;
-  var modifyInfo = parseJsonObject(detail.modify_info, {});
-  var groups = modal.querySelectorAll('.flex.flex-wrap.gap-1\\.5');
-  var values = [
-    modifyInfo.add_entity || modifyInfo.expected_entity_types || [],
-    modifyInfo.del_entity || modifyInfo.unexpected_entity_types || []
-  ];
-  groups.forEach(function(group, index) {
-    group.innerHTML = '';
-    (values[index] || []).forEach(function(value) {
-      appendSuggestionInput(group, value);
-    });
-  });
-  var textarea = modal.querySelector('textarea');
-  if (textarea) textarea.value = detail.modify_suggestion || '';
-}
-
-function addSuggestionTag(groupIndex) {
-  var modal = document.getElementById('modal-update-arch');
-  var groups = modal ? modal.querySelectorAll('.flex.flex-wrap.gap-1\\.5') : [];
-  appendSuggestionInput(groups[groupIndex], '');
-  var lastInput = groups[groupIndex] && groups[groupIndex].querySelector('span:last-child input');
-  if (lastInput) lastInput.focus();
-}
-
-function collectSuggestionInfo() {
-  var modal = document.getElementById('modal-update-arch');
-  var groups = modal ? modal.querySelectorAll('.flex.flex-wrap.gap-1\\.5') : [];
-  var collect = function(group) {
-    return Array.from(group ? group.querySelectorAll('input[type="text"]') : [])
-      .map(function(input) { return input.value.trim(); })
-      .filter(Boolean);
-  };
-  return { add_entity: collect(groups[0]), del_entity: collect(groups[1]) };
-}
-
-async function generateSuggestion() {
-  if (!currentSchemaUuid) {
-    showToast('请先选择知识架构');
-    return;
-  }
-  try {
-    var task = await TaskManager.submit(
-      'schema_graph.update_schema_graph_suggestion',
-      '生成架构建议',
-      currentSchemaData.name || currentSchemaUuid,
-      { uuid: currentSchemaUuid, user_token: Auth.getToken() }
-    );
-    await task.completion;
-    await loadSchemaDetail(currentSchemaUuid);
-  } catch (error) {
-    showToast(error.message || '生成建议失败');
-  }
-}
-
-async function saveArchSuggestion() {
-  if (!currentSchemaUuid) {
-    showToast('请先选择知识架构');
-    return;
-  }
-  var modal = document.getElementById('modal-update-arch');
-  var textarea = modal ? modal.querySelector('textarea') : null;
-  try {
-    var response = await KgBaseAPI.schemaGraph.updateDetail(currentSchemaUuid, {
-      modify_info: JSON.stringify(collectSuggestionInfo()),
-      modify_suggestion: textarea ? textarea.value : ''
-    });
-    if (response.code !== 200) throw new Error(response.msg || '保存失败');
-    modal.classList.add('hidden');
-    await loadSchemaDetail(currentSchemaUuid);
-    showToast('已保存');
-  } catch (error) {
-    showToast(error.message || '保存失败');
-  }
-}
-
-async function uploadFiles(files) {
-  validateUploadFiles(files);
-  var paths = [];
-  for (var index = 0; index < files.length; index += 1) {
-    var response = await API.uploadFile(files[index]);
-    if (response.code !== 200 || !response.data || !response.data.url) {
-      throw new Error(response.msg || '文件上传失败');
-    }
-    paths.push(response.data.url);
-  }
-  return paths;
-}
-
-function triggerCreateArchFiles() {
-  document.getElementById('create-arch-files').click();
-}
-
-function handleCreateArchFiles(input) {
-  var label = document.getElementById('create-arch-files-label');
-  if (label) label.textContent = input.files && input.files.length
-    ? Array.from(input.files).map(function(file) { return file.name; }).join('、')
-    : '上传 PDF / Word / TXT 文档';
-}
-
-async function submitCreateArch() {
-  if (document.getElementById('modal-new-arch')?.getAttribute('data-create-mode') === 'json') {
-    return handleImportArchFile(document.getElementById('import-arch-file'), true);
-  }
-  var input = document.getElementById('create-arch-files');
-  var name = document.getElementById('create-arch-name')?.value.trim() || '';
-  var aim = document.getElementById('create-arch-aim')?.value.trim() || '';
-  if (!name) return showToast('请输入架构名称');
-  if (!input.files || !input.files.length) return showToast('请上传构建文档');
-  try {
-    var filePaths = await uploadFiles(input.files);
-    document.getElementById('modal-new-arch').classList.add('hidden');
-    var task = await TaskManager.submit(
-      'schema_graph.create_schema_graph',
-      '创建知识架构',
-      name,
-      {
-        user_token: Auth.getToken(),
-        obj_data: {
-          file_paths: filePaths,
-          data: { kg_base_uuid: kgBaseUuid, name: name, aim: aim }
-        }
-      }
-    );
-    await task.completion;
-    await loadSchemaGraphs({ name: name });
-  } catch (error) {
-    showToast(error.message || '创建知识架构失败');
-  } finally {
-    input.value = '';
-    handleCreateArchFiles(input);
-  }
-}
-
-function triggerImportArchFile() {
-  document.getElementById('import-arch-file').click();
-}
-
-async function handleImportArchFile(input, shouldSubmit) {
-  if (!input.files || !input.files.length) return;
-  var label = document.getElementById('import-arch-file-label');
-  if (label) label.textContent = input.files[0].name;
-  if (!shouldSubmit) return;
-  try {
-    var filePaths = await uploadFiles(input.files);
-    var response = await KgBaseAPI.schemaGraph.import({
-      file_paths: filePaths,
-      data: {
-        kg_base_uuid: kgBaseUuid,
-        name: input.files[0].name.replace(/\.json$/i, ''),
-        aim: '',
-        modify_info: '',
-        modify_suggestion: ''
-      }
-    });
-    if (response.code !== 200) throw new Error(response.msg || '导入知识架构失败');
-    document.getElementById('modal-new-arch').classList.add('hidden');
-    await loadSchemaGraphs();
-    showToast('知识架构已导入');
-  } catch (error) {
-    showToast(error.message || '导入知识架构失败');
-  } finally {
-    input.value = '';
-    if (label) label.textContent = '选择 JSON 文件';
-  }
-}
-
-async function uploadArchFiles(files) {
-  if (!files || !files.length) return;
-  var selectedFiles = Array.from(files);
-  renderArchFileList(selectedFiles, 'uploading');
-  try {
-    pendingArchUpdatePaths = await uploadFiles(selectedFiles);
-    renderArchFileList(selectedFiles, 'uploaded');
-    showToast('已上传 ' + pendingArchUpdatePaths.length + ' 个文件');
-  } catch (error) {
-    pendingArchUpdatePaths = [];
-    renderArchFileList([], '');
-    showToast(error.message || '文件上传失败');
-  }
-}
-
-function renderArchFileList(files, status) {
-  var list = document.getElementById('arch-file-list');
-  if (!list) return;
-  list.innerHTML = '';
-  list.classList.toggle('hidden', !files.length);
-  files.forEach(function(file) {
-    var item = document.createElement('div');
-    item.className = 'flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-xs';
-    item.style.cssText = 'background:var(--claude-background);border:1px solid var(--claude-border);color:var(--claude-foreground);';
-
-    var name = document.createElement('span');
-    name.className = 'min-w-0 truncate';
-    name.textContent = file.name;
-
-    var state = document.createElement('span');
-    state.className = 'shrink-0 text-[10px]';
-    state.style.color = 'var(--claude-muted-foreground)';
-    state.textContent = status === 'uploaded' ? '已上传' : '上传中...';
-
-    item.appendChild(name);
-    item.appendChild(state);
-    list.appendChild(item);
-  });
-}
-
-async function submitArchUpdate() {
-  if (!currentSchemaUuid) {
-    showToast('请先选择知识架构');
-    return;
-  }
-  if (!pendingArchUpdatePaths.length) {
-    showToast('请先上传更新文档');
-    return;
-  }
-  var modal = document.getElementById('modal-update-arch');
-  var textarea = modal.querySelector('textarea');
-  try {
-    var task = await TaskManager.submit(
-      'schema_graph.update_schema_graph',
-      '更新知识架构',
-      currentSchemaData.name || currentSchemaUuid,
-      {
-        uuid: currentSchemaUuid,
-        user_token: Auth.getToken(),
-        obj_data: {
-          file_paths: pendingArchUpdatePaths,
-          data: {
-            modify_suggestion: textarea ? textarea.value : '',
-            modify_info: JSON.stringify(collectSuggestionInfo())
-          }
-        }
-      }
-    );
-    modal.classList.add('hidden');
-    pendingArchUpdatePaths = [];
-    renderArchFileList([], '');
-    var fileInput = document.getElementById('arch-file-input');
-    if (fileInput) fileInput.value = '';
-    await task.completion;
-    await loadSchemaDetail(currentSchemaUuid);
-  } catch (error) {
-    showToast(error.message || '更新知识架构失败');
-  }
-}
+const {
+  addSuggestionTag,
+  generateSuggestion,
+  handleCreateArchFiles,
+  handleImportArchFile,
+  populateArchSuggestionForm,
+  saveArchSuggestion,
+  submitArchUpdate,
+  submitCreateArch,
+  triggerCreateArchFiles,
+  triggerImportArchFile,
+  uploadArchFiles,
+} = createSchemaDocumentController({
+  API,
+  Auth,
+  KgBaseAPI,
+  TaskManager,
+  getCurrentSchemaData: () => currentSchemaData,
+  getCurrentSchemaUuid: () => currentSchemaUuid,
+  getKgBaseUuid: () => kgBaseUuid,
+  loadSchemaDetail,
+  loadSchemaGraphs,
+  notify: showToast,
+});
 
 lucide.createIcons();
 

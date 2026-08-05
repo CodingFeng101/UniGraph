@@ -99,6 +99,13 @@ async def get_all_library(request: Request, kg_base_uuid: Annotated[str, Path(..
     return response_base.success(data=data)
 
 
+@router.get('/all', summary='获取当前用户的所有对话', dependencies=[DependsJwtAuth])
+async def get_all_user_libraries(request: Request) -> ResponseModel:
+    libraries = await chat_library_service.get_all_for_user(user_uuid=request.user.uuid)
+    data = [LibraryResponse(**select_as_dict(library)) for library in libraries]
+    return response_base.success(data=data)
+
+
 @router.get('/{chat_library_uuid}', summary='获取聊天库具体信息', dependencies=[DependsJwtAuth])
 async def get_library(request: Request, chat_library_uuid: Annotated[str, Path(...)]) -> ResponseModel:
     data = await chat_library_service.get_conversation(

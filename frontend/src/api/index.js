@@ -296,6 +296,10 @@ export const KgBaseAPI = window.KgBaseAPI = {
     getAll(kgBaseUuid) {
       return API.get(`/v1/kg/chat_library/all/${kgBaseUuid}`);
     },
+    /** 获取当前用户的所有聊天，包括已解除知识库绑定的历史聊天 */
+    getAllForUser() {
+      return API.get('/v1/kg/chat_library/all');
+    },
     /** 获取聊天库详情 */
     getDetail(chatLibraryUuid) {
       return API.get(`/v1/kg/chat_library/${chatLibraryUuid}`);

@@ -12,7 +12,7 @@ MAX_UPLOAD_SIZE = 50 * 1024 * 1024
 MAX_IMAGE_UPLOAD_SIZE = 5 * 1024 * 1024
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 IMAGE_EXTENSIONS = {'.gif', '.jpeg', '.jpg', '.png', '.webp'}
-DOCUMENT_EXTENSIONS = {'.docx', '.json', '.pdf', '.txt'}
+DOCUMENT_EXTENSIONS = {'.csv', '.docx', '.json', '.md', '.pdf', '.txt'}
 ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | DOCUMENT_EXTENSIONS
 
 router = APIRouter()

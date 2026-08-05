@@ -426,26 +426,25 @@ class LlmCreateService:
 
     @staticmethod
     async def test(base_url: str, api_key: str, model_name: str, model_type: str = 'llm'):
-        from openai import AsyncOpenAI
-
+        from backend.common.clients import openai_client_registry
         from backend.common.security.outbound_url import validate_outbound_http_url
 
         await validate_outbound_http_url(base_url)
-        async with AsyncOpenAI(api_key=api_key, base_url=base_url) as client:
-            if model_type == 'embedding':
-                await client.embeddings.create(
-                    model=model_name,
-                    input=['connection test'],
-                )
-                return
-            await client.chat.completions.create(
+        client = await openai_client_registry.get(api_key=api_key, base_url=base_url)
+        if model_type == 'embedding':
+            await client.embeddings.create(
                 model=model_name,
-                messages=[
-                    {'role': 'system', 'content': 'You are a helpful assistant'},
-                    {'role': 'user', 'content': 'Hello'},
-                ],
-                stream=False,
+                input=['connection test'],
             )
+            return
+        await client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {'role': 'system', 'content': 'You are a helpful assistant'},
+                {'role': 'user', 'content': 'Hello'},
+            ],
+            stream=False,
+        )
 
 
 llm_create_service = LlmCreateService()

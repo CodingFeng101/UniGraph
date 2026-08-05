@@ -269,13 +269,27 @@
     </div>
   </div>
 
+  <button
+    id="chat-scroll-bottom"
+    type="button"
+    class="chat-scroll-bottom"
+    aria-label="回到对话底部"
+    title="回到对话底部"
+    @click="scrollChatToBottom()"
+  >
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="m7 6 5 5 5-5" />
+      <path d="m7 13 5 5 5-5" />
+    </svg>
+  </button>
+
   <aside id="chat-outline" class="chat-outline hidden" aria-label="对话问题目录"></aside>
 
   <div id="chat-composer-shell" class="chat-composer-shell shrink-0 pb-5 pt-2">
     <div class="max-w-[680px] mx-auto px-8">
       <div id="chat-composer" class="chat-composer rounded-2xl border px-4 pt-3.5 pb-3" style="background:var(--claude-card);border-color:var(--claude-border);">
         <div id="chat-attachment-list" class="chat-attachment-list hidden pb-3"></div>
-        <input id="chat-attachment-input" type="file" class="hidden" multiple accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.png,.jpg,.jpeg" @change="handleChatAttachments($event.currentTarget)">
+        <input id="chat-attachment-input" type="file" class="hidden" multiple accept=".pdf,.docx,.txt,.md,.csv,.json" @change="handleChatAttachments($event.currentTarget)">
 
         <textarea id="message-input" rows="1" class="w-full resize-none text-[15px] leading-relaxed bg-transparent outline-none" style="color:var(--claude-foreground);min-height:24px;max-height:160px;font-family:var(--claude-font-sans);" placeholder="有什么可以帮你的？" @input="adjustTextareaHeight($event.currentTarget);updateSendBtn()"></textarea>
 
@@ -460,6 +474,9 @@ export default {
     rotateShareLink(...args) {
       return this.controller?.rotateShareLink(...args);
     },
+    scrollChatToBottom(...args) {
+      return this.controller?.scrollChatToBottom(...args);
+    },
     selectModel(...args) {
       return this.controller?.selectModel(...args);
     },
@@ -506,6 +523,37 @@ export default {
 #app-main { position: relative; }
 .chat-composer-shell { position: relative; z-index: 35; }
 .chat-composer { box-shadow: var(--claude-shadow-sm); will-change: transform, opacity; }
+.chat-scroll-bottom {
+  position: absolute;
+  left: 50%;
+  bottom: 126px;
+  z-index: 34;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--claude-border);
+  border-radius: 999px;
+  background: var(--claude-card);
+  color: var(--claude-muted-foreground);
+  box-shadow: var(--claude-shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px) scale(.94);
+  transition: opacity .16s ease, transform .16s ease, color .16s ease, background-color .16s ease;
+  cursor: pointer;
+}
+.chat-scroll-bottom.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0) scale(1);
+}
+.chat-scroll-bottom:hover { background: var(--claude-accent); color: var(--claude-foreground); }
+#app-main.chat-is-empty .chat-scroll-bottom { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .chat-scroll-bottom { transition: none; }
+}
 #app-main.chat-is-empty #chat-container { pointer-events: none; }
 #app-main.chat-is-empty .chat-composer-shell {
   position: absolute;
@@ -564,8 +612,7 @@ export default {
   box-shadow: var(--claude-shadow-xs);
   cursor: pointer;
 }
-.chat-sent-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.chat-sent-attachments + p { margin-top: 10px; }
+.chat-sent-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-bottom: 10px; }
 .chat-sent-file {
   width: 148px;
   min-height: 82px;

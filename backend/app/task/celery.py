@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import asyncio
+
 import celery
 import celery_aio_pool
+from celery.signals import worker_process_shutdown
+from kombu import Exchange, Queue
 
 from backend.app.task.conf import task_settings
+from backend.common.clients import openai_client_registry
 from backend.core.conf import settings
 
 __all__ = ['celery_app']
@@ -58,6 +63,30 @@ def init_celery() -> celery.Celery:
     _beat_schedule = task_settings.CELERY_SCHEDULE
 
     # Update celery settings
+    task_exchange = Exchange('unigraph', type='direct', durable=True)
+    task_queues = tuple(
+        Queue(name, exchange=task_exchange, routing_key=name)
+        for name in (
+            task_settings.CELERY_DEFAULT_QUEUE,
+            task_settings.CELERY_QA_QUEUE,
+            task_settings.CELERY_INDEXING_QUEUE,
+            task_settings.CELERY_MIGRATION_QUEUE,
+        )
+    )
+    task_routes = {
+        'knowledge_graph.ask': {
+            'queue': task_settings.CELERY_QA_QUEUE,
+            'routing_key': task_settings.CELERY_QA_QUEUE,
+        },
+        'knowledge_graph.build_index': {
+            'queue': task_settings.CELERY_INDEXING_QUEUE,
+            'routing_key': task_settings.CELERY_INDEXING_QUEUE,
+        },
+        'knowledge_graph.infer_knowledge_graph': {
+            'queue': task_settings.CELERY_MIGRATION_QUEUE,
+            'routing_key': task_settings.CELERY_MIGRATION_QUEUE,
+        },
+    }
     app.conf.update(
         broker_url=_redis_broker,  # 强制使用Redis作为broker
         result_backend=_result_backend,
@@ -65,6 +94,13 @@ def init_celery() -> celery.Celery:
         timezone=settings.DATETIME_TIMEZONE,
         enable_utc=False,
         task_track_started=True,
+        task_default_queue=task_settings.CELERY_DEFAULT_QUEUE,
+        task_default_exchange=task_exchange.name,
+        task_default_exchange_type=task_exchange.type,
+        task_default_routing_key=task_settings.CELERY_DEFAULT_QUEUE,
+        task_queues=task_queues,
+        task_routes=task_routes,
+        worker_prefetch_multiplier=1,
         worker_concurrency=task_settings.CELERY_WORKER_CONCURRENCY,
         beat_schedule=_beat_schedule,
     )
@@ -81,3 +117,12 @@ celery_app.conf.include = [
     'backend.app.kgbase.api.v1.kgbase.knowledge_graph',
     'backend.app.kgbase.api.v1.kgbase.schema_graph',
 ]
+
+
+@worker_process_shutdown.connect
+def close_worker_http_clients(**kwargs) -> None:
+    try:
+        asyncio.run(openai_client_registry.close_all())
+    except RuntimeError:
+        # The process is already shutting down; open sockets will be released by the OS.
+        pass

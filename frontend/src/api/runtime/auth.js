@@ -5,9 +5,12 @@
 import CryptoJS from 'crypto-js';
 import { isLogin } from '@/utils/auth';
 import { AppConfig } from './config';
+import { pinia } from '@/stores';
+import { useChatStore } from '@/stores/chat';
+import { useTaskStore } from '@/stores/task';
+import { useUserStore } from '@/stores/user';
 
-const TOKEN_KEY = 'access_token';
-const USER_KEY = 'user';
+const userStore = useUserStore(pinia);
 
 export const Auth = window.Auth = {
   /** 是否已登录 */
@@ -17,7 +20,7 @@ export const Auth = window.Auth = {
 
   /** 获取 token */
   getToken() {
-    return localStorage.getItem(TOKEN_KEY);
+    return userStore.token;
   },
 
   /** 获取认证请求头 */
@@ -28,48 +31,29 @@ export const Auth = window.Auth = {
 
   /** 设置 token */
   setToken(token) {
-    localStorage.setItem(TOKEN_KEY, token);
+    userStore.setToken(token);
   },
 
   /** 清除 token */
   clearToken() {
-    localStorage.removeItem(TOKEN_KEY);
+    userStore.setToken(null);
   },
 
   /** 设置用户信息 */
   setUserInfo(info) {
     const incoming = typeof info === 'string' ? JSON.parse(info) : (info || {});
-    const cached = this.getUserInfo() || {};
-    const sameUser = Boolean(
-      (cached.uuid && incoming.uuid && cached.uuid === incoming.uuid) ||
-      (cached.user_uuid && incoming.user_uuid && cached.user_uuid === incoming.user_uuid) ||
-      (cached.id && incoming.id && cached.id === incoming.id) ||
-      (cached.username && incoming.username && cached.username === incoming.username)
-    );
-    const userInfo = {
-      ...cached,
-      ...incoming,
-      avatar: incoming.avatar || (sameUser ? cached.avatar : null),
-    };
-    localStorage.setItem(USER_KEY, JSON.stringify(userInfo));
-    window.dispatchEvent(new CustomEvent('unigraph:user-updated', { detail: userInfo }));
+    userStore.setProfile(incoming);
+    window.dispatchEvent(new CustomEvent('unigraph:user-updated', { detail: userStore.profile }));
   },
 
   /** 获取用户信息 */
   getUserInfo() {
-    const info = localStorage.getItem(USER_KEY);
-    if (!info) return null;
-    try {
-      return JSON.parse(info);
-    } catch {
-      this.clearUserInfo();
-      return null;
-    }
+    return userStore.profile;
   },
 
   /** 清除用户信息 */
   clearUserInfo() {
-    localStorage.removeItem(USER_KEY);
+    userStore.setProfile(null);
   },
 
   /**
@@ -96,6 +80,8 @@ export const Auth = window.Auth = {
     }
     this.clearToken();
     this.clearUserInfo();
+    useChatStore(pinia).reset();
+    useTaskStore(pinia).reset();
     window.location.href = `${import.meta.env.BASE_URL}login`;
   },
 

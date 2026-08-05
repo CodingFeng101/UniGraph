@@ -28,6 +28,11 @@ class AddKnowledgeGraphParam(SchemaBase):
     data: KnowledgeGraphBase
 
 
+class AskAttachment(SchemaBase):
+    name: str
+    url: str
+
+
 class AskKnowledgeGraphParam(SchemaBase):
     message: str
     infer: bool = False
@@ -37,6 +42,7 @@ class AskKnowledgeGraphParam(SchemaBase):
     current_message_uuid: str | None = None
     llm_model_uuid: str | None = None
     effort: str | None = None
+    attachments: list[AskAttachment] = Field(default_factory=list)
 
 
 class BuildKnowledgeGraphIndexParam(SchemaBase):
