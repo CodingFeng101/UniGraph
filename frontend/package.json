@@ -29,7 +29,7 @@
     "markdown-it": "^14.1.0",
     "mermaid": "^11.16.1",
     "pinia": "^4.0.2",
-    "vis-data": "^7.1.9",
+    "vis-data": "^8.0.4",
     "vis-network": "^9.1.9",
     "vue": "^3.5.13",
     "vue-i18n": "^11.4.8",
