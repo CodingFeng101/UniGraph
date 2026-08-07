@@ -102,7 +102,7 @@ fastapi-limiter==0.1.6
     # via unigraph-backend (backend/pyproject.toml)
 fastapi-oauth20==0.0.3
     # via unigraph-backend (backend/pyproject.toml)
-fastapi-pagination==0.15.15
+fastapi-pagination==0.15.16
     # via unigraph-backend (backend/pyproject.toml)
 frozenlist==1.8.0
     # via
