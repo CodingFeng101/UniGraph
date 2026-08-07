@@ -1,0 +1,234 @@
+x-app-environment: &app-environment
+  ENVIRONMENT: ${ENVIRONMENT:-dev}
+  MYSQL_HOST: mysql
+  MYSQL_PORT: 3306
+  MYSQL_USER: ${MYSQL_USER:-root}
+  MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+  MYSQL_DATABASE: ${MYSQL_DATABASE}
+  MYSQL_POOL_SIZE: ${MYSQL_POOL_SIZE:-10}
+  MYSQL_MAX_OVERFLOW: ${MYSQL_MAX_OVERFLOW:-20}
+  MYSQL_POOL_TIMEOUT: ${MYSQL_POOL_TIMEOUT:-30}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  REDIS_DATABASE: ${REDIS_DATABASE:-0}
+  TOKEN_SECRET_KEY: ${TOKEN_SECRET_KEY}
+  AUTH_AES_SECRET_KEY: ${AUTH_AES_SECRET_KEY}
+  LLM_API_KEY_ENCRYPTION_KEY: ${LLM_API_KEY_ENCRYPTION_KEY:-}
+  OPERA_LOG_ENCRYPT_SECRET_KEY: ${OPERA_LOG_ENCRYPT_SECRET_KEY}
+  JXNU_AES_SECRET_KEY: ${JXNU_AES_SECRET_KEY:-}
+  JXNU_USER_INFO_URL: ${JXNU_USER_INFO_URL:-https://ai.jxselab.com/tsp/v1/sys/users/me}
+  OAUTH2_GITHUB_CLIENT_ID: ${OAUTH2_GITHUB_CLIENT_ID:-test}
+  OAUTH2_GITHUB_CLIENT_SECRET: ${OAUTH2_GITHUB_CLIENT_SECRET:-test}
+  OAUTH2_LINUX_DO_CLIENT_ID: ${OAUTH2_LINUX_DO_CLIENT_ID:-test}
+  OAUTH2_LINUX_DO_CLIENT_SECRET: ${OAUTH2_LINUX_DO_CLIENT_SECRET:-test}
+  CELERY_BROKER_REDIS_DATABASE: ${CELERY_BROKER_REDIS_DATABASE:-1}
+  CELERY_BACKEND_REDIS_DATABASE: ${CELERY_BACKEND_REDIS_DATABASE:-2}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+  OPENAI_API_KEY: ${OPENAI_API_KEY}
+  INDEX_EXPORT_URL_ROOT: ${INDEX_EXPORT_URL_ROOT:-http://backend:8000/knowg/v1/knowledge/ask}
+  CHAT_CONTEXT_RECENT_TURNS: ${CHAT_CONTEXT_RECENT_TURNS:-8}
+  CHAT_CONTEXT_COMPRESSION_THRESHOLD_TOKENS: ${CHAT_CONTEXT_COMPRESSION_THRESHOLD_TOKENS:-6000}
+  CHAT_CONTEXT_TRIGGER_RATIO: ${CHAT_CONTEXT_TRIGGER_RATIO:-0.7}
+  CHAT_CONTEXT_SUMMARY_MAX_TOKENS: ${CHAT_CONTEXT_SUMMARY_MAX_TOKENS:-1500}
+  CHAT_CONTEXT_DEFAULT_MODEL_LIMIT: ${CHAT_CONTEXT_DEFAULT_MODEL_LIMIT:-128000}
+  CHAT_CONTEXT_MODEL_LIMITS: '${CHAT_CONTEXT_MODEL_LIMITS:-{"gpt-5":400000,"gpt-4.1":1000000,"gpt-4o":128000,"o1":200000,"o3":200000,"claude":200000,"deepseek":128000,"gemini":1000000}}'
+  LLM_MAX_CONCURRENCY: ${LLM_MAX_CONCURRENCY:-8}
+  LLM_HTTP_MAX_CLIENTS: ${LLM_HTTP_MAX_CLIENTS:-32}
+  LLM_HTTP_MAX_CONNECTIONS: ${LLM_HTTP_MAX_CONNECTIONS:-100}
+  LLM_HTTP_MAX_KEEPALIVE_CONNECTIONS: ${LLM_HTTP_MAX_KEEPALIVE_CONNECTIONS:-20}
+  LLM_HTTP_CONNECT_TIMEOUT: ${LLM_HTTP_CONNECT_TIMEOUT:-10}
+  LLM_HTTP_READ_TIMEOUT: ${LLM_HTTP_READ_TIMEOUT:-600}
+  EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-32}
+  EMBEDDING_BATCH_CONCURRENCY: ${EMBEDDING_BATCH_CONCURRENCY:-4}
+  ALLOW_PRIVATE_LLM_ENDPOINTS: ${ALLOW_PRIVATE_LLM_ENDPOINTS:-false}
+  ENABLE_PUBLIC_PASSWORD_RESET: ${ENABLE_PUBLIC_PASSWORD_RESET:-false}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  UNIGRAPH_RUNTIME_DIR: /app/var
+
+x-app-volumes: &app-volumes
+  - ./backend/static:/app/backend/static
+  - ./var:/app/var
+
+x-celery-service: &celery-service
+  image: unigraph-backend:${UNIGRAPH_IMAGE_TAG:-local}
+  build:
+    context: .
+    dockerfile: deploy/docker/backend.Dockerfile
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+  environment: *app-environment
+  volumes: *app-volumes
+  stop_grace_period: 60s
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      TZ: ${TZ:-Asia/Shanghai}
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "127.0.0.1:${MYSQL_EXPOSE_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./deploy/mysql/init/01-schema.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command: >
+      sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then
+        exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD";
+      else
+        exec redis-server --appendonly yes;
+      fi'
+    ports:
+      - "127.0.0.1:${REDIS_EXPOSE_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping; else redis-cli ping; fi"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    image: unigraph-backend:${UNIGRAPH_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: deploy/docker/backend.Dockerfile
+    command: ["python", "-m", "alembic", "-c", "backend/alembic.ini", "upgrade", "head"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment: *app-environment
+    volumes: *app-volumes
+    restart: "no"
+
+  backend:
+    image: unigraph-backend:${UNIGRAPH_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: deploy/docker/backend.Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *app-environment
+      CORS_ALLOWED_ORIGINS: '${CORS_ALLOWED_ORIGINS:-["http://localhost:8080"]}'
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    volumes: *app-volumes
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/knowg/v1/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 30s
+
+  celery-default:
+    <<: *celery-service
+    command:
+      [
+        "celery",
+        "-A",
+        "backend.app.task.celery:celery_app",
+        "worker",
+        "--queues=default",
+        "--concurrency=${CELERY_DEFAULT_CONCURRENCY:-4}",
+        "--loglevel=info",
+      ]
+
+  celery-qa:
+    <<: *celery-service
+    command:
+      [
+        "celery",
+        "-A",
+        "backend.app.task.celery:celery_app",
+        "worker",
+        "--queues=qa",
+        "--concurrency=${CELERY_QA_CONCURRENCY:-8}",
+        "--loglevel=info",
+      ]
+
+  celery-indexing:
+    <<: *celery-service
+    command:
+      [
+        "celery",
+        "-A",
+        "backend.app.task.celery:celery_app",
+        "worker",
+        "--queues=indexing",
+        "--concurrency=${CELERY_INDEXING_CONCURRENCY:-2}",
+        "--loglevel=info",
+      ]
+
+  celery-migration:
+    <<: *celery-service
+    command:
+      [
+        "celery",
+        "-A",
+        "backend.app.task.celery:celery_app",
+        "worker",
+        "--queues=migration",
+        "--concurrency=${CELERY_MIGRATION_CONCURRENCY:-2}",
+        "--loglevel=info",
+      ]
+
+  frontend:
+    image: unigraph-frontend:${UNIGRAPH_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: deploy/docker/frontend.Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NGINX_BACKEND_HOST: backend
+      NGINX_BACKEND_PORT: 8000
+      VITE_HOST_URL: ${FRONTEND_VITE_HOST_URL:-}
+      VITE_API_BASE_URL: ${FRONTEND_VITE_API_BASE_URL:-/knowg}
+      VITE_SHOW_IMAGE_API: ${FRONTEND_VITE_SHOW_IMAGE_API:-/knowg/v1/image/}
+      VITE_USER_INFO_SSO_URL: ${FRONTEND_VITE_USER_INFO_SSO_URL:-/knowg/v1/sys/users/me}
+      VITE_AUTH_AES_SECRET_KEY: ${AUTH_AES_SECRET_KEY}
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  mysql_data:
+  redis_data:

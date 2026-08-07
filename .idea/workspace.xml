@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="0ebf7d07-e813-417a-9f84-cd2120ae825d" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.env.docker.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.docker.example" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/SECURITY.md" beforeDir="false" afterPath="$PROJECT_DIR$/SECURITY.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/.env.template" beforeDir="false" afterPath="$PROJECT_DIR$/backend/.env.template" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/api/v1/auth/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/api/v1/auth/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/api/v1/auth/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/api/v1/auth/auth.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/api/v1/auth/sso.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/api/v1/llm/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/api/v1/llm/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/api/v1/llm/creater_routers.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/api/v1/llm/model_routers.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/api/v1/llm/model_routers.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/api/v1/llm/provider_routers.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/api/v1/llm/provider_routers.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/api/v1/oauth2/ai_jxnu.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/api/v1/oauth2/ai_jxnu.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/api/v1/sys/dept.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/api/v1/sys/dept.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/api/v1/sys/user.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/api/v1/sys/user.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/conf.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/conf.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/crud/crud_user.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/crud/crud_user.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/model/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/model/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/model/llm_provider_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/model/llm_provider_model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/model/sys_user.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/model/sys_user.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/schema/auth_service.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/schema/llm_provider_schema.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/schema/llm_provider_schema.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/schema/user.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/schema/user.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/service/auth_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/service/auth_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/service/llm_create_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/service/llm_create_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/service/llm_model_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/service/llm_model_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/service/llm_provider_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/service/llm_provider_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/service/login_log_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/service/login_log_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/service/oauth2_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/service/oauth2_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/admin/service/user_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/admin/service/user_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/file/file.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/file/file.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/image/get_image.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/image/get_image.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/chat_library.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/chat_library.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/kg_base.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/kg_base.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/knowledge_entity.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/knowledge_entity.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/knowledge_graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/knowledge_graph.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/knowledge_relationship.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/knowledge_relationship.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/schema_entity.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/schema_entity.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/schema_graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/schema_graph.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/schema_relationship.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/api/v1/kgbase/schema_relationship.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/crud/crud_schema_graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/crud/crud_schema_graph.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/model/chat_library.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/model/chat_library.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/model/kg_base.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/model/kg_base.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/schema/chat_library.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/schema/chat_library.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/schema/knowledge_graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/schema/knowledge_graph.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/service/chat_library_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/service/chat_library_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/service/community_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/service/community_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/service/embedding_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/service/embedding_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/service/knowledge_graph_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/service/knowledge_graph_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/service/llm_info_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/service/llm_info_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/kgbase/service/schema_graph_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/kgbase/service/schema_graph_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/router.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/router.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/task/api/v1/task.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/task/api/v1/task.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/task/celery_task/tasks.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/task/celery_task/tasks.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/task/conf.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/task/conf.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/task/service/task_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/task/service/task_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/interface/kgschema_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/interface/kgschema_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/interface/query_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/interface/query_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/ai_unit/chains/extraction_chain.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/ai_unit/chains/extraction_chain.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/ai_unit/llm/response_getter.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/ai_unit/llm/response_getter.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/ai_unit/response_parser/extraction_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/ai_unit/response_parser/extraction_parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/ai_unit/response_parser/inference_parser.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/ai_unit/response_parser/inference_parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/file/file_loader.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/file/file_loader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/index/graph/attribute_embedding.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/index/graph/attribute_embedding.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/index/graph/cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/index/graph/cli.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/model/model_load.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/model/model_load.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/retriver/context_builder/entity_extraction.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/retriver/context_builder/entity_extraction.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/retriver/structured_search/local_search/mixed_context.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/retriver/structured_search/local_search/mixed_context.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/retriver/structured_search/local_search/search.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/sapperrag/retriver/structured_search/local_search/search.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/schema_construction/related_retrieve.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/schema_construction/related_retrieve.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/schema_construction/schema_construction.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/schema_construction/schema_construction.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/schema_construction/suggestion_generation.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/schema_construction/suggestion_generation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/schema_construction/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/core_layer/unigraph/module/schema_construction/utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/exception/exception_handler.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/exception/exception_handler.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/log.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/log.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/schema.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/schema.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/security/permission.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/security/permission.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/security/rbac.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/security/rbac.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/common/task_progress.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/common/task_progress.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/core/conf.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/core/conf.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/core/registrar.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/core/registrar.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/database/db_mysql.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/database/db_mysql.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/middleware/opera_log_middleware.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/middleware/opera_log_middleware.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/tests/smoke_import.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/tests/smoke_import.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/tests/test_open_source_security.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/tests/test_open_source_security.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/compose.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/compose.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/deploy/docker/backend.Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/docker/backend.Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/deploy/mysql/init/01-schema.sql" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/mysql/init/01-schema.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/deploy/nginx/40-runtime-config.sh" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/nginx/40-runtime-config.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/deploy/nginx/default.conf.template" beforeDir="false" afterPath="$PROJECT_DIR$/deploy/nginx/default.conf.template" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/DEPLOYMENT.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/DEPLOYMENT.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/OPEN_SOURCE_CHECKLIST.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/OPEN_SOURCE_CHECKLIST.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/public/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/public/config.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/api/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/api/runtime/auth.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/runtime/auth.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/api/runtime/client.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/runtime/client.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/api/runtime/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/runtime/config.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/components/task/TaskCenter.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/task/TaskCenter.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/controllers/GraphApplicationView.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/controllers/GraphApplicationView.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/controllers/GraphBuildView.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/controllers/GraphBuildView.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/controllers/GraphDesignView.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/controllers/GraphDesignView.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/controllers/KnowledgeBaseInfoView.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/controllers/KnowledgeBaseInfoView.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/controllers/KnowledgeBaseListView.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/controllers/KnowledgeBaseListView.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/controllers/ProfileView.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/controllers/ProfileView.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/controllers/TutorialsView.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/env.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/env.d.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/graph/renderer.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/graph/renderer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/graph/runtime.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/graph/runtime.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/main.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/main.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/services/preferences.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/services/preferences.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/services/sidebar-chat.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/services/sidebar-chat.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/services/task-manager.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/services/task-manager.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/utils/feedback.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/utils/feedback.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/views/design/GraphApplicationView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/design/GraphApplicationView.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/views/design/GraphBuildView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/design/GraphBuildView.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/views/design/GraphDesignView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/design/GraphDesignView.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/views/design/KnowledgeBaseInfoView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/design/KnowledgeBaseInfoView.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/views/design/KnowledgeBaseListView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/design/KnowledgeBaseListView.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/views/design/ProfileView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/design/ProfileView.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/views/design/SettingsView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/design/SettingsView.vue" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/views/design/TutorialsView.vue" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/views/design/TutorialsView.vue" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3
+}</component>
+  <component name="ProjectId" id="3HDgoUCloHf499jNl09ZQuJsbVU" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/PycharmProjects/docker_unigraphonline&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RunManager">
+    <configuration default="true" type="PythonConfigurationType" factoryName="Python">
+      <module name="UniGraph" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="tests" factoryName="Autodetect">
+      <module name="UniGraph" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="tests" factoryName="Doctests">
+      <module name="UniGraph" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="" />
+      <option name="CLASS_NAME" value="" />
+      <option name="METHOD_NAME" value="" />
+      <option name="FOLDER_NAME" value="" />
+      <option name="TEST_TYPE" value="TEST_SCRIPT" />
+      <option name="PATTERN" value="" />
+      <option name="USE_PATTERN" value="false" />
+      <method v="2" />
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-e03c56caf84a-JavaScript-PY-252.23892.439" />
+        <option value="bundled-python-sdk-b3ae9b5d7125-f0eec537fc84-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.23892.439" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="0ebf7d07-e813-417a-9f84-cd2120ae825d" name="Changes" comment="" />
+      <created>1785408229349</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1785408229349</updated>
+      <workItem from="1785408231547" duration="241000" />
+      <workItem from="1785645463667" duration="19000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

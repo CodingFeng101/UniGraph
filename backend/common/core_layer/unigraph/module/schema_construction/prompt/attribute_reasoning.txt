@@ -1,0 +1,24 @@
+'''
+                        @ContextControl{
+                            Must output in {{language}}.
+                            The Input contains multiple entity types.
+                            The entity types in the Input are separated by ',', and any errors should be avoided when outputting the entity types.
+                    	}
+                    	@Input{
+                    	    {{entity_type_string}}
+                    	}
+                        @Instruction Attribute_Reasoning{
+                            @Commands{
+                                [step1]Infer two to three possible attributes for each entity type, which must match the entity type.
+                                [step2]Output Entity type and corresponding attributes according to the following Format.
+                            }
+                            @Rules Every time an entity type is output, all entities corresponding to that entity type must be output.
+                            @Rules Please note that the Entity type and Attribute in the Format should be replaced with a specific type output instead of directly outputting the "Entity type" and "Attribute".
+                            @Rules Do not output your thought process or any other unnecessary content.
+                            @Format{
+                                Entity Type 1: Attribute 1, Attribute 2, Attribute 3
+                                Entity Type 2: Attribute 4, Attribute 5, Attribute 6
+                                Entity Type 3: Attribute 7, Attribute 8, Attribute 9
+                            }
+                        }
+'''

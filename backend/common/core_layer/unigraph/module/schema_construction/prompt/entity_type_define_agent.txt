@@ -1,0 +1,17 @@
+'''
+                        @ContextControl{
+                            Must output in {{language}}.
+                            The part before the colon in the input is the entity type, and the part after the colon is the corresponding entities.
+                    	}
+                    	@Input{
+                    	    {{entity_type_dict_string}}
+                    	}
+                        @Instruction Entity Classifier{
+                            @Commands{
+                                [Step1]Define the entity type in one sentence, no more than 20 words.
+                                [Step2]Output according to the following Format: Before the colon is the entity type, and after the colon is the definition of that entity type.
+                            }
+                            @Rules Do not output any unnecessary content.
+                            @Rules Only define the entity type, do not define entities.
+                        }
+'''

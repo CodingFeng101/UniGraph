@@ -1,0 +1,27 @@
+'''
+                        @ContextControl{
+                            Must output in {{language}}.
+                            The Input contains multiple relationships.
+                            The relationships in the Input are separated by ',', and any errors should be avoided when outputting the relationships.
+                    	}
+                    	@Input{
+                    	    {{relation_string}}
+                    	}
+                        @Instruction Relationship Classifier{
+                                @Commands Classify entity relationships with the highest level of abstraction as far as possible.
+                                @Commands Output each relationship Category and corresponding relations according to the following Format.
+                                @Rules Multiple colons must not appear on the same line.
+                                @Rules Only one relationship Category and its corresponding relationships can be output in one line.
+                                @Rules The relationship category is usually a verb phrase and cannot be a noun and no more than five words.
+                                @Rules Please note that the Relationship Category in the Format should be replaced with a specific category output instead of directly outputting the "Relationship Category".
+                                @Rules Avoid creating an "other" or miscellaneous category.
+                                @Rules Do not output any of your thought process.
+                                @Rules Ensure that the relationship is output in its original format without adding numbers.
+                                @Format{
+                                    Relationship Category1: relationship1, relationship2, relationship3
+                                    Relationship Category2: relationship4, relationship5, relationship6
+                                    Relationship Category3: relationship7, relationship8, relationship9
+                                }
+                            }
+                        }
+'''

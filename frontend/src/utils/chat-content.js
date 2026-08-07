@@ -1,0 +1,267 @@
+import DOMPurify from 'dompurify';
+import hljs from 'highlight.js/lib/core';
+import bash from 'highlight.js/lib/languages/bash';
+import css from 'highlight.js/lib/languages/css';
+import javascript from 'highlight.js/lib/languages/javascript';
+import json from 'highlight.js/lib/languages/json';
+import python from 'highlight.js/lib/languages/python';
+import sql from 'highlight.js/lib/languages/sql';
+import typescript from 'highlight.js/lib/languages/typescript';
+import xml from 'highlight.js/lib/languages/xml';
+import yaml from 'highlight.js/lib/languages/yaml';
+import MarkdownIt from 'markdown-it';
+
+[
+  ['bash', bash], ['css', css], ['javascript', javascript], ['json', json],
+  ['python', python], ['sql', sql], ['typescript', typescript], ['xml', xml], ['yaml', yaml],
+].forEach(([name, language]) => hljs.registerLanguage(name, language));
+
+const languageAliases = {
+  html: 'xml', js: 'javascript', jsx: 'javascript', shell: 'bash', sh: 'bash',
+  ts: 'typescript', tsx: 'typescript', yml: 'yaml',
+};
+
+const markdown = new MarkdownIt({
+  breaks: true,
+  linkify: true,
+  highlight(code, language) {
+    if (String(language || '').trim().toLowerCase() === 'mermaid') {
+      return `<pre class="chat-mermaid" data-mermaid-source="${escapeHtml(encodeURIComponent(code))}"></pre>`;
+    }
+    try {
+      const normalizedLanguage = languageAliases[String(language || '').toLowerCase()] || String(language || '').toLowerCase();
+      const result = normalizedLanguage && hljs.getLanguage(normalizedLanguage)
+        ? hljs.highlight(code, { language: normalizedLanguage, ignoreIllegals: true })
+        : { value: escapeHtml(code) };
+      const languageClass = normalizedLanguage ? ` language-${escapeHtml(normalizedLanguage)}` : '';
+      return `<pre class="chat-code-block"><code class="hljs${languageClass}">${result.value}</code></pre>`;
+    } catch {
+      return `<pre class="chat-code-block"><code>${escapeHtml(code)}</code></pre>`;
+    }
+  },
+});
+
+const sourceLabels = {
+  Reports: '整体知识概览',
+  Sources: '具体信息来源',
+  Relationships: '相关知识关联',
+  Entities: '重点知识细节',
+};
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character]);
+}
+
+export function renderChatMarkdown(text) {
+  if (text == null || text === '') return '';
+  try {
+    return DOMPurify.sanitize(markdown.render(String(text)));
+  } catch {
+    return escapeHtml(text).replace(/\n/g, '<br>');
+  }
+}
+
+export function normalizeChatSources(sources) {
+  const input = Array.isArray(sources)
+    ? sources.reduce((result, source) => {
+        if (source?.source_type) result[source.source_type] = source.content;
+        return result;
+      }, {})
+    : (sources && typeof sources === 'object' ? sources : {});
+  return {
+    Reports: input.Reports != null ? input.Reports : (input.Communities || []),
+    Sources: input.Sources || [],
+    Relationships: input.Relationships || [],
+    Entities: input.Entities || [],
+  };
+}
+
+function parseSourceContent(content) {
+  if (typeof content !== 'string') return content;
+  try {
+    return JSON.parse(content);
+  } catch {
+    return content;
+  }
+}
+
+function sourceRecords(content) {
+  const parsed = parseSourceContent(content);
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || typeof parsed !== 'object') return [];
+
+  const columns = Object.keys(parsed);
+  if (!columns.length) return [];
+  const knownColumns = ['id', 'text', 'entity_type', 'entity_name', 'name', 'source', 'target'];
+  const isColumnOriented = columns.some((column) => knownColumns.includes(column));
+  if (!isColumnOriented && columns.every((key) => parsed[key] && typeof parsed[key] === 'object' && !Array.isArray(parsed[key]))) {
+    return columns.map((key) => ({ ...parsed[key], id: parsed[key].id ?? key }));
+  }
+  const rowKeys = new Set();
+  columns.forEach((column) => {
+    const values = parsed[column];
+    if (values && typeof values === 'object' && !Array.isArray(values)) {
+      Object.keys(values).forEach((key) => rowKeys.add(key));
+    }
+  });
+  if (!rowKeys.size) return [parsed];
+  return Array.from(rowKeys).map((rowKey) => {
+    const row = { id: rowKey };
+    columns.forEach((column) => {
+      const values = parsed[column];
+      row[column] = values && typeof values === 'object' ? values[rowKey] : values;
+    });
+    return row;
+  });
+}
+
+function findSourceRecord(sources, type, recordId) {
+  const normalizedId = String(recordId ?? '').trim();
+  return sourceRecords(sources[type]).find((record) => String(record?.id ?? '').trim() === normalizedId);
+}
+
+function entityAttributeFields(value) {
+  const parsed = parseSourceContent(value);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return Object.entries(parsed)
+      .filter(([key]) => !['id', 'name', 'entity_name', 'entity_type'].includes(String(key).toLowerCase()))
+      .map(([key, fieldValue]) => [key, fieldValue == null || fieldValue === 'None' ? '—' : fieldValue]);
+  }
+
+  const text = String(parsed || '').trim();
+  if (!text) return [];
+  const matches = Array.from(text.matchAll(/(?:^|\s)([\p{L}\p{N}_/·-]+)\s*[:：]\s*/gu));
+  if (!matches.length) return [['知识属性', text]];
+  return matches.map((match, index) => {
+    const key = match[1];
+    const start = match.index + match[0].length;
+    const end = index + 1 < matches.length ? matches[index + 1].index : text.length;
+    const fieldValue = text.slice(start, end).trim().replace(/[;；]+$/, '').trim();
+    return [key, !fieldValue || fieldValue === 'None' ? '—' : fieldValue];
+  }).filter(([key]) => !['name', 'entity_name', 'entity_type'].includes(String(key).toLowerCase()));
+}
+
+function sourceRecordFields(type, record) {
+  if (!record) return [['记录状态', '未在本次检索上下文中找到对应记录']];
+  if (type === 'Relationships') {
+    return [
+      ['关系', record.name],
+      ['起点实体', record.source],
+      ['终点实体', record.target],
+    ].filter((field) => field[1] != null && String(field[1]).trim() !== '');
+  }
+  if (type === 'Entities') {
+    return [
+      ['实体类型', record.entity_type],
+      ['实体名称', record.entity_name],
+      ...entityAttributeFields(record.text),
+    ].filter((field) => field[1] != null && String(field[1]).trim() !== '');
+  }
+  return [['原文片段', record.text || '该记录没有可展示的文本片段']];
+}
+
+function overviewSections(record) {
+  const text = String(record?.text || '该记录没有可展示的概览内容').trim();
+  const sections = [];
+  let current = null;
+  text.split(/\r?\n/).forEach((line) => {
+    const match = line.match(/^\s*(社区名称|社区摘要|详细摘要(?:[（(]\d+[）)])?|摘要说明(?:[（(]\d+[）)])?)\s*[:：]\s*(.*)$/);
+    if (match) {
+      current = { label: match[1], value: match[2].trim() };
+      sections.push(current);
+      return;
+    }
+    if (!line.trim()) {
+      if (current?.value && !current.value.endsWith('\n')) current.value += '\n';
+      return;
+    }
+    if (!current) {
+      current = { label: '概览补充', value: line.trim() };
+      sections.push(current);
+      return;
+    }
+    current.value += (current.value.endsWith('\n') ? '' : ' ') + line.trim();
+  });
+  return sections.length ? sections : [{ label: '概览摘要', value: text }];
+}
+
+function renderOverviewText(value) {
+  return String(value || '').split(/\n+/).map((paragraph) => paragraph.trim()).filter(Boolean)
+    .map((paragraph) => '<span class="source-popup-overview__paragraph">' + escapeHtml(paragraph) + '</span>')
+    .join('');
+}
+
+function renderOverviewRecord(record, index, showIndex) {
+  if (!record) {
+    return '<span class="source-popup-record source-popup-overview-record"><span class="source-popup-field__value">未在本次检索上下文中找到对应记录</span></span>';
+  }
+  const sections = overviewSections(record);
+  const nameSection = sections.find((section) => section.label === '社区名称');
+  const contentSections = sections.filter((section) => section !== nameSection);
+  return '<span class="source-popup-record source-popup-overview-record">' +
+    (showIndex ? '<span class="source-popup-overview__index">概览 ' + (index + 1) + '</span>' : '') +
+    (nameSection ? '<span class="source-popup-overview__heading">' + escapeHtml(nameSection.value) + '</span>' : '') +
+    '<span class="source-popup-overview__sections">' + contentSections.map((section) =>
+      '<span class="source-popup-overview__section' + (section.label === '社区摘要' ? ' is-summary' : '') + '">' +
+      '<span class="source-popup-overview__label">' + escapeHtml(section.label) + '</span>' +
+      '<span class="source-popup-overview__text">' + renderOverviewText(section.value) + '</span></span>').join('') +
+    '</span></span>';
+}
+
+function renderCitationBadge(type, recordIds, sources) {
+  const label = sourceLabels[type];
+  const ids = Array.isArray(recordIds) ? recordIds : [recordIds];
+  const records = ids.map((recordId, index) => {
+    const record = findSourceRecord(sources, type, recordId);
+    if (type === 'Reports') return renderOverviewRecord(record, index, ids.length > 1);
+    const fields = sourceRecordFields(type, record).map((field) =>
+      '<span class="source-popup-field"><span class="source-popup-field__label">' + escapeHtml(field[0]) + '</span>' +
+      '<span class="source-popup-field__value">' + escapeHtml(field[1]) + '</span></span>').join('');
+    return '<span class="source-popup-record">' +
+      (ids.length > 1 ? '<span class="source-popup-record__id">#' + escapeHtml(recordId) + '</span>' : '') +
+      '<span class="source-popup-fields">' + fields + '</span></span>';
+  }).join('');
+  const hasRecord = ids.some((recordId) => findSourceRecord(sources, type, recordId));
+  const summary = ids.length > 1 ? `${ids.length} 条` : `#${ids[0]}`;
+  const typeClass = type === 'Reports' ? ' citation-tag--overview' : '';
+  return '<button type="button" class="source-tag citation-tag' + typeClass + (hasRecord ? '' : ' is-missing') + '" data-citation data-source-type="' +
+    escapeHtml(type) + '" aria-expanded="false" aria-label="查看引用 ' +
+    escapeHtml(`${label}，${ids.length} 条`) + '"><span class="citation-tag__label">' + escapeHtml(label) + '</span>' +
+    '<span class="source-popup" role="tooltip" popover="manual"><span class="source-popup-title"><span>' + escapeHtml(label) +
+    '</span><span class="source-popup-id">' + escapeHtml(summary) + '</span></span><span class="source-popup-records">' + records +
+    '</span></span></button>';
+}
+
+export function renderAnswerWithCitations(text, rawSources) {
+  if (text == null || text === '') return '';
+  const sources = normalizeChatSources(rawSources);
+  const citations = [];
+  const prepared = String(text).replace(/(?:\[|【)Data\s*[:：]\s*([^】\]]+)(?:\]|】)/gi, (original, citationBody) => {
+    const groups = [];
+    const groupPattern = /(Reports|Sources|Relationships|Entities|Communities)\s*[(（]([^）)]+)[)）]/gi;
+    let match;
+    while ((match = groupPattern.exec(String(citationBody))) !== null) {
+      const canonicalType = match[1].toLowerCase() === 'communities'
+        ? 'Reports'
+        : Object.keys(sourceLabels).find((type) => type.toLowerCase() === match[1].toLowerCase());
+      if (!canonicalType) continue;
+      const recordIds = match[2].split(/[,，、]/).map((id) => id.trim()).filter(Boolean);
+      if (!recordIds.length) continue;
+      const previousGroup = groups[groups.length - 1];
+      if (previousGroup?.type === canonicalType) previousGroup.recordIds.push(...recordIds);
+      else groups.push({ type: canonicalType, recordIds });
+    }
+    if (!groups.length) return original;
+    const badges = groups.map((group) => renderCitationBadge(group.type, group.recordIds, sources));
+    const placeholder = `@@UNIGRAPH_CITATION_${citations.length}@@`;
+    citations.push('<span class="citation-group" aria-label="信息来源">' + badges.join('') + '</span>');
+    return placeholder;
+  });
+  let rendered = renderChatMarkdown(prepared);
+  citations.forEach((citation, index) => {
+    rendered = rendered.replace(`@@UNIGRAPH_CITATION_${index}@@`, citation);
+  });
+  return rendered;
+}

@@ -1,0 +1,34 @@
+services:
+  backend:
+    restart: always
+    environment:
+      ENVIRONMENT: pro
+
+  celery-default:
+    restart: always
+    environment:
+      ENVIRONMENT: pro
+
+  celery-qa:
+    restart: always
+    environment:
+      ENVIRONMENT: pro
+
+  celery-indexing:
+    restart: always
+    environment:
+      ENVIRONMENT: pro
+
+  celery-migration:
+    restart: always
+    environment:
+      ENVIRONMENT: pro
+
+  mysql:
+    restart: always
+
+  redis:
+    restart: always
+
+  frontend:
+    restart: always
