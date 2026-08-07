@@ -193,7 +193,7 @@ numpy==2.4.6
     #   pandas
     #   scikit-learn
     #   scipy
-openai==2.49.0
+openai==2.53.0
     # via
     #   unigraph-backend (backend/pyproject.toml)
     #   langchain-openai
