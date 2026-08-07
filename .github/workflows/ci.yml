@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend quality tools
+        run: python -m pip install ruff==0.15.20 -r backend/requirements-dev.txt
+      - name: Check Python formatting and lint
+        working-directory: backend
+        run: |
+          ruff format --check .
+          ruff check .
+      - name: Run security regression tests
+        run: |
+          python -m pytest backend/tests -q
+          python backend/tests/smoke_import.py
+          python -m alembic -c backend/alembic.ini heads
+      - name: Audit locked backend dependencies
+        run: |
+          python -m pip install pip-audit
+          pip-audit --requirement backend/requirements.txt --no-deps --disable-pip
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: npm audit --audit-level=high
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configuration
+        run: |
+          docker compose --env-file .env.docker.example config --quiet
+          docker compose --env-file .env.docker.example -f compose.yaml -f deploy/compose.prod.yaml config --quiet
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start a clean Docker stack
+        run: docker compose --env-file .env.docker.example up -d --build
+      - name: Wait for frontend and backend health
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/ >/dev/null \
+              && curl --fail --silent http://127.0.0.1:8000/knowg/v1/health >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose --env-file .env.docker.example ps
+          docker compose --env-file .env.docker.example logs --tail=200
+          exit 1
+      - name: Stop Docker stack
+        if: always()
+        run: docker compose --env-file .env.docker.example down --volumes --remove-orphans

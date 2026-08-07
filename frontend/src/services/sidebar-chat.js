@@ -1,0 +1,231 @@
+import { Auth } from '@/api/runtime/auth';
+import { KgBaseAPI } from '@/api';
+import { displayChatName } from '@/utils/chat-name';
+import { pinia } from '@/stores';
+import { useChatStore } from '@/stores/chat';
+
+export const ChatSidebar = window.ChatSidebar = (() => {
+  const chatStore = useChatStore(pinia);
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[char]);
+  }
+
+  function notify(message) {
+    if (typeof window.showToast === 'function') window.showToast(message);
+  }
+
+  function hrefFor(item) {
+    const baseUuid = item.kg_base_uuid || item.navigation_base_uuid;
+    return baseUuid
+      ? `/unigraph/unigraphs/${encodeURIComponent(baseUuid)}/qa?chat=${encodeURIComponent(item.uuid)}`
+      : '#';
+  }
+
+  function row(item) {
+    const active = new URLSearchParams(location.search).get('chat') === item.uuid;
+    const name = displayChatName(item.name);
+    return `
+      <div class="group relative px-3 py-2 rounded-lg transition-colors hover:bg-[var(--claude-accent)]"${active ? ' style="background:var(--claude-accent);"' : ''}>
+        <a href="${hrefFor(item)}" data-chat-link data-chat-uuid="${escapeHtml(item.uuid)}" class="block" style="text-decoration:none;">
+          <p class="text-[15px] leading-[22px] font-normal truncate pr-7" style="color:var(--claude-foreground);">${escapeHtml(name)}</p>
+        </a>
+        <button type="button" onclick="event.stopPropagation();ChatSidebar.toggleMenu(this)" class="absolute right-2 top-1.5 flex w-6 h-6 items-center justify-center rounded-md claude-menu-item opacity-55 group-hover:opacity-100 transition-opacity" style="background:transparent;border:none;color:var(--claude-muted-foreground);font-size:18px;line-height:1;" aria-label="对话菜单">⋮</button>
+        <div class="chat-context-menu hidden absolute right-2 top-8 z-50 min-w-28 rounded-xl p-1" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
+          <button type="button" onclick="ChatSidebar.rename('${item.uuid}')" class="claude-menu-item w-full px-3 py-2 rounded-lg text-xs text-left" style="background:none;border:none;color:var(--claude-foreground);">重命名</button>
+          <button type="button" onclick="ChatSidebar.favorite('${item.uuid}',${!item.is_favorite})" class="claude-menu-item w-full px-3 py-2 rounded-lg text-xs text-left" style="background:none;border:none;color:var(--claude-foreground);">${item.is_favorite ? '取消收藏' : '收藏'}</button>
+          <button type="button" onclick="ChatSidebar.remove('${item.uuid}')" class="claude-menu-item w-full px-3 py-2 rounded-lg text-xs text-left" style="background:none;border:none;color:var(--claude-destructive);">删除</button>
+        </div>
+      </div>`;
+  }
+
+  function render() {
+    const container = document.querySelector('#app-sidebar .sidebar-content .space-y-0\\.5');
+    if (!container) return;
+    const sorted = chatStore.items.slice().sort((a, b) => {
+      const left = new Date(a.updated_time || a.created_time || 0);
+      const right = new Date(b.updated_time || b.created_time || 0);
+      return chatStore.sortAscending ? left - right : right - left;
+    });
+    const starred = sorted.filter((item) => item.is_favorite);
+    const recent = sorted.filter((item) => !item.is_favorite);
+    const recentHeading = `<div class="flex items-center justify-between px-3 pt-4 pb-1 text-[13px] font-normal" style="color:var(--claude-muted-foreground);"><span>Recents</span><button type="button" onclick="ChatSidebar.toggleSort()" class="w-6 h-6 flex items-center justify-center rounded-md claude-menu-item cursor-pointer" style="background:none;border:none;color:var(--claude-muted-foreground);" aria-label="排序"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><line x1="7" y1="3" x2="7" y2="21"/><circle cx="7" cy="8" r="2"/><line x1="17" y1="3" x2="17" y2="21"/><circle cx="17" cy="16" r="2"/></svg></button></div>`;
+    container.innerHTML = sorted.length
+      ? `${starred.length ? `<div class="px-3 pt-1 pb-1 text-[13px] font-normal" style="color:var(--claude-muted-foreground);">Starred</div>${starred.map(row).join('')}` : ''}
+         ${recentHeading}${recent.map(row).join('')}`
+      : '<div class="px-3 py-2 text-[12px]" style="color:var(--claude-muted-foreground);">暂无历史对话</div>';
+    bindChatLinks(container);
+    renderSearch(sorted);
+  }
+
+  function bindChatLinks(container) {
+    const routeMatch = location.pathname.match(/^\/unigraph\/unigraphs\/([^/]+)\/qa\/?$/);
+    if (!routeMatch || typeof window.switchChat !== 'function') return;
+    const currentBaseUuid = decodeURIComponent(routeMatch[1]);
+    container.querySelectorAll('[data-chat-link]').forEach((link) => {
+      const item = chatStore.items.find((entry) => entry.uuid === link.dataset.chatUuid);
+      const targetBaseUuid = item?.kg_base_uuid || item?.navigation_base_uuid;
+      if (!item || targetBaseUuid !== currentBaseUuid) return;
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        window.switchChat(item.uuid, displayChatName(item.name));
+        document.getElementById('search-modal')?.classList.add('hidden');
+      });
+    });
+  }
+
+  function renderSearch(list) {
+    const container = document.querySelector('#search-modal .max-h-\\[50vh\\]');
+    if (!container) return;
+    container.innerHTML = list.length
+      ? `<div class="px-2 py-2">${list.map((item) => `<a href="${hrefFor(item)}" data-chat-link data-chat-uuid="${escapeHtml(item.uuid)}" class="chat-search-item block px-3 py-2.5 rounded-lg claude-menu-item text-sm" style="color:var(--claude-foreground);">${escapeHtml(displayChatName(item.name))}</a>`).join('')}</div>`
+      : '<div class="px-4 py-8 text-center text-sm" style="color:var(--claude-muted-foreground);">暂无历史对话</div>';
+    bindChatLinks(container);
+  }
+
+  function filterSearch(query) {
+    const value = String(query || '').toLowerCase();
+    document.querySelectorAll('#search-modal .chat-search-item').forEach((element) => {
+      element.style.display = element.textContent.toLowerCase().includes(value) ? '' : 'none';
+    });
+  }
+
+  async function hydrateUser() {
+    const response = await KgBaseAPI.auth.getUserInfo();
+    if (response.code !== 200 || !response.data) return;
+    const user = response.data;
+    const footer = document.querySelector('#app-sidebar > .px-3.py-2\\.5.relative.mt-auto');
+    if (!footer) return;
+    const name = user.nickname || user.username || '用户';
+    const nameElement = footer.querySelector('p.text-sm');
+    const roleElement = footer.querySelector('p.text-\\[10px\\]');
+    const emailElement = document.querySelector('#user-dropdown > div:first-child p');
+    if (nameElement) nameElement.textContent = name;
+    if (roleElement) roleElement.textContent = user.is_superuser ? '管理员' : '用户';
+    if (emailElement) emailElement.textContent = user.email || '未设置邮箱';
+  }
+
+  async function load() {
+    if (!Auth.isLogin()) return;
+    try {
+      const [basesResponse, chatsResponse] = await Promise.all([
+        KgBaseAPI.kgBase.getAll(),
+        KgBaseAPI.chatLibrary.getAllForUser(),
+      ]);
+      if (basesResponse.code !== 200) throw new Error(basesResponse.msg || '加载知识库失败');
+      if (chatsResponse.code !== 200) throw new Error(chatsResponse.msg || '加载历史对话失败');
+      const bases = Array.isArray(basesResponse.data) ? basesResponse.data : [];
+      const fallbackBaseUuid = bases[0]?.uuid || null;
+      const chats = Array.isArray(chatsResponse.data)
+        ? chatsResponse.data.map((item) => ({ ...item, navigation_base_uuid: fallbackBaseUuid }))
+        : [];
+      const baseContexts = await Promise.all(bases.map(async (base) => {
+        try {
+          const graphResponse = await KgBaseAPI.knowledgeGraph.getAll(base.uuid);
+          const hasIndex = graphResponse.code === 200 && Array.isArray(graphResponse.data)
+            && graphResponse.data.some((graph) => Number(graph.index_status) === 1);
+          return { base, hasIndex };
+        } catch {
+          return { base, hasIndex: false };
+        }
+      }));
+      if (bases.length && !location.pathname.includes('/unigraphs/')) {
+        const preferredBase = baseContexts
+          .filter((context) => context.hasIndex)
+          .sort((left, right) =>
+            new Date(right.base.created_time || 0) - new Date(left.base.created_time || 0))[0]?.base;
+        if (preferredBase) {
+          window.dispatchEvent(new CustomEvent('unigraph:knowledge-base-default', {
+            detail: { uuid: preferredBase.uuid },
+          }));
+        }
+      }
+      chatStore.replaceItems(chats);
+      await hydrateUser();
+      const searchInput = document.getElementById('search-input');
+      if (searchInput) searchInput.oninput = () => filterSearch(searchInput.value);
+      if (!/\/qa\/?$/.test(location.pathname)) render();
+    } catch (error) {
+      notify(error.message || '加载历史对话失败');
+    }
+  }
+
+  function toggleMenu(button) {
+    const menu = button?.nextElementSibling;
+    const shouldOpen = menu?.classList.contains('hidden');
+    document.querySelectorAll('.chat-context-menu').forEach((element) => element.classList.add('hidden'));
+    if (shouldOpen) menu?.classList.remove('hidden');
+  }
+
+  function toggleSort() {
+    chatStore.sortAscending = !chatStore.sortAscending;
+    render();
+  }
+
+  async function rename(uuid) {
+    const item = chatStore.items.find((entry) => entry.uuid === uuid);
+    if (!item) return;
+    const name = window.prompt('请输入新的对话名称', item.name || '');
+    if (!name || name === item.name) return;
+    const detail = await KgBaseAPI.chatLibrary.getDetail(uuid);
+    const response = await KgBaseAPI.chatLibrary.update(uuid, {
+      kg_base_uuid: item.kg_base_uuid,
+      name,
+      messages: detail.data?.messages || {},
+      is_favorite: Boolean(item.is_favorite),
+    });
+    if (response.code !== 200) return notify(response.msg || '重命名失败');
+    item.name = name;
+    render();
+  }
+
+  async function favorite(uuid, isFavorite) {
+    const response = await KgBaseAPI.chatLibrary.setFavorite(uuid, isFavorite);
+    if (response.code !== 200) return notify(response.msg || '收藏失败');
+    const item = chatStore.items.find((entry) => entry.uuid === uuid);
+    if (item) item.is_favorite = isFavorite;
+    render();
+  }
+
+  async function remove(uuid) {
+    const item = chatStore.items.find((entry) => entry.uuid === uuid);
+    if (typeof window.confirmAction !== 'function') {
+      notify('确认组件未就绪，请稍后重试');
+      return;
+    }
+    const confirmed = await window.confirmAction({
+      title: '删除对话',
+      message: item?.name
+        ? '确定要删除“' + item.name + '”吗？删除后无法恢复。'
+        : '确定要删除这段对话吗？删除后无法恢复。',
+      confirmText: '删除',
+      size: 'compact',
+    });
+    if (!confirmed) return;
+    const response = await KgBaseAPI.chatLibrary.delete(uuid);
+    if (response.code !== 200) return notify(response.msg || '删除失败');
+    chatStore.removeItem(uuid);
+    render();
+    window.dispatchEvent(new CustomEvent('unigraph:chat-deleted', { detail: { uuid } }));
+  }
+
+  document.addEventListener('DOMContentLoaded', load);
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('.chat-context-menu')) return;
+    document.querySelectorAll('.chat-context-menu').forEach((element) => element.classList.add('hidden'));
+  });
+  if (document.readyState !== 'loading') load();
+
+  return {
+    favorite,
+    filterSearch,
+    load,
+    remove,
+    rename,
+    render,
+    toggleMenu,
+    toggleSort,
+  };
+})();

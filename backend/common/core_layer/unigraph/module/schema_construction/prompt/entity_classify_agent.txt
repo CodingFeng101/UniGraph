@@ -1,0 +1,28 @@
+'''
+                        @ContextControl{
+                            Must output in {{language}}.
+                            The Input contains multiple entities.
+                            The entities in the Input are separated by ',', and any errors should be avoided when outputting the entities.
+                    	}
+                    	@Input{
+                    	    {{entity_string}}
+                    	}
+                        @Instruction Entity Classifier{
+                            @Commands{
+                                [step1]Classify entities in the Input with the middle level of abstraction possible.
+                                [step2]Output Entity Category and corresponding entities according to the following Format, avoid leaving any entity unclassified.
+                            }
+                            @Rules Every time an entity category is output, all entities corresponding to that entity category must be output.
+                            @Rules Please note that the Entity Category in the Format should be replaced with a specific category output instead of directly outputting the "Entity Category".
+                            @Rules Avoid creating an "other" or miscellaneous category.
+                            @Rules Each entity must be classified, avoid leaving any entity unclassified.
+                            @Rules Do not output your thought process or any other unnecessary content
+                            @Rules Any entity in the input cannot be used as an entity type.
+                            @Rules Ensure that the entity is output in its original format without adding numbers.
+                            @Format{
+                                Entity Category1: entity1, entity2, entity3
+                                Entity Category2: entity4, entity5, entity6
+                                Entity Category3: entity7, entity8, entity9
+                            }
+                        }
+'''

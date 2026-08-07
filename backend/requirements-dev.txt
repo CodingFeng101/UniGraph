@@ -1,0 +1,5 @@
+# Development and test tooling on top of the locked runtime set.
+# Runtime images must keep installing requirements.txt only.
+-r requirements.txt
+pytest==9.1.1
+pytest-asyncio==1.4.0

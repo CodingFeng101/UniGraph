@@ -1,0 +1,33 @@
+* text=auto
+
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.vue text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.toml text eol=lf
+*.conf text eol=lf
+*.sql text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Dockerfile* text eol=lf
+.dockerignore text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.svg text eol=lf
+*.ttf binary
+*.woff binary
+*.woff2 binary

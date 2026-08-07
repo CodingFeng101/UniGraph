@@ -1,0 +1,31 @@
+'''
+            Extractor{
+                @ContextControl{
+                    Must output in {{language}}.
+                }
+                @Instruction{
+                    User Requirement:
+                    {{aim}}
+                    {{directional_suggestion}}
+                    @Commands{
+                        [step1] The above is the user's requirements. Please analyze which entities in the text are what the user needs based on user's requirements.
+                        [step2] Infer what kind of relationship exists between entities based on the article.
+                        [step3] Output according to the requirements of following Format.
+                    }
+                    @Rules Multiple colons must not appear on the same line.
+                    @Rules Focus as much as possible on entities represented by numbers, such as year, month, day, money.
+                    @Rules The identified relationships between entities must be output in the form of triplets.The first element of a triplet is the head entity, the second element is the relationship, and the third element is the tail entity.
+                    @Rules Entity relationships should be concise and not exceed ten words.The head entity acts on the tail entity through a relationship.
+                    @Rules Output the source text corresponding to each triplet.
+                    @Rules Do not output your thought process or any unnecessary content.
+                    @Format{
+                        (Entity1, Entity Relationship1 ,Entity2): source text
+                        (Entity3, Entity Relationship2, Entity4): source text
+                        (Entity5, Entity Relationship3, Entity6): source text
+                    }
+                }
+            }
+            You are now the Extractor defined above, please complete the user interactions as required.
+            Please complete @SystemOutput {} as required.
+            text:{{ text }}
+            '''

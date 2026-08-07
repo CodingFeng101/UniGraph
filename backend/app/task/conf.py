@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from functools import lru_cache
+from typing import Literal
+
+from celery.schedules import crontab
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from backend.core.path_conf import BasePath
+
+
+class TaskSettings(BaseSettings):
+    """Task Settings"""
+
+    model_config = SettingsConfigDict(env_file=f'{BasePath}/.env', env_file_encoding='utf-8', extra='ignore')
+
+    # Env Config
+    ENVIRONMENT: Literal['dev', 'pro']
+
+    # Env Celery
+    CELERY_BROKER_REDIS_DATABASE: int  # 仅当使用 redis 作为 broker 时生效, 更适用于测试环境
+    CELERY_BACKEND_REDIS_DATABASE: int
+
+    # Celery
+    CELERY_BACKEND_REDIS_PREFIX: str = 'fba:celery'
+    CELERY_BACKEND_REDIS_TIMEOUT: float = 5.0
+    CELERY_TASK_OWNER_TTL_SECONDS: int = 7 * 24 * 60 * 60
+    CELERY_TASK_SUBMISSION_GRACE_SECONDS: int = 5 * 60
+    CELERY_WORKER_CONCURRENCY: int = 4
+    CELERY_DEFAULT_QUEUE: str = 'default'
+    CELERY_QA_QUEUE: str = 'qa'
+    CELERY_INDEXING_QUEUE: str = 'indexing'
+    CELERY_MIGRATION_QUEUE: str = 'migration'
+    CELERY_DEFAULT_CONCURRENCY: int = 4
+    CELERY_QA_CONCURRENCY: int = 8
+    CELERY_INDEXING_CONCURRENCY: int = 2
+    CELERY_MIGRATION_CONCURRENCY: int = 2
+
+    # 这里需要添加新增的包路径
+    CELERY_TASKS_PACKAGES: list[str] = [
+        'backend.app.task.celery_task',
+        'backend.app.task.celery_task.db_log',
+        'backend.app.kgbase.api.v1.kgbase',
+    ]
+    CELERY_TASK_MAX_RETRIES: int = 5
+    CELERY_SCHEDULE: dict = {
+        'exec-every-10-seconds': {
+            'task': 'task_demo_async',
+            'schedule': 10,
+        },
+        'exec-every-sunday': {
+            'task': 'auto_delete_db_opera_log',
+            'schedule': crontab(0, 0, day_of_week='6'),  # type: ignore
+        },
+        'exec-every-15-of-month': {
+            'task': 'auto_delete_db_login_log',
+            'schedule': crontab(0, 0, day_of_month='15'),  # type: ignore
+        },
+    }
+
+
+@lru_cache
+def get_task_settings() -> TaskSettings:
+    """获取 task 配置"""
+    return TaskSettings()
+
+
+task_settings = get_task_settings()

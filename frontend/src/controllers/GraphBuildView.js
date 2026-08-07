@@ -1,0 +1,897 @@
+import { renderGraphTooltipContent } from '@/utils/graphTooltip';
+import { validateUploadFiles } from '@/utils/upload';
+import { createGraphExplorationController } from '@/features/graph/graph-exploration';
+import { createGraphEditorController } from '@/features/graph/graph-editor';
+
+/* Generated from pages/graph-build.html; keep behavior changes in the source controller during migration. */
+export function createGraphBuildViewController() {
+  const { Auth, API, GraphRenderer, KgBaseAPI, TaskManager } = window;
+
+lucide.createIcons();
+
+function openModal(id) {
+  document.getElementById(id).classList.remove('hidden');
+  if (typeof onOpenModal === 'function') onOpenModal(id);
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+  if (typeof onCloseModal === 'function') onCloseModal(id);
+}
+
+function toggleDropdown(id) {
+  var dropdown = document.getElementById(id);
+  document.querySelectorAll('[id$="-dropdown"]').forEach(function(el) {
+    if (el !== dropdown) el.classList.add('hidden');
+  });
+  dropdown.classList.toggle('hidden');
+}
+
+function selectArch(value, uuid) {
+  document.getElementById('arch-modal-value').textContent = value;
+  if (uuid) selectedSchemaUuid = uuid;
+  document.getElementById('arch-dropdown-modal').classList.add('hidden');
+}
+
+function selectEntityType(type) {
+  var value = document.getElementById('entity-type-input');
+  value.value = type;
+  value.dataset.value = type;
+  document.getElementById('entity-type-dropdown').classList.add('hidden');
+}
+
+function filterEntityTypeList(preserveSelection) {
+  var input = document.getElementById('entity-type-input');
+  var dropdown = document.getElementById('entity-type-dropdown');
+  if (!input || !dropdown) return;
+  if (!preserveSelection) input.dataset.value = '';
+  var query = input.value.trim().toLowerCase();
+  var visibleCount = 0;
+  dropdown.querySelectorAll('button[data-type-name]').forEach(function(button) {
+    var visible = button.dataset.typeName.toLowerCase().includes(query);
+    button.classList.toggle('hidden', !visible);
+    if (visible) visibleCount += 1;
+  });
+  dropdown.querySelector('[data-empty-filter]')?.classList.toggle('hidden', visibleCount > 0);
+  dropdown.classList.remove('hidden');
+}
+
+function showEntityTypeList() {
+  filterEntityTypeList(true);
+}
+
+function selectRelationType(type) {
+  var value = document.getElementById('relation-type-input');
+  value.value = type;
+  value.dataset.value = type;
+  document.getElementById('relation-type-dropdown').classList.add('hidden');
+}
+
+function filterRelationTypeList(preserveSelection) {
+  var input = document.getElementById('relation-type-input');
+  var dropdown = document.getElementById('relation-type-dropdown');
+  if (!input || !dropdown) return;
+  if (!preserveSelection) input.dataset.value = '';
+  var query = input.value.trim().toLowerCase();
+  var visibleCount = 0;
+  dropdown.querySelectorAll('button[data-type-name]').forEach(function(button) {
+    var visible = button.dataset.typeName.toLowerCase().includes(query);
+    button.classList.toggle('hidden', !visible);
+    if (visible) visibleCount += 1;
+  });
+  dropdown.querySelector('[data-empty-filter]')?.classList.toggle('hidden', visibleCount > 0);
+  dropdown.classList.remove('hidden');
+}
+
+function showRelationTypeList() {
+  filterRelationTypeList(true);
+}
+
+function addEntityAttribute() {
+  var container = document.getElementById('entity-attributes');
+  var div = document.createElement('div');
+  div.className = 'flex items-center gap-1.5';
+  div.innerHTML = '<input type="text" class="flex-1 min-w-0 h-8 px-2 text-xs rounded-lg border outline-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);" placeholder="属性名"><span class="shrink-0 text-xs" style="color:var(--claude-muted-foreground);">=</span><input type="text" class="flex-1 min-w-0 h-8 px-2 text-xs rounded-lg border outline-none" style="background:var(--claude-background);border-color:var(--claude-border);color:var(--claude-foreground);" placeholder="属性值"><button type="button" onclick="this.parentElement.remove()" class="w-7 h-7 shrink-0 flex items-center justify-center rounded cursor-pointer transition-colors hover:opacity-80" style="background:var(--claude-primary);border:none;color:var(--claude-primary-foreground);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+  container.appendChild(div);
+}
+
+function filterEntityList(prefix) {
+  var input = document.getElementById(prefix + '-input');
+  var query = input.value.toLowerCase();
+  selectedEntityUuids[prefix] = null;
+  document.getElementById(prefix + '-list')?.classList.remove('hidden');
+  var buttons = document.querySelectorAll('#' + prefix + '-list button');
+  buttons.forEach(function(btn) {
+    var text = btn.textContent.toLowerCase();
+    btn.style.display = text.includes(query) ? 'block' : 'none';
+  });
+}
+
+function showEntityList(prefix) {
+  document.getElementById(prefix + '-list')?.classList.remove('hidden');
+  filterEntityList(prefix);
+}
+
+function selectEntity(prefix, name, uuid) {
+  document.getElementById(prefix + '-input').value = name;
+  document.getElementById(prefix + '-list').classList.add('hidden');
+  if (typeof selectedEntityUuids !== 'undefined' && selectedEntityUuids) {
+    selectedEntityUuids[prefix] = uuid || null;
+  }
+}
+
+function showToast(message) {
+  window.showToast(message);
+}
+
+function showTooltip(e, title, type, bodyHtml) {
+  var t = document.getElementById('canvas-tooltip');
+  if (!t) return;
+  renderGraphTooltipContent(title, type, bodyHtml);
+  t.classList.remove('hidden');
+  var rect = t.parentElement.getBoundingClientRect();
+  var x = e.clientX - rect.left + 15;
+  var y = e.clientY - rect.top - 10;
+  if (x + t.offsetWidth + 12 > rect.width) x = e.clientX - rect.left - t.offsetWidth - 15;
+  if (y + t.offsetHeight + 12 > rect.height) y = rect.height - t.offsetHeight - 12;
+  t.style.left = x + 'px';
+  t.style.top = Math.max(12, y) + 'px';
+}
+
+function hideTooltip() {
+  document.getElementById('canvas-tooltip').classList.add('hidden');
+}
+
+function handleDocumentClick(e) {
+  var wrapper = document.getElementById('graph-dropdown-wrapper-top');
+  var dropdown = document.getElementById('graph-dropdown-top');
+  if (wrapper && dropdown && !wrapper.contains(e.target)) {
+    dropdown.classList.add('hidden');
+  }
+  document.querySelectorAll('#entity-type-dropdown, #relation-type-dropdown, #head-entity-list, #tail-entity-list').forEach(function(el) {
+    var wrapper = el.parentElement;
+    if (wrapper && !wrapper.contains(e.target)) {
+      el.classList.add('hidden');
+    }
+  });
+}
+
+document.addEventListener('click', handleDocumentClick);
+
+
+
+// ===== API Integration =====
+// Check login status
+if (!Auth.requireAuth()) throw new Error('Not logged in');
+
+// Global state
+const urlParams = window.getUniGraphSearchParams();
+const kgBaseUuid = urlParams.get('uuid');
+let graphList = [];
+let currentGraphUuid = null;
+let graphData = { entities: [], relationships: [], schema_graph: null };
+let fullGraphData = { entities: [], relationships: [], schema_graph: null };
+let cy = null;
+let selectedElement = null;
+let editingEntityUuid = null;
+let editingRelationshipUuid = null;
+let schemaList = [];
+let selectedSchemaUuid = null;
+let selectedEntityUuids = { 'head-entity': null, 'tail-entity': null };
+let allEntitiesForDropdown = [];
+let currentGraphStyle = 'database';
+let loadModeFullyExpanded = false;
+
+function syncLoadExpandButton(loading = false) {
+  var button = document.getElementById('load-expand-all-button');
+  var label = document.getElementById('load-expand-all-label');
+  if (!button || !label) return;
+  var visible = currentGraphStyle === 'load';
+  button.classList.toggle('hidden', !visible);
+  button.classList.toggle('inline-flex', visible);
+  button.disabled = loading || loadModeFullyExpanded;
+  label.textContent = loading ? '展开中' : loadModeFullyExpanded ? '已全部展开' : '全部展开';
+}
+
+function getCurrentSchemaUuid() {
+  if (graphData.schema_graph && graphData.schema_graph.uuid) return graphData.schema_graph.uuid;
+  var graph = graphList.find(function(item) { return item.uuid === currentGraphUuid; });
+  if (!graph) return null;
+  return graph.schema_graph_uuid || (graph.schema_graph && graph.schema_graph.uuid) || null;
+}
+
+function renderSchemaTypeOptions(kind, items, emptyText) {
+  var isEntity = kind === 'entity';
+  var dropdown = document.getElementById(isEntity ? 'entity-type-dropdown' : 'relation-type-dropdown');
+  if (isEntity) {
+    var input = document.getElementById('entity-type-input');
+    if (!dropdown || !input) return;
+    var entityNames = Array.from(new Set((items || []).map(function(item) {
+      return String(item.name || item.type || '').trim();
+    }).filter(Boolean)));
+    var currentType = input.dataset.value || '';
+    dropdown.innerHTML = '';
+    input.disabled = entityNames.length === 0;
+    if (entityNames.length === 0) {
+      input.value = '';
+      input.dataset.value = '';
+      input.placeholder = emptyText;
+      dropdown.classList.add('hidden');
+      return;
+    }
+    input.placeholder = '搜索或选择实体类型';
+    if (!entityNames.includes(currentType)) {
+      input.value = '';
+      input.dataset.value = '';
+    }
+    entityNames.forEach(function(name) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.typeName = name;
+      button.className = 'block w-full px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--claude-secondary)] cursor-pointer';
+      button.style.cssText = 'background:transparent;border:none;color:var(--claude-foreground);';
+      button.textContent = name;
+      button.onclick = function() { selectEntityType(name); };
+      dropdown.appendChild(button);
+    });
+    var emptyFilter = document.createElement('div');
+    emptyFilter.dataset.emptyFilter = 'true';
+    emptyFilter.className = 'hidden px-3 py-2 text-xs';
+    emptyFilter.style.color = 'var(--claude-muted-foreground)';
+    emptyFilter.textContent = '没有匹配的实体类型';
+    dropdown.appendChild(emptyFilter);
+    return;
+  }
+  var value = document.getElementById('relation-type-input');
+  if (!dropdown || !value) return;
+
+  var names = Array.from(new Set((items || []).map(function(item) {
+    return String(item.name || item.type || '').trim();
+  }).filter(Boolean)));
+  var currentValue = value.dataset.value || '';
+  dropdown.innerHTML = '';
+  value.disabled = names.length === 0;
+
+  if (names.length === 0) {
+    value.value = '';
+    value.dataset.value = '';
+    value.placeholder = emptyText;
+    dropdown.classList.add('hidden');
+    return;
+  }
+
+  value.placeholder = '搜索或选择关系类型';
+  if (!names.includes(currentValue)) {
+    value.value = '';
+    value.dataset.value = '';
+  }
+  names.forEach(function(name) {
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.typeName = name;
+    button.className = 'w-full px-3 py-2 text-xs text-left cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]';
+    button.style.cssText = 'background:transparent;border:none;color:var(--claude-foreground);';
+    button.textContent = name;
+    button.onclick = function() {
+      selectRelationType(name);
+    };
+    dropdown.appendChild(button);
+  });
+  var relationEmptyFilter = document.createElement('div');
+  relationEmptyFilter.dataset.emptyFilter = 'true';
+  relationEmptyFilter.className = 'hidden px-3 py-2 text-xs';
+  relationEmptyFilter.style.color = 'var(--claude-muted-foreground)';
+  relationEmptyFilter.textContent = '没有匹配的关系类型';
+  dropdown.appendChild(relationEmptyFilter);
+}
+
+async function loadSchemaTypesForModal(kind) {
+  var isEntity = kind === 'entity';
+  var schemaUuid = getCurrentSchemaUuid();
+  var trigger = document.getElementById(isEntity ? 'entity-type-input' : 'relation-type-input');
+  var value = trigger;
+  if (trigger) trigger.disabled = true;
+  if (!schemaUuid) {
+    renderSchemaTypeOptions(kind, [], '当前图谱未绑定知识架构');
+    return;
+  }
+  try {
+    var response = await KgBaseAPI.schemaGraph.getDetail(schemaUuid);
+    if (schemaUuid !== getCurrentSchemaUuid()) return;
+    if (response.code !== 200 || !response.data) {
+      throw new Error(response.msg || '加载知识架构类型失败');
+    }
+    renderSchemaTypeOptions(
+      kind,
+      isEntity ? response.data.entities : response.data.relationships,
+      isEntity ? '该架构暂无实体类型' : '该架构暂无关系类型'
+    );
+  } catch (error) {
+    if (value) {
+      if (isEntity) {
+        value.value = '';
+        value.placeholder = '类型加载失败';
+      } else {
+        value.value = '';
+        value.placeholder = '类型加载失败';
+      }
+      value.dataset.value = '';
+    }
+    showToast(error.message || '加载知识架构类型失败');
+  }
+}
+
+// ===== Sidebar navigation =====
+function updateSidebarLinks(uuid) {
+  var infoLink = document.querySelector('a[data-title="信息"]');
+  var designLink = document.querySelector('a[data-title="设计"]');
+  var buildLink = document.querySelector('a[data-title="构建"]');
+  var appLink = document.querySelector('a[data-title="新建对话"]');
+  if (infoLink) infoLink.href = '/unigraph/unigraphs/' + encodeURIComponent(uuid) + '/info';
+  if (designLink) designLink.href = '/unigraph/unigraphs/' + encodeURIComponent(uuid) + '/structure';
+  if (buildLink) buildLink.href = '/unigraph/unigraphs/' + encodeURIComponent(uuid) + '/graph';
+  if (appLink) appLink.href = '/unigraph/unigraphs/' + encodeURIComponent(uuid) + '/qa';
+}
+
+// ===== Load knowledge graph list =====
+async function loadSchemaList() {
+  if (!kgBaseUuid) return;
+  try {
+    var response = await KgBaseAPI.schemaGraph.getAll(kgBaseUuid);
+    if (response.code !== 200) throw new Error(response.msg || '加载知识架构失败');
+    schemaList = Array.isArray(response.data) ? response.data : (response.data && response.data.list) || [];
+    if (!selectedSchemaUuid && schemaList.length) selectedSchemaUuid = schemaList[0].uuid;
+    renderSchemaOptions();
+  } catch (error) {
+    showToast(error.message || '加载知识架构失败');
+  }
+}
+
+function renderSchemaOptions() {
+  var dropdown = document.getElementById('arch-dropdown-modal');
+  if (!dropdown) return;
+  var trigger = document.getElementById('arch-modal-trigger');
+  var hasSchemas = schemaList.length > 0;
+  if (trigger) {
+    trigger.disabled = !hasSchemas;
+    trigger.style.color = hasSchemas ? 'var(--claude-foreground)' : 'var(--claude-muted-foreground)';
+  }
+  if (!hasSchemas) dropdown.classList.add('hidden');
+  dropdown.innerHTML = '';
+  schemaList.forEach(function(schema) {
+    var item = document.createElement('div');
+    item.className = 'px-3 py-2 cursor-pointer transition-colors hover:bg-[var(--claude-secondary)]';
+    item.style.background = 'transparent';
+    item.innerHTML = '<span class="text-xs" style="color:var(--claude-foreground);"></span>';
+    item.querySelector('span').textContent = schema.name || '未命名架构';
+    item.onclick = function() {
+      selectArch(schema.name || '未命名架构', schema.uuid);
+    };
+    dropdown.appendChild(item);
+  });
+  var selected = schemaList.find(function(schema) { return schema.uuid === selectedSchemaUuid; });
+  var label = document.getElementById('arch-modal-value');
+  if (label) label.textContent = selected ? (selected.name || '未命名架构') : '暂无知识架构';
+}
+
+async function loadGraphList() {
+  if (!kgBaseUuid) {
+    showToast('缺少知识库 UUID');
+    return;
+  }
+  try {
+    const res = await KgBaseAPI.knowledgeGraph.getAll(kgBaseUuid);
+    if (res.code === 200 && res.data) {
+      graphList = Array.isArray(res.data) ? res.data : (res.data.list || res.data.graphs || []);
+      graphList.sort(function(a, b) {
+        return new Date(b.created_time || 0).getTime() - new Date(a.created_time || 0).getTime();
+      });
+      if (graphList.length === 0) {
+        currentGraphUuid = null;
+        graphData = { entities: [], relationships: [], schema_graph: null };
+        renderGraphDropdown();
+        if (cy) {
+          cy.destroy();
+          cy = null;
+        }
+        showToast('暂无知识图谱');
+        return;
+      }
+      renderGraphDropdown();
+      // If only one graph, load directly; otherwise load the first
+      loadGraphDetail(graphList[0].uuid);
+    } else {
+      showToast(res.msg || '加载知识图谱列表失败');
+    }
+  } catch (err) {
+    console.error('Failed to load graph list:', err);
+    showToast('加载知识图谱列表失败');
+  }
+}
+
+// Render graph dropdown in header
+function renderGraphDropdown() {
+  var dropdown = document.getElementById('graph-dropdown-top');
+  if (!dropdown) return;
+  var trigger = document.getElementById('graph-dropdown-trigger');
+  var label = trigger?.querySelector('span.truncate');
+  var hasGraphs = graphList.length > 0;
+  if (trigger) {
+    trigger.disabled = !hasGraphs;
+    trigger.style.borderColor = hasGraphs ? 'var(--claude-brand-500)' : 'var(--claude-border)';
+  }
+  if (!hasGraphs) dropdown.classList.add('hidden');
+  var html = '';
+  graphList.forEach(function(g) {
+    html += '<div class="px-3 py-2 flex items-center justify-between transition-colors hover:bg-[var(--claude-secondary)] cursor-pointer" onclick="loadGraphDetail(\'' + g.uuid + '\')">';
+    html += '<div class="flex items-center min-w-0">';
+    html += '<span class="text-xs truncate" style="color:var(--claude-foreground);">' + (g.name || '未命名图谱') + '</span>';
+    html += '</div>';
+    html += '<button type="button" onclick="event.stopPropagation();deleteKnowledgeGraph(\'' + g.uuid + '\')" class="w-6 h-6 flex items-center justify-center cursor-pointer transition-opacity hover:opacity-70" style="background:none;border:none;color:var(--claude-destructive);" aria-label="删除知识图谱"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+    html += '</div>';
+  });
+  dropdown.innerHTML = html;
+  var current = graphList.find(function(g) { return g.uuid === currentGraphUuid; }) || graphList[0];
+  if (label) {
+    label.textContent = current ? (current.name || '未命名图谱') : '暂无知识图谱';
+    label.style.color = current ? 'var(--claude-foreground)' : 'var(--claude-muted-foreground)';
+  }
+}
+
+function onNewGraphFilesSelected(input) {
+  var label = document.getElementById('new-graph-files-label');
+  if (!label) return;
+  label.textContent = input.files && input.files.length
+    ? Array.from(input.files).map(function(file) { return file.name; }).join('、')
+    : '上传 PDF/Word/TXT 文档';
+}
+
+async function uploadGraphFiles(files) {
+  validateUploadFiles(files);
+  var paths = [];
+  for (var index = 0; index < files.length; index += 1) {
+    var response = await API.uploadFile(files[index]);
+    if (response.code !== 200 || !response.data || !response.data.url) {
+      throw new Error(response.msg || '文件上传失败');
+    }
+    paths.push(response.data.url);
+  }
+  return paths;
+}
+
+async function submitNewGraph() {
+  var name = document.getElementById('new-graph-name').value.trim();
+  var input = document.getElementById('new-graph-files');
+  if (!name) {
+    showToast('请输入知识图谱名称');
+    return;
+  }
+  if (!selectedSchemaUuid) {
+    showToast('请选择知识架构');
+    return;
+  }
+  if (!input.files || !input.files.length) {
+    showToast('请上传构建文档');
+    return;
+  }
+  try {
+    var filePaths = await uploadGraphFiles(input.files);
+    var task = await TaskManager.submit(
+      'knowledge_graph.create_knowledge_graph',
+      '创建知识图谱',
+      name,
+      {
+        user_token: Auth.getToken(),
+        obj_data: {
+          file_paths: filePaths,
+          data: {
+            kg_base_uuid: kgBaseUuid,
+            schema_graph_uuid: selectedSchemaUuid,
+            name: name
+          }
+        }
+      }
+    );
+    document.getElementById('modal-new-graph').classList.add('hidden');
+    await task.completion;
+    await loadGraphList();
+  } catch (error) {
+    showToast(error.message || '创建知识图谱失败');
+  }
+}
+
+async function deleteKnowledgeGraph(uuid) {
+  if (!uuid || !await window.confirmAction({
+    title: '删除知识图谱',
+    message: '确定要删除这个知识图谱吗？删除后无法恢复。',
+  })) return;
+  try {
+    var response = await KgBaseAPI.knowledgeGraph.delete(uuid);
+    if (response.code !== 200) throw new Error(response.msg || '删除知识图谱失败');
+    if (currentGraphUuid === uuid) {
+      currentGraphUuid = null;
+      graphData = { entities: [], relationships: [], schema_graph: null };
+      if (cy) {
+        cy.destroy();
+        cy = null;
+      }
+    }
+    await loadGraphList();
+    showToast('知识图谱已删除');
+  } catch (error) {
+    showToast(error.message || '删除知识图谱失败');
+  }
+}
+
+async function deleteCurrentKnowledgeGraph() {
+  if (!currentGraphUuid) {
+    showToast('请先选择知识图谱');
+    return;
+  }
+  await deleteKnowledgeGraph(currentGraphUuid);
+}
+
+async function buildGraphIndex() {
+  if (!currentGraphUuid) {
+    showToast('请先选择知识图谱');
+    return;
+  }
+  try {
+    var task = await TaskManager.submit(
+      'knowledge_graph.build_index',
+      '建立知识索引',
+      graphList.find(function(item) { return item.uuid === currentGraphUuid; })?.name || currentGraphUuid,
+      { uuid: currentGraphUuid, user_token: Auth.getToken() }
+    );
+    await task.completion;
+    await loadGraphDetail(currentGraphUuid);
+  } catch (error) {
+    showToast(error.message || '建立索引失败');
+  }
+}
+
+function filterGraph(shouldFocus) {
+  if (!cy) return;
+  var search = document.getElementById('build-graph-search')?.value.toLowerCase().trim() || '';
+  if (GraphRenderer.filter(cy, search, shouldFocus)) return;
+  var elements = cy.elements();
+  if (!search) {
+    elements.style('opacity', 1);
+    elements.nodes().removeStyle('border-color border-width shadow-blur shadow-color shadow-opacity');
+    elements.edges().removeStyle('line-color target-arrow-color width color');
+    return;
+  }
+  var matches = elements.filter(function(element) {
+    return String(element.data('label') || element.data('type') || '').toLowerCase().includes(search);
+  });
+  elements.style('opacity', 0.16);
+  matches.style('opacity', 1);
+  matches.nodes().style({
+    'border-color': '#c96442',
+    'border-width': 4,
+    'shadow-blur': 18,
+    'shadow-color': '#c96442',
+    'shadow-opacity': 0.42
+  });
+  matches.edges().style({
+    'line-color': '#c96442',
+    'target-arrow-color': '#c96442',
+    'width': 4,
+    'color': '#a0502f'
+  });
+  if (shouldFocus && matches.length) {
+    cy.animate({
+      center: { eles: matches },
+      zoom: Math.min(Math.max(cy.zoom(), 0.75), 1.25),
+      duration: 280
+    });
+  }
+}
+
+async function exportGraphIndex() {
+  if (!currentGraphUuid) {
+    showToast('请先选择知识图谱');
+    return;
+  }
+  try {
+    var response = await KgBaseAPI.knowledgeGraph.exportIndexFile(currentGraphUuid);
+    if (response.code !== 200) throw new Error(response.msg || '导出索引失败');
+    var text = typeof response.data === 'string' ? response.data : JSON.stringify(response.data, null, 2);
+    var blobUrl = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }));
+    var link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = (graphList.find(function(item) { return item.uuid === currentGraphUuid; })?.name || 'knowledge-graph') + '-index.json';
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+    showToast('索引已导出');
+  } catch (error) {
+    showToast(error.message || '导出索引失败');
+  }
+}
+
+async function startKnowledgeInference() {
+  if (!currentGraphUuid) {
+    showToast('请先选择知识图谱');
+    return;
+  }
+  try {
+    var task = await TaskManager.submit(
+      'knowledge_graph.infer_knowledge_graph',
+      '知识迁移',
+      graphList.find(function(item) { return item.uuid === currentGraphUuid; })?.name || currentGraphUuid,
+      { uuid: currentGraphUuid, user_token: Auth.getToken() }
+    );
+    closeModal('modal-reasoning');
+    await task.completion;
+    await loadGraphDetail(currentGraphUuid);
+  } catch (error) {
+    showToast(error.message || '知识迁移失败');
+  }
+}
+
+// ===== Load graph detail =====
+async function loadGraphDetail(graphUuid) {
+  if (!graphUuid) return;
+  currentGraphUuid = graphUuid;
+  document.getElementById('graph-dropdown-top').classList.add('hidden');
+  if (currentGraphStyle === 'load') {
+    fullGraphData = { entities: [], relationships: [], schema_graph: null };
+    renderGraphDropdown();
+    await loadExplorationOverview();
+    return;
+  }
+  try {
+    const res = await KgBaseAPI.knowledgeGraph.getDetail(graphUuid);
+    if (res.code === 200 && res.data) {
+      graphData = {
+        entities: res.data.entities || [],
+        relationships: res.data.relationships || [],
+        schema_graph: res.data.schema_graph || null,
+      };
+      fullGraphData = {
+        entities: graphData.entities.slice(),
+        relationships: graphData.relationships.slice(),
+        schema_graph: graphData.schema_graph,
+      };
+      renderGraphDropdown();
+      renderGraph();
+    } else {
+      showToast(res.msg || '加载知识图谱详情失败');
+    }
+  } catch (err) {
+    console.error('Failed to load graph detail:', err);
+    showToast('加载知识图谱详情失败');
+  }
+}
+
+// ===== Render graph with Cytoscape =====
+function renderGraph(viewState) {
+  var container = document.getElementById('graph-canvas');
+  if (!container) return;
+  // Destroy existing instance
+  if (cy) {
+    cy.destroy();
+    cy = null;
+  }
+  cy = GraphRenderer.init('graph-canvas', graphData.entities, graphData.relationships, {
+    mode: currentGraphStyle,
+    serverExploration: currentGraphStyle === 'load' && !loadModeFullyExpanded,
+    positions: viewState?.positions,
+    anchorPosition: viewState?.anchorPosition,
+    viewport: viewState?.viewport,
+    onNodeClick: function(data, node) {
+      selectedElement = { type: 'node', data: data, node: node };
+      showElementDetail(data, 'node');
+    },
+    onNodeDoubleClick: function(data) {
+      if (currentGraphStyle === 'load' && !loadModeFullyExpanded) loadExplorationNeighbors(data.id);
+    },
+    onClusterDoubleClick: function(data) {
+      loadExplorationType(data.type);
+    },
+    onEdgeClick: function(data, edge) {
+      selectedElement = { type: 'edge', data: data, edge: edge };
+      showElementDetail(data, 'edge');
+    },
+    onNodeHover: function(data, node, position) {
+      selectedElement = { type: 'node', data: data, node: node };
+      showElementDetail(data, 'node', position);
+    },
+    onEdgeHover: function(data, edge, position) {
+      selectedElement = { type: 'edge', data: data, edge: edge };
+      showElementDetail(data, 'edge', position);
+    },
+    onElementLeave: scheduleTooltipHide,
+    onCanvasClick: function() {
+      selectedElement = null;
+      hideTooltip();
+    },
+  });
+}
+
+const {
+  changeGraphStyle,
+  expandLoadGraph,
+  loadExplorationNeighbors,
+  loadExplorationOverview,
+  loadExplorationType,
+} = createGraphExplorationController({
+  api: KgBaseAPI.knowledgeGraph,
+  getCy: () => cy,
+  getFullGraphData: () => fullGraphData,
+  getGraphData: () => graphData,
+  getGraphStyle: () => currentGraphStyle,
+  getGraphUuid: () => currentGraphUuid,
+  isFullyExpanded: () => loadModeFullyExpanded,
+  loadGraphDetail,
+  notify: showToast,
+  renderer: GraphRenderer,
+  renderGraph,
+  setFullyExpanded: (value) => { loadModeFullyExpanded = value; },
+  setFullGraphData: (value) => { fullGraphData = value; },
+  setGraphData: (value) => { graphData = value; },
+  setGraphStyle: (value) => { currentGraphStyle = value; },
+  syncExpandButton: syncLoadExpandButton,
+});
+
+const {
+  deleteSelected,
+  editSelected,
+  loadEntitiesForDropdowns,
+  onUpdateFileSelected,
+  scheduleTooltipHide,
+  showElementDetail,
+  submitEntity,
+  submitRelation,
+  submitUpdateGraph,
+  triggerUpdateFile,
+} = createGraphEditorController({
+  api: KgBaseAPI,
+  closeModal,
+  getState: () => ({
+    allEntities: allEntitiesForDropdown,
+    editingEntityUuid,
+    editingRelationshipUuid,
+    fullGraphData,
+    graphData,
+    graphList,
+    graphUuid: currentGraphUuid,
+    selectedElement,
+    selectedEntityUuids,
+  }),
+  getToken: () => Auth.getToken(),
+  hideTooltip,
+  loadGraphDetail,
+  notify: showToast,
+  openModal,
+  selectEntity,
+  selectEntityType,
+  selectRelationType,
+  setAllEntities: (value) => { allEntitiesForDropdown = value; },
+  setEditingEntityUuid: (value) => { editingEntityUuid = value; },
+  setEditingRelationshipUuid: (value) => { editingRelationshipUuid = value; },
+  taskManager: TaskManager,
+  uploadFile: (file) => API.uploadFile(file),
+  addEntityAttribute,
+});
+
+ // ===== Zoom controls =====
+// ===== Zoom controls =====
+function zoomIn() {
+  if (cy) GraphRenderer.zoom(cy, 0.18);
+}
+
+function zoomOut() {
+  if (cy) GraphRenderer.zoom(cy, -0.18);
+}
+
+function fitCanvas() {
+  if (cy) GraphRenderer.fit(cy);
+}
+
+// ===== Modal hooks =====
+function onOpenModal(id) {
+  if (id === 'modal-relation-build') {
+    if (!editingRelationshipUuid) {
+      var relationTypeValue = document.getElementById('relation-type-input');
+      if (relationTypeValue) {
+        relationTypeValue.value = '';
+        relationTypeValue.dataset.value = '';
+      }
+      var relationNameInput = document.getElementById('relation-name-input');
+      var relationDescriptionInput = document.getElementById('relation-description-input');
+      if (relationNameInput) relationNameInput.value = '';
+      if (relationDescriptionInput) relationDescriptionInput.value = '';
+      selectedEntityUuids = { 'head-entity': null, 'tail-entity': null };
+      var headInput = document.getElementById('head-entity-input');
+      var tailInput = document.getElementById('tail-entity-input');
+      if (headInput) headInput.value = '';
+      if (tailInput) tailInput.value = '';
+      var relationTitle = document.querySelector('#modal-relation-build h3');
+      if (relationTitle) relationTitle.textContent = '新增关系';
+      var button = document.querySelector('#modal-relation-build .flex.justify-end button:last-child');
+      if (button) button.textContent = '创建';
+    }
+    loadSchemaTypesForModal('relation');
+    loadEntitiesForDropdowns();
+  }
+  if (id === 'modal-entity-build' && !editingEntityUuid) {
+    var entityTypeValue = document.getElementById('entity-type-input');
+    if (entityTypeValue) {
+      entityTypeValue.value = '';
+      entityTypeValue.dataset.value = '';
+    }
+    var nameInput = document.getElementById('entity-name-input');
+    if (nameInput) nameInput.value = '';
+    var container = document.getElementById('entity-attributes');
+    if (container) {
+      container.innerHTML = '';
+      addEntityAttribute();
+    }
+    var entityTitle = document.querySelector('#modal-entity-build h3');
+    if (entityTitle) entityTitle.textContent = '新增实体';
+    var submitBtn = document.querySelector('#modal-entity-build .flex.justify-end button:last-child');
+    if (submitBtn) submitBtn.textContent = '创建';
+  }
+  if (id === 'modal-entity-build') loadSchemaTypesForModal('entity');
+}
+
+function onCloseModal(id) {
+  if (id === 'modal-entity-build') {
+    editingEntityUuid = null;
+  }
+  if (id === 'modal-relation-build') {
+    editingRelationshipUuid = null;
+  }
+}
+
+// ===== Init =====
+updateSidebarLinks(kgBaseUuid);
+loadSchemaList();
+loadGraphList();
+
+  window.loadGraphDetail = loadGraphDetail;
+  window.deleteKnowledgeGraph = deleteKnowledgeGraph;
+
+  return {
+    addEntityAttribute,
+    buildGraphIndex,
+    changeGraphStyle,
+    closeModal,
+    deleteCurrentKnowledgeGraph,
+    deleteSelected,
+    editSelected,
+    exportGraphIndex,
+    expandLoadGraph,
+    filterGraph,
+    filterEntityTypeList,
+    filterRelationTypeList,
+    filterEntityList,
+    fitCanvas,
+    hideTooltip,
+    onNewGraphFilesSelected,
+    onUpdateFileSelected,
+    openModal,
+    selectArch,
+    selectEntity,
+    selectEntityType,
+    selectRelationType,
+    showToast,
+    showEntityList,
+    showEntityTypeList,
+    showRelationTypeList,
+    showTooltip,
+    startKnowledgeInference,
+    submitEntity,
+    submitNewGraph,
+    submitRelation,
+    submitUpdateGraph,
+    toggleDropdown,
+    triggerUpdateFile,
+    zoomIn,
+    zoomOut,
+    destroy() {
+      document.removeEventListener('click', handleDocumentClick);
+    },
+  };
+}
