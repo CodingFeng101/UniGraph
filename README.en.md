@@ -24,19 +24,6 @@
 
 </div>
 
-## 🙏 Acknowledgements
-
-Thanks to the following friends for their help with UniGraph's design, development, testing, and feedback:
-
-<p>
-  <a href="https://github.com/SE-qinghuang"><img src="https://github.com/SE-qinghuang.png?size=96" width="72" height="72" alt="SE-qinghuang" /></a>
-  <a href="https://github.com/YuCheng1106"><img src="https://github.com/YuCheng1106.png?size=96" width="72" height="72" alt="YuCheng1106" /></a>
-  <a href="https://github.com/lixian292"><img src="https://github.com/lixian292.png?size=96" width="72" height="72" alt="lixian292" /></a>
-  <a href="https://github.com/LiKunKun64867"><img src="https://github.com/LiKunKun64867.png?size=96" width="72" height="72" alt="LiKunKun64867" /></a>
-</p>
-
-Order: SE-qinghuang, YuCheng1106, lixian292, LiKunKun64867.
-
 ---
 
 ## 💡 Why UniGraph
@@ -232,3 +219,14 @@ UniGraph is released under the [GNU Affero General Public License v3.0](LICENSE)
 If UniGraph is useful for your knowledge engineering work, consider trying it, starring the repository, and sharing feedback.
 
 </div>
+
+## 🙏 Acknowledgements
+
+- **Project contributors:**
+
+<p>
+  <a href="https://github.com/SE-qinghuang"><img src="https://github.com/SE-qinghuang.png?size=120" width="72" height="72" alt="SE-qinghuang" style="border-radius:50%; border:1px solid #d0d7de; margin-right:8px;" /></a>
+  <a href="https://github.com/YuCheng1106"><img src="https://github.com/YuCheng1106.png?size=120" width="72" height="72" alt="YuCheng1106" style="border-radius:50%; border:1px solid #d0d7de; margin-right:8px;" /></a>
+  <a href="https://github.com/lixian292"><img src="https://github.com/lixian292.png?size=120" width="72" height="72" alt="lixian292" style="border-radius:50%; border:1px solid #d0d7de; margin-right:8px;" /></a>
+  <a href="https://github.com/LiKunKun64867"><img src="https://github.com/LiKunKun64867.png?size=120" width="72" height="72" alt="LiKunKun64867" style="border-radius:50%; border:1px solid #d0d7de;" /></a>
+</p>
