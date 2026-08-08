@@ -225,8 +225,8 @@ If UniGraph is useful for your knowledge engineering work, consider trying it, s
 - **Project contributors:**
 
 <p>
-  <a href="https://github.com/SE-qinghuang"><img src="https://github.com/SE-qinghuang.png?size=120" width="72" height="72" alt="SE-qinghuang" style="border-radius:50%; border:1px solid #d0d7de; margin-right:8px;" /></a>
-  <a href="https://github.com/YuCheng1106"><img src="https://github.com/YuCheng1106.png?size=120" width="72" height="72" alt="YuCheng1106" style="border-radius:50%; border:1px solid #d0d7de; margin-right:8px;" /></a>
-  <a href="https://github.com/lixian292"><img src="https://github.com/lixian292.png?size=120" width="72" height="72" alt="lixian292" style="border-radius:50%; border:1px solid #d0d7de; margin-right:8px;" /></a>
-  <a href="https://github.com/LiKunKun64867"><img src="https://github.com/LiKunKun64867.png?size=120" width="72" height="72" alt="LiKunKun64867" style="border-radius:50%; border:1px solid #d0d7de;" /></a>
+  <a href="https://github.com/SE-qinghuang"><img src="https://github.com/SE-qinghuang.png?size=64" width="56" height="56" alt="SE-qinghuang" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de; margin-right:8px; display:inline-block;" /></a>
+  <a href="https://github.com/YuCheng1106"><img src="https://github.com/YuCheng1106.png?size=64" width="56" height="56" alt="YuCheng1106" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de; margin-right:8px; display:inline-block;" /></a>
+  <a href="https://github.com/lixian292"><img src="https://github.com/lixian292.png?size=64" width="56" height="56" alt="lixian292" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de; margin-right:8px; display:inline-block;" /></a>
+  <a href="https://github.com/LiKunKun64867"><img src="https://github.com/LiKunKun64867.png?size=64" width="56" height="56" alt="LiKunKun64867" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de;" /></a>
 </p>
