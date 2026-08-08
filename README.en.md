@@ -224,9 +224,11 @@ If UniGraph is useful for your knowledge engineering work, consider trying it, s
 
 - **Project contributors:**
 
-<p>
-  <a href="https://github.com/SE-qinghuang"><img src="./docs/images/contributors/SE-qinghuang.png" width="72" height="72" alt="SE-qinghuang" /></a>&nbsp;
-  <a href="https://github.com/YuCheng1106"><img src="./docs/images/contributors/YuCheng1106.png" width="72" height="72" alt="YuCheng1106" /></a>&nbsp;
-  <a href="https://github.com/lixian292"><img src="./docs/images/contributors/lixian292.png" width="72" height="72" alt="lixian292" /></a>&nbsp;
-  <a href="https://github.com/LiKunKun64867"><img src="./docs/images/contributors/LiKunKun64867.png" width="72" height="72" alt="LiKunKun64867" /></a>
-</p>
+[![Contributors](https://contrib.rocks/image?repo=CodingFeng101/UniGraph)](https://github.com/CodingFeng101/UniGraph/graphs/contributors)
+
+Thanks to the following contributors (listed in the requested order):
+
+1. [SE-qinghuang](https://github.com/SE-qinghuang)
+2. [YuCheng1106](https://github.com/YuCheng1106)
+3. [lixian292](https://github.com/lixian292)
+4. [LiKunKun64867](https://github.com/LiKunKun64867)
