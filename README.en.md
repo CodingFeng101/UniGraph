@@ -24,6 +24,19 @@
 
 </div>
 
+## 🙏 Acknowledgements
+
+Thanks to the following friends for their help with UniGraph's design, development, testing, and feedback:
+
+<p>
+  <a href="https://github.com/SE-qinghuang"><img src="https://github.com/SE-qinghuang.png?size=96" width="72" height="72" alt="SE-qinghuang" /></a>
+  <a href="https://github.com/YuCheng1106"><img src="https://github.com/YuCheng1106.png?size=96" width="72" height="72" alt="YuCheng1106" /></a>
+  <a href="https://github.com/lixian292"><img src="https://github.com/lixian292.png?size=96" width="72" height="72" alt="lixian292" /></a>
+  <a href="https://github.com/LiKunKun64867"><img src="https://github.com/LiKunKun64867.png?size=96" width="72" height="72" alt="LiKunKun64867" /></a>
+</p>
+
+Order: SE-qinghuang, YuCheng1106, lixian292, LiKunKun64867.
+
 ---
 
 ## 💡 Why UniGraph

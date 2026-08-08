@@ -24,6 +24,19 @@
 
 </div>
 
+## 🙏 致谢
+
+感谢以下朋友对 UniGraph 的设计、开发、测试和建议反馈提供帮助：
+
+<p>
+  <a href="https://github.com/SE-qinghuang"><img src="https://github.com/SE-qinghuang.png?size=96" width="72" height="72" alt="SE-qinghuang" /></a>
+  <a href="https://github.com/YuCheng1106"><img src="https://github.com/YuCheng1106.png?size=96" width="72" height="72" alt="YuCheng1106" /></a>
+  <a href="https://github.com/lixian292"><img src="https://github.com/lixian292.png?size=96" width="72" height="72" alt="lixian292" /></a>
+  <a href="https://github.com/LiKunKun64867"><img src="https://github.com/LiKunKun64867.png?size=96" width="72" height="72" alt="LiKunKun64867" /></a>
+</p>
+
+顺序为：SE-qinghuang、YuCheng1106、lixian292、LiKunKun64867。
+
 ---
 
 ## 💡 为什么是 UniGraph
