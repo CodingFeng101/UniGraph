@@ -338,8 +338,8 @@ UniGraph 使用 [GNU Affero General Public License v3.0](LICENSE) 开源。若�
 - **项目贡献者们：**
 
 <p>
-  <a href="https://github.com/SE-qinghuang"><img src="https://github.com/SE-qinghuang.png?size=64" width="56" height="56" alt="SE-qinghuang" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de; margin-right:8px; display:inline-block;" /></a>
-  <a href="https://github.com/YuCheng1106"><img src="https://github.com/YuCheng1106.png?size=64" width="56" height="56" alt="YuCheng1106" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de; margin-right:8px; display:inline-block;" /></a>
-  <a href="https://github.com/lixian292"><img src="https://github.com/lixian292.png?size=64" width="56" height="56" alt="lixian292" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de; margin-right:8px; display:inline-block;" /></a>
-  <a href="https://github.com/LiKunKun64867"><img src="https://github.com/LiKunKun64867.png?size=64" width="56" height="56" alt="LiKunKun64867" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de;" /></a>
+  <a href="https://github.com/SE-qinghuang"><img class="avatar" src="https://github.com/SE-qinghuang.png?size=64" width="56" height="56" alt="SE-qinghuang" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de; margin-right:8px; display:inline-block;" /></a>
+  <a href="https://github.com/YuCheng1106"><img class="avatar" src="https://github.com/YuCheng1106.png?size=64" width="56" height="56" alt="YuCheng1106" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de; margin-right:8px; display:inline-block;" /></a>
+  <a href="https://github.com/lixian292"><img class="avatar" src="https://github.com/lixian292.png?size=64" width="56" height="56" alt="lixian292" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de; margin-right:8px; display:inline-block;" /></a>
+  <a href="https://github.com/LiKunKun64867"><img class="avatar" src="https://github.com/LiKunKun64867.png?size=64" width="56" height="56" alt="LiKunKun64867" style="border-radius:50%; object-fit:cover; border:1px solid #d0d7de;" /></a>
 </p>
