@@ -7,7 +7,12 @@ from fastapi.security import HTTPBasicCredentials
 from starlette.background import BackgroundTasks
 
 from backend.app.admin.schema.token import GetSwaggerToken
-from backend.app.admin.schema.user import AuthLoginParam, AuthRegisterParam, AuthResetPasswordParam
+from backend.app.admin.schema.user import (
+    AuthLoginParam,
+    AuthPasswordResetCodeParam,
+    AuthRegisterParam,
+    AuthResetPasswordParam,
+)
 from backend.app.admin.service.auth_service import auth_service
 from backend.app.admin.service.llm_create_service import llm_create_service
 from backend.app.admin.service.user_service import user_service
@@ -59,6 +64,20 @@ async def forgetPassword(request: Request, obj: AuthResetPasswordParam) -> Respo
         raise ForbiddenError(msg='公开密码重置未启用，请联系管理员重置密码')
     await auth_service.pwd_reset(request=request, obj=obj)
     return response_base.success(data='密码重置成功')
+
+
+@router.post(
+    '/password/reset/code',
+    summary='发送密码重置验证码',
+    dependencies=[Depends(rate_limiter(times=3, seconds=60))],
+)
+async def send_password_reset_code(request: Request, obj: AuthPasswordResetCodeParam) -> ResponseModel:
+    from backend.core.conf import settings
+
+    if not settings.ENABLE_PUBLIC_PASSWORD_RESET:
+        raise ForbiddenError(msg='公开密码重置未启用，请联系管理员重置密码')
+    await auth_service.send_password_reset_code(request=request, obj=obj)
+    return response_base.success(data='如果账号和邮箱匹配，验证码已发送')
 
 
 @router.post('/token/new', summary='创建新 token', dependencies=[DependsJwtAuth])

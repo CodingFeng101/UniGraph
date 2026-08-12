@@ -109,6 +109,8 @@ class Settings(BaseSettings):
         f'{FASTAPI_API_V1_PATH}/oauth2/jxnu/jxnu-auth',
         f'{FASTAPI_API_V1_PATH}/auth/captcha',
         f'{FASTAPI_API_V1_PATH}/auth/register',
+        f'{FASTAPI_API_V1_PATH}/auth/password/reset',
+        f'{FASTAPI_API_V1_PATH}/auth/password/reset/code',
     ]
 
     JWT_USER_REDIS_PREFIX: str = 'fba:user'

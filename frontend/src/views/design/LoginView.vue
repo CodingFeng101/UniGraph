@@ -186,8 +186,12 @@
         <AuthField v-model="resetForm.email" compact input-id="reset-email" label="注册邮箱" icon="mail" type="email" placeholder="请输入注册邮箱" autocomplete="email" />
         <AuthField v-model="resetForm.password" compact input-id="reset-password" label="新密码" icon="lock" type="password" placeholder="请输入新密码" autocomplete="new-password" />
         <AuthField v-model="resetForm.confirmPassword" compact input-id="reset-confirm-password" label="确认新密码" icon="lock" type="password" placeholder="请再次输入新密码" autocomplete="new-password" />
-        <AuthField v-model="resetForm.captcha" compact input-id="reset-captcha" label="验证码" icon="shield-check" placeholder="请输入验证码" :maxlength="4">
-          <template #suffix><img class="captcha-image" :src="captchaSrc" @click="loadCaptcha" title="点击刷新验证码" alt="验证码" /></template>
+        <AuthField v-model="resetForm.emailCode" compact input-id="reset-email-code" label="邮箱验证码" icon="shield-check" placeholder="请输入邮箱验证码" :maxlength="6">
+          <template #suffix>
+            <button type="button" class="email-code-btn" :disabled="busy || codeSending || resetCodeCooldown > 0" @click="sendResetCode">
+              {{ codeSending ? '发送中...' : (resetCodeCooldown > 0 ? `${resetCodeCooldown}s 后重试` : '发送验证码') }}
+            </button>
+          </template>
         </AuthField>
         <p v-if="feedback.message" class="auth-feedback" :class="{ 'auth-feedback--success': feedback.success }">{{ feedback.message }}</p>
         <button type="submit" class="login-btn auth-submit" :disabled="busy">{{ busy ? '提交中...' : '重置密码' }}</button>
@@ -215,12 +219,15 @@ export default {
   data: () => ({
     mode: 'login',
     busy: false,
+    codeSending: false,
+    resetCodeCooldown: 0,
+    resetCodeTimer: null,
     captchaSrc: '',
     rememberUsername: false,
     feedback: { message: '', success: false },
     loginForm: { username: '', password: '', captcha: '' },
     registerForm: { username: '', email: '', password: '', confirmPassword: '', captcha: '' },
-    resetForm: { username: '', email: '', password: '', confirmPassword: '', captcha: '' },
+    resetForm: { username: '', email: '', password: '', confirmPassword: '', emailCode: '' },
   }),
   computed: {
     loginRedirect() {
@@ -252,6 +259,9 @@ export default {
       this.rememberUsername = true;
     }
     this.loadCaptcha();
+  },
+  beforeUnmount() {
+    if (this.resetCodeTimer) window.clearInterval(this.resetCodeTimer);
   },
   methods: {
     switchMode(mode) {
@@ -333,7 +343,7 @@ export default {
       }
     },
     async submitResetPassword() {
-      const fields = ['username', 'email', 'password', 'confirmPassword', 'captcha'];
+      const fields = ['username', 'email', 'password', 'confirmPassword', 'emailCode'];
       if (!this.validateRequired(this.resetForm, fields)) return;
       this.busy = true;
       this.feedback = { message: '', success: false };
@@ -346,9 +356,34 @@ export default {
       } catch (error) {
         this.feedback = { message: error.msg || error.message || '密码重置失败，请重试', success: false };
       } finally {
-        this.resetForm.captcha = '';
+        this.resetForm.emailCode = '';
         await this.loadCaptcha();
         this.busy = false;
+      }
+    },
+    async sendResetCode() {
+      if (!this.resetForm.username.trim() || !this.resetForm.email.trim()) {
+        this.feedback = { message: '请先填写用户名和注册邮箱', success: false };
+        return;
+      }
+      this.codeSending = true;
+      this.feedback = { message: '', success: false };
+      try {
+        const response = await KgBaseAPI.auth.sendPasswordResetCode(this.resetForm);
+        if (response.code !== 200) throw new Error(response.msg || '验证码发送失败');
+        this.feedback = { message: response.data || '验证码已发送，请检查邮箱', success: true };
+        this.resetCodeCooldown = 60;
+        this.resetCodeTimer = window.setInterval(() => {
+          this.resetCodeCooldown -= 1;
+          if (this.resetCodeCooldown <= 0) {
+            window.clearInterval(this.resetCodeTimer);
+            this.resetCodeTimer = null;
+          }
+        }, 1000);
+      } catch (error) {
+        this.feedback = { message: error.msg || error.message || '验证码发送失败，请重试', success: false };
+      } finally {
+        this.codeSending = false;
       }
     },
   },
@@ -466,6 +501,25 @@ export default {
     border-radius: 8px;
     cursor: pointer;
     user-select: none;
+  }
+
+  .email-code-btn {
+    min-width: 96px;
+    height: 30px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--claude-brand-500);
+    cursor: pointer;
+    font-family: var(--claude-font-sans);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .email-code-btn:disabled {
+    color: var(--claude-muted-foreground);
+    cursor: not-allowed;
   }
 
   .auth-feedback {

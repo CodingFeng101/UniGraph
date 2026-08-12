@@ -50,23 +50,34 @@ export const KgBaseAPI = window.KgBaseAPI = {
         captcha_iv: values.captcha.iv,
       });
     },
+    /** 发送密码重置邮箱验证码 */
+    sendPasswordResetCode({ username, email }) {
+      const u = Auth.encryptData(username);
+      const e = Auth.encryptData(email);
+      return API.post('/v1/auth/password/reset/code', {
+        username: u.ciphertext,
+        email: e.ciphertext,
+        username_iv: u.iv,
+        email_iv: e.iv,
+      });
+    },
     /** 重置密码 */
-    resetPassword({ username, email, password, captcha }) {
+    resetPassword({ username, email, password, emailCode }) {
       const values = {
         username: Auth.encryptData(username),
         email: Auth.encryptData(email),
         password: Auth.encryptData(password),
-        captcha: Auth.encryptData(captcha),
+        emailCode: Auth.encryptData(emailCode),
       };
       return API.put('/v1/auth/password/reset', {
         username: values.username.ciphertext,
         email: values.email.ciphertext,
         password: values.password.ciphertext,
-        captcha: values.captcha.ciphertext,
+        email_code: values.emailCode.ciphertext,
         username_iv: values.username.iv,
         email_iv: values.email.iv,
         password_iv: values.password.iv,
-        captcha_iv: values.captcha.iv,
+        email_code_iv: values.emailCode.iv,
       });
     },
     /** 退出登录 */

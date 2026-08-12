@@ -47,11 +47,18 @@ class AuthResetPasswordParam(SchemaBase):
     username: str
     email: str
     password: str
-    captcha: str
+    email_code: str
     username_iv: str  # 添加 iv 字段
     password_iv: str  # 添加 iv 字段
     email_iv: str
-    captcha_iv: str  # 添加 iv 字段
+    email_code_iv: str
+
+
+class AuthPasswordResetCodeParam(SchemaBase):
+    username: str
+    email: str
+    username_iv: str
+    email_iv: str
 
 
 class AddUserParam(AuthSchemaBase):

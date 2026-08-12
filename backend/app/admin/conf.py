@@ -30,6 +30,18 @@ class AdminSettings(BaseSettings):
     CAPTCHA_LOGIN_REDIS_PREFIX: str = 'fba:login:captcha'
     CAPTCHA_LOGIN_EXPIRE_SECONDS: int = 60 * 5  # 过期时间，单位：秒
 
+    # Password reset email
+    MAIL_USERNAME: str = ''
+    MAIL_PASSWORD: str = ''
+    MAIL_SERVER: str = 'smtp.qq.com'
+    MAIL_PORT: int = 465
+    MAIL_USE_SSL: bool = True
+    MAIL_FROM_NAME: str = 'UniGraph'
+    PASSWORD_RESET_CODE_REDIS_PREFIX: str = 'fba:password_reset:code'
+    PASSWORD_RESET_CODE_COOLDOWN_PREFIX: str = 'fba:password_reset:cooldown'
+    PASSWORD_RESET_CODE_EXPIRE_SECONDS: int = 60 * 5
+    PASSWORD_RESET_CODE_COOLDOWN_SECONDS: int = 60
+
     # Config
     CONFIG_REDIS_KEY: str = 'fba:config'
 

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import base64
+import hashlib
+import hmac
 import random
+import secrets
+import smtplib
+from email.message import EmailMessage
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
@@ -9,6 +14,7 @@ from fastapi import HTTPException, Request, Response
 from fastapi.security import HTTPBasicCredentials
 from sqlalchemy.exc import IntegrityError
 from starlette.background import BackgroundTask, BackgroundTasks
+from starlette.concurrency import run_in_threadpool
 
 from backend.app.admin.conf import admin_settings
 from backend.app.admin.crud.crud_user import user_dao
@@ -16,6 +22,7 @@ from backend.app.admin.model import User
 from backend.app.admin.schema.token import GetLoginToken, GetNewToken
 from backend.app.admin.schema.user import (
     AuthLoginParam,
+    AuthPasswordResetCodeParam,
     AuthRegisterParam,
     AuthResetPasswordParam,
     RegisterUserParam,
@@ -67,6 +74,72 @@ def decrypt_data(encrypted_data: str, iv_base64: str) -> str:
 
 
 class AuthService:
+    @staticmethod
+    def _password_reset_key(email: str) -> str:
+        email_hash = hashlib.sha256(email.casefold().encode('utf-8')).hexdigest()
+        return f'{admin_settings.PASSWORD_RESET_CODE_REDIS_PREFIX}:{email_hash}'
+
+    @staticmethod
+    def _password_reset_cooldown_key(email: str) -> str:
+        email_hash = hashlib.sha256(email.casefold().encode('utf-8')).hexdigest()
+        return f'{admin_settings.PASSWORD_RESET_CODE_COOLDOWN_PREFIX}:{email_hash}'
+
+    @staticmethod
+    def _send_password_reset_email(*, recipient: str, code: str) -> None:
+        message = EmailMessage()
+        message['Subject'] = 'UniGraph 密码重置验证码'
+        message['From'] = f'{admin_settings.MAIL_FROM_NAME} <{admin_settings.MAIL_USERNAME}>'
+        message['To'] = recipient
+        message.set_content(
+            f'您好，您正在重置 UniGraph 账号密码。\n\n'
+            f'您的验证码是：{code}\n'
+            f'验证码 {admin_settings.PASSWORD_RESET_CODE_EXPIRE_SECONDS // 60} 分钟内有效。\n\n'
+            '如果不是您本人操作，请忽略此邮件。'
+        )
+        if admin_settings.MAIL_USE_SSL:
+            with smtplib.SMTP_SSL(admin_settings.MAIL_SERVER, admin_settings.MAIL_PORT, timeout=20) as server:
+                server.login(admin_settings.MAIL_USERNAME, admin_settings.MAIL_PASSWORD)
+                server.send_message(message)
+        else:
+            with smtplib.SMTP(admin_settings.MAIL_SERVER, admin_settings.MAIL_PORT, timeout=20) as server:
+                server.starttls()
+                server.login(admin_settings.MAIL_USERNAME, admin_settings.MAIL_PASSWORD)
+                server.send_message(message)
+
+    @staticmethod
+    async def send_password_reset_code(*, request: Request, obj: AuthPasswordResetCodeParam) -> None:
+        obj.username = decrypt_data(obj.username, obj.username_iv).strip()
+        obj.email = decrypt_data(obj.email, obj.email_iv).strip().casefold()
+        if not obj.username or not obj.email:
+            raise errors.ForbiddenError(msg='请输入用户名和注册邮箱')
+        if not admin_settings.MAIL_USERNAME or not admin_settings.MAIL_PASSWORD:
+            raise errors.ServerError(msg='邮件服务尚未配置，请联系管理员')
+
+        async with async_db_session() as db:
+            user = await user_dao.get_by_username(db, obj.username)
+        if not user or not user.email or user.email.casefold() != obj.email:
+            # 对外保持统一响应，避免通过接口枚举系统账号和邮箱。
+            return
+
+        cooldown_key = AuthService._password_reset_cooldown_key(obj.email)
+        cooldown_created = await redis_client.set(
+            cooldown_key,
+            '1',
+            ex=admin_settings.PASSWORD_RESET_CODE_COOLDOWN_SECONDS,
+            nx=True,
+        )
+        if not cooldown_created:
+            raise errors.ForbiddenError(msg='验证码发送过于频繁，请稍后再试')
+
+        code = f'{secrets.randbelow(900000) + 100000}'
+        code_key = AuthService._password_reset_key(obj.email)
+        await redis_client.set(code_key, code, ex=admin_settings.PASSWORD_RESET_CODE_EXPIRE_SECONDS)
+        try:
+            await run_in_threadpool(AuthService._send_password_reset_email, recipient=obj.email, code=code)
+        except Exception as exc:
+            await redis_client.delete(code_key, cooldown_key)
+            raise errors.ServerError(msg='验证码邮件发送失败，请检查邮箱配置后重试') from exc
+
     @staticmethod
     async def swagger_login(*, obj: HTTPBasicCredentials) -> tuple[str, User]:
         async with async_db_session.begin() as db:
@@ -213,12 +286,14 @@ class AuthService:
                 obj.username = decrypt_data(obj.username, obj.username_iv)  # 使用传来的 IV 和密文解密
                 obj.email = decrypt_data(obj.email, obj.email_iv)
                 obj.password = decrypt_data(obj.password, obj.password_iv)  # 使用传来的 IV 和密文解密
-                obj.captcha = decrypt_data(obj.captcha, obj.captcha_iv)  # 使用传来的 IV 和密文解密
+                obj.email_code = decrypt_data(obj.email_code, obj.email_code_iv)
+                obj.email = obj.email.strip().casefold()
                 # 验证验证码
-                captcha_code = await redis_client.get(f'{admin_settings.CAPTCHA_LOGIN_REDIS_PREFIX}:{request.state.ip}')
-                if not captcha_code:
-                    raise errors.AuthorizationError(msg='验证码失效，请重新获取')
-                if captcha_code.lower() != obj.captcha.lower():
+                code_key = AuthService._password_reset_key(obj.email)
+                email_code = await redis_client.get(code_key)
+                if not email_code:
+                    raise errors.AuthorizationError(msg='邮箱验证码已失效，请重新获取')
+                if not hmac.compare_digest(email_code, obj.email_code.strip()):
                     raise errors.CustomError(error=CustomErrorCode.CAPTCHA_ERROR)
 
                     # 检查密码
@@ -227,13 +302,14 @@ class AuthService:
                 user = await user_dao.get_by_username(db, obj.username)
                 if not user:
                     raise errors.ForbiddenError(msg='用户不存在')
-                if not obj.email == user.email:
+                if not user.email or obj.email != user.email.casefold():
                     raise errors.ForbiddenError(msg='邮箱验证错误')
 
                     # 更新密码
                 salt = user.salt
                 hashed_password = get_hash_password(f'{obj.password}{salt}')  # 假设你需要哈希密码
                 await user_dao.update_user_pwd(db, obj.username, hashed_password)
+                await redis_client.delete(code_key)
 
             except errors.NotFoundError as e:
                 raise errors.NotFoundError(msg=e.msg)
