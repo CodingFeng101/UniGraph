@@ -270,19 +270,11 @@ API Key 会在后端加密保存，编辑模型时留空表示保留已有密钥
 
 ## 🎬 视频教程
 
-**实操系列**（全程真实界面）：
+**实操系列**：
 
 - [UniGraph 实操①｜设计篇：一句需求，AI 设计知识架构](https://www.bilibili.com/video/BV1r2xs6ME5s)
 - [UniGraph 实操②｜构建篇：三份文档，长出近千实体图谱](https://www.bilibili.com/video/BV1c2xs6uEJw)
 - [UniGraph 实操③｜应用篇：每个回答，都能追到原文出处](https://www.bilibili.com/video/BV1r2xs6MEGV)
-
-**功能解说**：
-
-- [一站式知识图谱智造平台](https://www.bilibili.com/video/BV1jkivYZEyB)
-- [知识架构设计解说](https://www.bilibili.com/video/BV1weR8YeEPh)
-- [知识图谱构建解说](https://www.bilibili.com/video/BV1ceR8YeEhD)
-- [知识图谱检索解说](https://www.bilibili.com/video/BV1weR8YeEjv)
-- [UniGraph & Sapper：导入智能体平台](https://www.bilibili.com/video/BV1kcZuYjEuM)
 
 ## 📌 项目状态
 

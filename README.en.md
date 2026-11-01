@@ -197,18 +197,11 @@ See the [deployment guide](docs/DEPLOYMENT.md) for traditional startup, producti
 
 ## 🎬 Tutorials
 
-**Hands-on series** (real UI throughout, narration in Chinese):
+**Hands-on series**:
 
 - [Hands-on ① · Design: one requirement, an AI-designed knowledge schema](https://www.bilibili.com/video/BV1r2xs6ME5s)
 - [Hands-on ② · Build: three documents grow a graph of nearly 1,000 entities](https://www.bilibili.com/video/BV1c2xs6uEJw)
 - [Hands-on ③ · Apply: every answer traces back to its source](https://www.bilibili.com/video/BV1r2xs6MEGV)
-
-**Feature walkthroughs**:
-
-- [UniGraph: an end-to-end knowledge graph platform](https://www.bilibili.com/video/BV1jkivYZEyB)
-- [Knowledge schema design](https://www.bilibili.com/video/BV1weR8YeEPh)
-- [Knowledge graph construction](https://www.bilibili.com/video/BV1ceR8YeEhD)
-- [Knowledge graph retrieval](https://www.bilibili.com/video/BV1weR8YeEjv)
 
 ## 📌 Project status
 
