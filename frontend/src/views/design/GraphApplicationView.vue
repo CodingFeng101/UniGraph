@@ -326,26 +326,26 @@
               <div class="relative">
                 <div id="effort-panel" class="hidden absolute left-full bottom-0 ml-2 w-72 rounded-xl p-2" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-lg);">
                   <div class="px-3 py-1.5">
-                    <p class="text-[11px] leading-snug" style="color:var(--claude-muted-foreground);">档位越高，知识图谱检索层级越深，回答耗时也会增加</p>
+                    <p class="text-[11px] leading-snug" style="color:var(--claude-muted-foreground);">档位决定参考哪一层社区报告：L0 最宏观，L3 最细</p>
                   </div>
                   <div class="px-2 space-y-0.5">
                     <div class="px-2.5 py-1.5 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]" @click="selectEffort('Low')">
                       <div class="flex items-center justify-between">
                         <div class="flex items-center gap-1.5">
-                          <span class="text-[13px]" style="color:var(--claude-foreground);">Low · 1 跳</span>
+                          <span class="text-[13px]" style="color:var(--claude-foreground);">Low · L0 宏观</span>
                           <span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:var(--claude-accent);color:var(--claude-muted-foreground);">Default</span>
                         </div>
                         <svg class="effort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                       </div>
                     </div>
                     <div class="px-2.5 py-1.5 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]" @click="selectEffort('Medium')">
-                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">Medium · 2 跳</span>
+                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">Medium · L1</span>
                     </div>
                     <div class="px-2.5 py-1.5 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]" @click="selectEffort('High')">
-                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">High · 3 跳</span>
+                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">High · L2</span>
                     </div>
                     <div class="px-2.5 py-1.5 cursor-pointer rounded-lg transition-colors hover:bg-[var(--claude-secondary)]" @click="selectEffort('Max')">
-                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">Max · 4 跳</span>
+                      <span class="text-[13px]" style="color:var(--claude-muted-foreground);">Max · L3 细粒度</span>
                     </div>
                   </div>
                 </div>

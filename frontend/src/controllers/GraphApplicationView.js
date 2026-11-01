@@ -24,6 +24,9 @@ lucide.createIcons();
 
 var motionContext = null;
 var effortRetrievalDepth = { Low: 1, Medium: 2, High: 3, Max: 4 };
+// The tier picks which level of community reports joins the answer (level = depth - 1); entity and
+// relationship retrieval is the same at every tier.
+var effortCommunityLevel = { Low: 'L0 宏观', Medium: 'L1', High: 'L2', Max: 'L3 细粒度' };
 
 function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -356,13 +359,13 @@ function selectEffort(level) {
     div.setAttribute('onclick', "selectEffort('" + lv + "')");
     if (lv === level) {
       var badge = lv === 'Low' ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:var(--claude-accent);color:var(--claude-muted-foreground);">Default</span>' : '';
-      div.innerHTML = '<div class="flex items-center justify-between"><div class="flex items-center gap-1.5"><span class="text-[13px] font-medium" style="color:var(--claude-foreground);">' + lv + ' · ' + effortRetrievalDepth[lv] + ' 跳</span>' + badge + '</div><svg class="effort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>';
+      div.innerHTML = '<div class="flex items-center justify-between"><div class="flex items-center gap-1.5"><span class="text-[13px] font-medium" style="color:var(--claude-foreground);">' + lv + ' · ' + effortCommunityLevel[lv] + '</span>' + badge + '</div><svg class="effort-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--claude-primary)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>';
     } else {
-      div.innerHTML = '<span class="text-[13px]" style="color:var(--claude-muted-foreground);">' + lv + ' · ' + effortRetrievalDepth[lv] + ' 跳</span>';
+      div.innerHTML = '<span class="text-[13px]" style="color:var(--claude-muted-foreground);">' + lv + ' · ' + effortCommunityLevel[lv] + '</span>';
     }
     container.appendChild(div);
   });
-  showToast('已切换检索档位：' + level + '（' + effortRetrievalDepth[level] + ' 跳）');
+  showToast('已切换检索档位：' + level + '（社区层级 ' + effortCommunityLevel[level] + '）');
 }
 
 function getSelectedEffort() {
