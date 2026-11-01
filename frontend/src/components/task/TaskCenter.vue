@@ -72,14 +72,17 @@ export default {
         ? Math.min(window.innerWidth - width - 12, orbLeft + 58)
         : Math.max(12, orbLeft - width - 8);
       const style = { width: `${width}px`, height: `${height}px`, left: `${left}px` };
+      // Keep the whole panel on screen: on short windows it must not run off the top or bottom.
+      const maxOffset = window.innerHeight - height - 12;
+      const clamp = (value) => Math.min(Math.max(12, value), maxOffset);
       if (this.position.y > window.innerHeight / 2) {
         return {
           ...style,
           top: 'auto',
-          bottom: `${Math.max(12, window.innerHeight - this.position.y - 52)}px`,
+          bottom: `${clamp(window.innerHeight - this.position.y - 52)}px`,
         };
       }
-      return { ...style, top: `${Math.max(12, this.position.y)}px`, bottom: 'auto' };
+      return { ...style, top: `${clamp(this.position.y)}px`, bottom: 'auto' };
     },
   },
   mounted() {

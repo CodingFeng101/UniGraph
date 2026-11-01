@@ -248,6 +248,13 @@ class AuthService:
 
                 if not obj.password:
                     raise errors.ForbiddenError(msg='密码为空')
+                # 与 sys_user 列长度保持一致，避免超长数据触发数据库异常
+                if len(obj.username) > 20:
+                    raise errors.RequestError(msg='用户名不能超过 20 个字符')
+                if len(obj.email) > 50:
+                    raise errors.RequestError(msg='邮箱不能超过 50 个字符')
+                if obj.nickname and len(obj.nickname) > 20:
+                    raise errors.RequestError(msg='昵称不能超过 20 个字符')
                 username = await user_dao.get_by_username(db, obj.username)
                 if username:
                     raise errors.ForbiddenError(msg='用户已注册')

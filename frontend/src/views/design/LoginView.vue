@@ -170,7 +170,7 @@
       </form>
 
       <form v-else-if="mode === 'register'" id="register-form" class="auth-form auth-form--compact" autocomplete="off" @submit.prevent="submitRegister">
-        <AuthField v-model="registerForm.username" compact input-id="register-username" label="用户名" icon="user" placeholder="请输入用户名" autocomplete="username" />
+        <AuthField v-model="registerForm.username" compact input-id="register-username" label="用户名" icon="user" placeholder="请输入用户名（最多 20 个字符）" autocomplete="username" :maxlength="20" />
         <AuthField v-model="registerForm.email" compact input-id="register-email" label="邮箱" icon="mail" type="email" placeholder="请输入邮箱" autocomplete="email" />
         <AuthField v-model="registerForm.password" compact input-id="register-password" label="密码" icon="lock" type="password" placeholder="请输入密码" autocomplete="new-password" />
         <AuthField v-model="registerForm.confirmPassword" compact input-id="register-confirm-password" label="确认密码" icon="lock" type="password" placeholder="请再次输入密码" autocomplete="new-password" />
@@ -326,6 +326,10 @@ export default {
     async submitRegister() {
       const fields = ['username', 'email', 'password', 'confirmPassword', 'captcha'];
       if (!this.validateRequired(this.registerForm, fields)) return;
+      if (this.registerForm.username.trim().length > 20) {
+        this.feedback = { message: '用户名不能超过 20 个字符', success: false };
+        return;
+      }
       this.busy = true;
       this.feedback = { message: '', success: false };
       try {

@@ -642,6 +642,8 @@ function renderSchemaGraph(detail) {
 function showTooltipByPos(title, type, bodyHtml, position) {
   var t = document.getElementById('canvas-tooltip');
   if (!t) return;
+  // A hide scheduled by leaving the previous element must not close this one.
+  window.clearTimeout(tooltipHideTimer);
   renderGraphTooltipContent(title, type, bodyHtml);
   t.classList.remove('hidden');
   var parent = t.parentElement;
@@ -653,8 +655,11 @@ function showTooltipByPos(title, type, bodyHtml, position) {
   t.style.top = Math.max(12, y) + 'px';
 }
 
+var tooltipHideTimer = null;
+
 function scheduleTooltipHide() {
-  window.setTimeout(function() {
+  window.clearTimeout(tooltipHideTimer);
+  tooltipHideTimer = window.setTimeout(function() {
     var tooltip = document.getElementById('canvas-tooltip');
     if (tooltip && !tooltip.matches(':hover')) hideTooltip();
   }, 140);
