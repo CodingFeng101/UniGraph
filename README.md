@@ -16,11 +16,9 @@
 
 [🚀 在线体验](https://unigraph.jxselab.com/login) · [⚡ 快速开始](#-五分钟启动) · [🏗️ 技术架构](docs/TECHNICAL_ARCHITECTURE.md) · [📦 部署指南](docs/DEPLOYMENT.md) · [🎬 视频教程](#-视频教程) · [🤝 参与贡献](CONTRIBUTING.md)
 
-<a href="docs/assets/screenshots/graph-design.png">
-  <img src="docs/assets/screenshots/graph-design.png" alt="UniGraph 工作台总览" width="100%" />
-</a>
+https://github.com/user-attachments/assets/d034d38e-23b0-4e7a-aa00-f86b144eaaaa
 
-<sub>从领域建模、图谱构建到知识应用，所有关键步骤都在同一个工作台中完成。</sub>
+<sub>两分钟看懂 UniGraph：知识图谱设计不易、构建不全、应用不精，UniGraph 逐一破解。</sub>
 
 </div>
 
@@ -271,6 +269,14 @@ Windows 多 worker 和完整排障命令见 [部署指南](docs/DEPLOYMENT.md)�
 API Key 会在后端加密保存，编辑模型时留空表示保留已有密钥，页面不会回显明文。
 
 ## 🎬 视频教程
+
+**实操系列**（全程真实界面）：
+
+- [UniGraph 实操①｜设计篇：一句需求，AI 设计知识架构](https://www.bilibili.com/video/BV1r2xs6ME5s)
+- [UniGraph 实操②｜构建篇：三份文档，长出近千实体图谱](https://www.bilibili.com/video/BV1c2xs6uEJw)
+- [UniGraph 实操③｜应用篇：每个回答，都能追到原文出处](https://www.bilibili.com/video/BV1r2xs6MEGV)
+
+**功能解说**：
 
 - [一站式知识图谱智造平台](https://www.bilibili.com/video/BV1jkivYZEyB)
 - [知识架构设计解说](https://www.bilibili.com/video/BV1weR8YeEPh)

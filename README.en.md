@@ -16,11 +16,9 @@
 
 [🚀 Live demo](https://unigraph.jxselab.com/login) · [⚡ Quick start](#-quick-start) · [🏗️ Architecture](docs/TECHNICAL_ARCHITECTURE.en.md) · [📦 Deployment](docs/DEPLOYMENT.md) · [🎬 Tutorials](#-tutorials) · [🤝 Contributing](CONTRIBUTING.md)
 
-<a href="docs/assets/screenshots/graph-design.png">
-  <img src="docs/assets/screenshots/graph-design.png" alt="UniGraph workbench overview" width="100%" />
-</a>
+https://github.com/user-attachments/assets/d034d38e-23b0-4e7a-aa00-f86b144eaaaa
 
-<sub>Design the domain, build the graph, and apply knowledge from one unified workbench.</sub>
+<sub>UniGraph in two minutes: knowledge graphs are hard to design, incomplete to build and imprecise to apply. UniGraph tackles each one. (Narration in Chinese.)</sub>
 
 </div>
 
@@ -198,6 +196,14 @@ See the [deployment guide](docs/DEPLOYMENT.md) for traditional startup, producti
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 
 ## 🎬 Tutorials
+
+**Hands-on series** (real UI throughout, narration in Chinese):
+
+- [Hands-on ① · Design: one requirement, an AI-designed knowledge schema](https://www.bilibili.com/video/BV1r2xs6ME5s)
+- [Hands-on ② · Build: three documents grow a graph of nearly 1,000 entities](https://www.bilibili.com/video/BV1c2xs6uEJw)
+- [Hands-on ③ · Apply: every answer traces back to its source](https://www.bilibili.com/video/BV1r2xs6MEGV)
+
+**Feature walkthroughs**:
 
 - [UniGraph: an end-to-end knowledge graph platform](https://www.bilibili.com/video/BV1jkivYZEyB)
 - [Knowledge schema design](https://www.bilibili.com/video/BV1weR8YeEPh)
