@@ -50,6 +50,10 @@
   <div class="flex-1 min-h-0 flex">
     <div class="flex-1 min-w-0 relative overflow-hidden" style="background:var(--claude-secondary);">
       <div id="graph-canvas" class="w-full h-full" style="background:var(--claude-background);"></div>
+      <div id="inferred-legend" class="hidden absolute bottom-16 left-4 z-20 items-center gap-3 px-3 py-1.5 rounded-lg text-[11px]" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-sm);color:var(--claude-muted-foreground);">
+        <span class="inline-flex items-center gap-1.5"><span class="inline-block w-4 border-t-2" style="border-color:var(--claude-muted-foreground);"></span>文档抽取</span>
+        <span class="inline-flex items-center gap-1.5"><span class="inline-block w-4 border-t-2 border-dashed" style="border-color:#c2410c;"></span>AI 扩展</span>
+      </div>
       <div class="absolute bottom-4 left-4 z-20 flex items-center gap-1 p-1 rounded-lg" style="background:var(--claude-card);border:1px solid var(--claude-border);box-shadow:var(--claude-shadow-sm);">
         <button data-build-graph-style="database" type="button" @click="changeGraphStyle('database')" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer" style="background:var(--claude-primary);color:var(--claude-primary-foreground);border:none;">数据库</button>
         <button data-build-graph-style="minimal" type="button" @click="changeGraphStyle('minimal')" class="px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors hover:opacity-70 cursor-pointer" style="background:transparent;color:var(--claude-muted-foreground);border:none;">简约</button>

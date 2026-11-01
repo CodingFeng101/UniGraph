@@ -18,6 +18,9 @@ export const GraphRenderer = window.GraphRenderer = {
   /** 高亮色 */
   highlightColor: '#FF5252',
 
+  /** Knowledge added by knowledge migration rather than extracted from the documents. */
+  inferredColor: '#c2410c',
+
   /** Only the load mode groups graphs at or above this node count. */
   clusterThreshold: 150,
 
@@ -65,6 +68,48 @@ export const GraphRenderer = window.GraphRenderer = {
     } catch (error) {
       return {};
     }
+  },
+
+  isInferredRelationship(relationship) {
+    return this.normalizeAttributes(relationship?.attributes).origin === 'knowledge_migration';
+  },
+
+  /**
+   * Flag migrated relationships, and the entities that only migrated relationships touch: those
+   * entities were added by knowledge migration, since every extracted entity has an extracted relationship.
+   */
+  markInferred(nodes, edges) {
+    const touched = new Set();
+    const extracted = new Set();
+    edges.forEach(({ data }) => {
+      data.inferred = this.isInferredRelationship(data.raw);
+      [data.source, data.target].forEach((id) => {
+        touched.add(id);
+        if (!data.inferred) extracted.add(id);
+      });
+    });
+    nodes.forEach(({ data }) => {
+      data.inferred = touched.has(data.id) && !extracted.has(data.id);
+    });
+  },
+
+  applyInferredStyle(cy) {
+    cy.batch(() => {
+      cy.edges('[?inferred]').style({
+        width: 2.5,
+        'line-color': this.inferredColor,
+        'target-arrow-color': this.inferredColor,
+        'line-style': 'dashed',
+        'line-dash-pattern': [7, 4],
+        color: this.inferredColor,
+      });
+      cy.nodes('[?inferred]').style({
+        'border-width': 4,
+        'border-style': 'dashed',
+        'border-color': this.inferredColor,
+        'border-opacity': 1,
+      });
+    });
   },
 
   /**
@@ -147,7 +192,9 @@ export const GraphRenderer = window.GraphRenderer = {
     } else {
       return {
         name: 'fcose',
-        quality: nodeCount <= 400 ? 'default' : 'draft',
+        // 'draft' stops after the spectral pass, which leaves a ~1000-node graph piled into a few hundred
+        // pixels; the force pass still takes under a second at that size.
+        quality: nodeCount <= 2000 ? 'default' : 'draft',
         randomize: true,
         idealEdgeLength: nodeCount <= 400 ? 220 : 190,
         nodeRepulsion: nodeCount <= 400 ? 18000 : 15000,
@@ -473,6 +520,7 @@ export const GraphRenderer = window.GraphRenderer = {
     ) {
       this.enableLoadClusters(cy);
     }
+    if (selectedMode !== 'load') this.applyInferredStyle(cy);
     cy.nodes('[isCluster]').style({
       label: 'data(label)',
       'border-width': 3,
@@ -711,6 +759,7 @@ export const GraphRenderer = window.GraphRenderer = {
     edges.forEach(({ data }) => {
       data.color = nodeColors[data.source] || this.defaultColor;
     });
+    this.markInferred(nodes, edges);
 
     // 选择布局
     if (callbacks.positions) {
@@ -871,33 +920,39 @@ export const GraphRenderer = window.GraphRenderer = {
     const nodeColorMap = Object.fromEntries(nodeItems.map((node) => [node.id, node.baseColor]));
     const edgeItems = relationships
       .filter((relationship) => nodeIds.has(relationship.source_entity_uuid) && nodeIds.has(relationship.target_entity_uuid))
-      .map((relationship) => ({
-        id: relationship.uuid,
-        uuid: relationship.uuid,
-        from: relationship.source_entity_uuid,
-        to: relationship.target_entity_uuid,
-        label: relationship.name,
-        type: relationship.type,
-        raw: relationship,
-        arrows: { to: { enabled: true, scaleFactor: 1 } },
-        color: {
-          color: nodeColorMap[relationship.source_entity_uuid] || this.defaultColor,
-          highlight: nodeColorMap[relationship.source_entity_uuid] || this.defaultColor,
-          hover: nodeColorMap[relationship.source_entity_uuid] || this.defaultColor,
-          opacity: 1,
-        },
-        width: 1,
-        hoverWidth: 0,
-        selectionWidth: 1,
-        background: { enabled: true, color: '#E4F1FE' },
-        smooth: { enabled: true, type: 'dynamic', roundness: 0.5 },
-        font: {
-          color: '#000000',
-          size: 12,
-          face: 'arial',
-          align: 'top',
-        },
-      }));
+      .map((relationship) => {
+        const inferred = this.isInferredRelationship(relationship);
+        const color = inferred ? this.inferredColor : nodeColorMap[relationship.source_entity_uuid] || this.defaultColor;
+        return {
+          id: relationship.uuid,
+          uuid: relationship.uuid,
+          from: relationship.source_entity_uuid,
+          to: relationship.target_entity_uuid,
+          label: relationship.name,
+          type: relationship.type,
+          raw: relationship,
+          inferred,
+          dashes: inferred ? [7, 4] : false,
+          arrows: { to: { enabled: true, scaleFactor: 1 } },
+          color: {
+            color,
+            highlight: color,
+            hover: color,
+            opacity: 1,
+          },
+          width: inferred ? 2 : 1,
+          hoverWidth: 0,
+          selectionWidth: 1,
+          background: { enabled: true, color: '#E4F1FE' },
+          smooth: { enabled: true, type: 'dynamic', roundness: 0.5 },
+          font: {
+            color: '#000000',
+            size: 12,
+            face: 'arial',
+            align: 'top',
+          },
+        };
+      });
 
     const nodeData = new DataSet(nodeItems);
     const edgeData = new DataSet(edgeItems);

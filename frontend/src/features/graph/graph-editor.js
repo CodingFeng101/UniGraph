@@ -25,9 +25,13 @@ export function createGraphEditorController(context) {
     return '未知实体';
   }
 
+  var inferredNote = '<p class="text-[11px] mt-1 font-medium" style="color:#c2410c;">来源: 知识迁移（AI 扩展）</p>';
+
   function showElementDetail(data, type, position) {
     var tooltip = document.getElementById('canvas-tooltip');
     if (!tooltip) return;
+    // A hide scheduled by leaving the previous element must not close this one.
+    window.clearTimeout(tooltipHideTimer);
     var title = data.label || data.name || '';
     var typeLabel = type === 'node' ? (data.type || '实体') + ' (实体)' : (data.type || data.label || '关系') + ' (关系)';
     var bodyHtml = '';
@@ -37,6 +41,7 @@ export function createGraphEditorController(context) {
         bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">' + key + ' = ' + attrs[key] + '</p>';
       });
       if (data.raw.source) bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">来源: ' + data.raw.source + '</p>';
+      if (data.inferred) bodyHtml += inferredNote;
     } else if (type === 'edge' && data.raw) {
       var srcName = resolveKnowledgeEntityName(data.raw.source_entity_uuid, data.raw.source_entity_name);
       var tgtName = resolveKnowledgeEntityName(data.raw.target_entity_uuid, data.raw.target_entity_name);
@@ -44,6 +49,7 @@ export function createGraphEditorController(context) {
       bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">尾实体: ' + tgtName + '</p>';
       if (data.raw.type) bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">类型: ' + data.raw.type + '</p>';
       if (data.raw.source) bodyHtml += '<p class="text-[11px] mt-1" style="color:var(--claude-muted-foreground);">来源: ' + data.raw.source + '</p>';
+      if (data.inferred) bodyHtml += inferredNote;
     }
     renderGraphTooltipContent(title, typeLabel, bodyHtml);
     tooltip.classList.remove('hidden');
@@ -57,8 +63,11 @@ export function createGraphEditorController(context) {
     tooltip.style.top = Math.max(12, y) + 'px';
   }
 
+  var tooltipHideTimer = null;
+
   function scheduleTooltipHide() {
-    window.setTimeout(function() {
+    window.clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = window.setTimeout(function() {
       var tooltip = document.getElementById('canvas-tooltip');
       if (tooltip && !tooltip.matches(':hover')) context.hideTooltip();
     }, 140);

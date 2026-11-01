@@ -664,10 +664,20 @@ async function loadGraphDetail(graphUuid) {
   }
 }
 
+// The legend only matters once knowledge migration has added something to the graph.
+function syncInferredLegend() {
+  var legend = document.getElementById('inferred-legend');
+  if (!legend) return;
+  var hasInferred = graphData.relationships.some(function(item) { return GraphRenderer.isInferredRelationship(item); });
+  legend.classList.toggle('hidden', !hasInferred);
+  legend.classList.toggle('flex', hasInferred);
+}
+
 // ===== Render graph with Cytoscape =====
 function renderGraph(viewState) {
   var container = document.getElementById('graph-canvas');
   if (!container) return;
+  syncInferredLegend();
   // Destroy existing instance
   if (cy) {
     cy.destroy();

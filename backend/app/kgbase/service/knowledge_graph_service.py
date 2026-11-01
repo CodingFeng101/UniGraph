@@ -381,18 +381,18 @@ class KnowledgeGraphService:
                 schema_entry = {
                     'DirectionalEntity': {
                         'Name': source_entity.name,
-                        'Type': source_entity.name,
+                        'Type': source_entity.type or source_entity.name,
                         'Attributes': json.loads(source_entity.attributes),
                         # 假设 attributes 是列表
                     },
                     'Relation': {
                         'Name': relationship.name,
-                        'Type': relationship.name,
+                        'Type': relationship.type or relationship.name,
                         'Attributes': {},
                     },  # 假设关系有 type 属性
                     'DirectedEntity': {
                         'Name': target_entity.name,
-                        'Type': target_entity.name,
+                        'Type': target_entity.type or target_entity.name,
                         'Attributes': json.loads(target_entity.attributes),
                         # 假设 attributes 是列表
                     },

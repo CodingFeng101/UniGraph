@@ -55,6 +55,8 @@ logger = logging.getLogger(__name__)
 
 # 定义心跳间隔（50秒）
 HEARTBEAT_INTERVAL = 50
+# Marks relationships written by knowledge migration, so the graph can tell them from extracted ones.
+INFERRED_RELATIONSHIP_ATTRIBUTES = json.dumps({'origin': 'knowledge_migration'})
 
 router = APIRouter()
 
@@ -1123,7 +1125,7 @@ async def infer_knowledge_graph(self, uuid: str, user_token: str):
                     source_entity_uuid=source_entity_uuid,
                     target_entity_uuid=target_entity_uuid,
                     name=relation.get('Name'),
-                    attributes='{}',
+                    attributes=INFERRED_RELATIONSHIP_ATTRIBUTES,
                     type=relation.get('Type'),
                     source=source,
                 )
