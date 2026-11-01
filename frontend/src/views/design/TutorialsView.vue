@@ -121,21 +121,12 @@ export default {
     playerLoaded: false,
     categories: [
       { value: 'all', label: '全部' },
-      { value: '总览', label: '总览' },
       { value: '设计', label: '图谱设计' },
       { value: '构建', label: '图谱构建' },
       { value: '检索', label: '图谱检索' },
       { value: '集成', label: '智能体集成' },
     ],
     videos: [
-      {
-        category: '总览',
-        title: '一站式知识图谱智造平台',
-        description: '系统了解 UniGraph 的完整工作流与核心能力。',
-        bvid: 'BV1jkivYZEyB',
-        url: 'https://www.bilibili.com/video/BV1jkivYZEyB',
-        cover: 'https://i1.hdslb.com/bfs/archive/28a393a50a1dcbbe1792d64750cfbe838d4c2b53.jpg',
-      },
       {
         category: '设计',
         title: 'UniGraph 实操①｜设计篇：一句需求，AI 设计知识架构',
@@ -159,30 +150,6 @@ export default {
         bvid: 'BV1r2xs6MEGV',
         url: 'https://www.bilibili.com/video/BV1r2xs6MEGV',
         cover: 'https://i1.hdslb.com/bfs/archive/ab3e2b0d7856caae7dbdcdece53d27cfaa698347.jpg',
-      },
-      {
-        category: '设计',
-        title: '知识架构设计解说',
-        description: '讲解实体类型、关系类型、属性与知识架构设计流程。',
-        bvid: 'BV1weR8YeEPh',
-        url: 'https://www.bilibili.com/video/BV1weR8YeEPh',
-        cover: 'https://i0.hdslb.com/bfs/archive/a1ea3888aa76832689fb230764844ecd2afe7b9a.jpg',
-      },
-      {
-        category: '构建',
-        title: '知识图谱构建解说',
-        description: '演示从文件上传、知识抽取到图谱生成的完整过程。',
-        bvid: 'BV1ceR8YeEhD',
-        url: 'https://www.bilibili.com/video/BV1ceR8YeEhD',
-        cover: 'https://i2.hdslb.com/bfs/archive/6dd89c00275b733dfdb50ad7949eef22cd7a9b09.jpg',
-      },
-      {
-        category: '检索',
-        title: '知识图谱检索解说',
-        description: '介绍图谱索引、上下文检索与知识问答能力。',
-        bvid: 'BV1weR8YeEjv',
-        url: 'https://www.bilibili.com/video/BV1weR8YeEjv',
-        cover: 'https://i0.hdslb.com/bfs/archive/2a2641bbc602b0516db8af5d4790cf67c2ed7006.jpg',
       },
       {
         category: '集成',
