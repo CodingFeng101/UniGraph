@@ -22,8 +22,20 @@ class SchemaConstruction:
         self.kg_schema = kg_schema
         self.definition = definition
         self.suggestion = ''
-        self.entity_type_dict = {}  # 用于存储实体类型及其实例的字典
-        self.relation_type_dict = {}  # 用于存储关系类型及其实例的字典
+        # 更新架构时，已有的类型是新实例优先归入的类别；先放进字典，语义合并时才能对齐到它们，
+        # 否则新类型自成一体，更新后的架构会和原架构断开
+        self.existing_entity_types = sorted({
+            entity['Name']
+            for item in kg_schema
+            for entity in (item['schema'].get('DirectionalEntityType'), item['schema'].get('DirectedEntityType'))
+            if entity and entity.get('Name')
+        })
+        self.existing_relation_types = sorted({
+            item['schema']['RelationType'] for item in kg_schema if item['schema'].get('RelationType')
+        })
+        self.excluded_entity_types = []  # 专家删除（不需要）的实体类型，抽取时不再生成
+        self.entity_type_dict = {name: [] for name in self.existing_entity_types}  # 实体类型及其实例
+        self.relation_type_dict = {name: [] for name in self.existing_relation_types}  # 关系类型及其实例
 
     @staticmethod
     def load_prompt(filename: str) -> str:
@@ -71,6 +83,7 @@ class SchemaConstruction:
         # 2. aim:构建知识图谱的核心目标（应用）
         # 3. info:字典形式为{"add_entity": [], "del_entity": []}，每个列表中填相应的增删类别
         # 将新的增删信息添加到总的增删信息中
+        self.excluded_entity_types = [name for name in (info or {}).get('del_entity', []) if name]
         chunks = SchemaConstruction.file_load(file_path_list)
         # 过滤掉空的文本块
         filter_chunks = [chunk for chunk in chunks if chunk]
@@ -99,13 +112,19 @@ class SchemaConstruction:
         self.kg_schema = deduplicate_schema(self.kg_schema)
         # 过滤掉 source 为空字典的元素
         self.kg_schema = [i for i in self.kg_schema if i.get('source') != {}]
-        definition_total = len(self.entity_type_dict) + len(self.relation_type_dict)
+        definition_total = len(self.pending_definitions(self.entity_type_dict)) + len(
+            self.pending_definitions(self.relation_type_dict)
+        )
         if progress_callback:
             progress_callback('definitions', 0, definition_total, len(self.kg_schema))
         await self.type_definition(language, api_key=api_key, base_url=base_url, model=model)
         if progress_callback:
             progress_callback('definitions', definition_total, definition_total, len(self.kg_schema))
         return self.kg_schema, self.definition
+
+    def pending_definitions(self, type_dict):
+        """已有定义的类型（更新时沿用的原架构类型）不再重新定义"""
+        return [(key, values) for key, values in type_dict.items() if key not in self.definition]
 
     # 对实体类型和关系类型进行定义
     async def type_definition(self, language, api_key, base_url, model: str):
@@ -119,7 +138,7 @@ class SchemaConstruction:
         """
 
         # ========= 实体类型定义（每10个键一批） =========
-        entity_items = list(self.entity_type_dict.items())
+        entity_items = self.pending_definitions(self.entity_type_dict)
         for i in range(0, len(entity_items), 10):
             batch = entity_items[i : i + 10]
 
@@ -138,7 +157,7 @@ class SchemaConstruction:
             self.definition.update(extract_definition(entity_type_define_response))
 
         # ========= 关系类型定义（每10个键一批） =========
-        relation_items = list(self.relation_type_dict.items())
+        relation_items = self.pending_definitions(self.relation_type_dict)
         for i in range(0, len(relation_items), 10):
             batch = relation_items[i : i + 10]
 
@@ -191,15 +210,26 @@ class SchemaConstruction:
 
         entity_classify_prompt = Template(self.load_prompt('entity_classify_agent.txt'))
 
-        entity_classify_prompt = entity_classify_prompt.render(entity_string=entity_string, language=language)
+        entity_classify_prompt = entity_classify_prompt.render(
+            entity_string=entity_string,
+            language=language,
+            existing_types=', '.join(self.existing_entity_types),
+            excluded_types=', '.join(self.excluded_entity_types),
+        )
 
         entity_classify_response = await self.chatresponse(entity_classify_prompt, api_key, base_url, model=model)
+        # 专家删除的类型即使模型仍然输出也丢弃；其中的实体没有类型，相关三元组随之不进入架构
+        new_entity_types = {
+            name: entities
+            for name, entities in get_new_entity_types_from_response(response=entity_classify_response).items()
+            if name not in self.excluded_entity_types
+        }
 
         # 更新实体类型字典
         if not self.kg_schema:
-            self.entity_type_dict = get_new_entity_types_from_response(response=entity_classify_response)
+            self.entity_type_dict = new_entity_types
         else:
-            temp_entity_type_dict = get_new_entity_types_from_response(response=entity_classify_response)
+            temp_entity_type_dict = new_entity_types
             self.entity_type_dict = await merge_type_dicts_with_semantic(
                 self.entity_type_dict,
                 temp_entity_type_dict,
@@ -209,7 +239,9 @@ class SchemaConstruction:
             )
 
         relation_classify_prompt = Template(self.load_prompt('relation_classify_agent.txt'))
-        relation_classify_prompt = relation_classify_prompt.render(relation_string=relation_string, language=language)
+        relation_classify_prompt = relation_classify_prompt.render(
+            relation_string=relation_string, language=language, existing_types=', '.join(self.existing_relation_types)
+        )
 
         relation_classify_response = await self.chatresponse(relation_classify_prompt, api_key, base_url, model=model)
         # 更新关系类型字典

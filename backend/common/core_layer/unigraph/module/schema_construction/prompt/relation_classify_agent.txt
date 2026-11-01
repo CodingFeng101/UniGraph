@@ -15,7 +15,8 @@
                                 @Rules The relationship category is usually a verb phrase and cannot be a noun and no more than five words.
                                 @Rules Please note that the Relationship Category in the Format should be replaced with a specific category output instead of directly outputting the "Relationship Category".
                                 @Rules Avoid creating an "other" or miscellaneous category.
-                                @Rules Do not output any of your thought process.
+                                {% if existing_types %}@Rules The knowledge architecture already has these relationship categories: {{existing_types}}. Reuse one of these names, exactly as given, only when the relationship means the same thing; otherwise create a new category that describes it accurately.
+                                {% endif %}@Rules Do not output any of your thought process.
                                 @Rules Ensure that the relationship is output in its original format without adding numbers.
                                 @Format{
                                     Relationship Category1: relationship1, relationship2, relationship3

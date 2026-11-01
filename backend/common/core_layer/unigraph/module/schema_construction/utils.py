@@ -7,6 +7,32 @@ from backend.common.core_layer.unigraph.module.schema_construction.related_retri
     cosine_similarity,
 )
 
+# LLM output may use either ASCII or full-width Chinese punctuation, plus markdown decoration.
+_TYPE_LINE = re.compile(r'^\s*(?:[-*•]|\d+[.、)])?\s*\**\s*(.+?)\s*\**\s*[:：]\s*(.*)$')
+_ITEM_SEP = re.compile(r'[,，、;；]')
+_MAX_TYPE_NAME = 30
+_TRIPLE_LINE = re.compile(
+    r'^\s*(?:[-*•]|\d+[.、)])?\s*[(（]\s*(.+?)\s*[,，]\s*(.+?)\s*[,，]\s*(.+?)\s*[)）]\s*[:：]?\s*(.*)$'
+)
+
+
+def _parse_type_lines(response):
+    """Parse `类型: 实例1, 实例2` lines into {type: [instances]}, tolerant of Chinese punctuation."""
+    type_dict = {}
+    for line in response.split('\n'):
+        match = _TYPE_LINE.match(line.strip())
+        if not match:
+            continue
+        # Drop any preamble the model wrote on the same line, e.g. "我会按……归类。设备：…"
+        type_name = re.split(r'[。！？!?]', match.group(1))[-1].strip().strip('*').strip()
+        if len(type_name) > _MAX_TYPE_NAME:
+            continue
+        items = [item.strip(' "“”*') for item in _ITEM_SEP.split(match.group(2))]
+        items = [item for item in items if item]
+        if type_name and items:
+            type_dict[type_name] = items
+    return type_dict
+
 
 def transform_dict(original_dict):
     """
@@ -79,30 +105,7 @@ def get_new_entity_types_from_response(response):
     Returns:
         Dictionary mapping entity types to their instances
     """
-    try:
-        entity_type_dict = {}
-
-        # Process each line in the response
-        for line in response.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-
-            # Split entity type and entity list
-            if ':' in line:
-                type, entities_str = line.split(':', 1)
-                type = type.strip().strip('*')
-
-                # Extract entity instances
-                entities = [e.strip(' "') for e in entities_str.split(',')]
-                entities = [e for e in entities if e]  # Remove empty entities
-
-                # Add to dictionary
-                entity_type_dict[type] = entities
-
-    except Exception:
-        raise
-    return entity_type_dict
+    return _parse_type_lines(response)
 
 
 def get_new_relationship_types_from_response(response):
@@ -115,31 +118,7 @@ def get_new_relationship_types_from_response(response):
     Returns:
         Dictionary mapping relationship types to their instances
     """
-    try:
-        relation_type_dict = {}
-
-        # Process each line in the response
-        for line in response.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-
-            # Split relationship type and relationship list
-            if ':' in line:
-                type, relationships_str = line.split(':', 1)
-                type = type.strip()
-
-                # Extract relationship instances
-                relationships = [rel.strip(' "') for rel in relationships_str.split(',')]
-                relationships = [rel for rel in relationships if rel]  # Remove empty relationships
-
-                # Add to dictionary
-                relation_type_dict[type] = relationships
-
-    except Exception:
-        raise  # Re-raise the caught exception
-
-    return relation_type_dict
+    return _parse_type_lines(response)
 
 
 def convert_to_type_triples(instance_triples, entity_type_dict, relation_type_dict):
@@ -438,20 +417,14 @@ def extract_triples_and_strings(input_str):
     relations = set()
 
     for line in input_str.strip().split('\n'):
-        line = line.strip()
-        if not line or ':' not in line:
+        # 兼容中英文括号、冒号、逗号以及列表符号；三元组键统一规范为 "(实体1, 关系, 实体2)"
+        match = _TRIPLE_LINE.match(line.strip())
+        if not match:
             continue
-
-        triple_str_raw, description = line.split(':', 1)
-        triple_str = triple_str_raw.strip()
-        Triple_source_dict[triple_str] = description.strip()
-
-        # 用正则从三元组字符串中提取实体和关系（容忍中英文逗号）
-        match = re.match(r'\(\s*([^,，]+?)\s*[,，]\s*([^,，]+?)\s*[,，]\s*([^)]+?)\s*\)', triple_str)
-        if match:
-            e1, rel, e2 = match.groups()
-            entities.update([e1, e2])
-            relations.add(rel)
+        e1, rel, e2, description = (part.strip() for part in match.groups())
+        Triple_source_dict[f'({e1}, {rel}, {e2})'] = description
+        entities.update([e1, e2])
+        relations.add(rel)
 
     entity_string = ','.join(entities)
     relation_string = ','.join(relations)

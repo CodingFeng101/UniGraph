@@ -69,24 +69,22 @@ class SemanticKGConstructor:
         """
         提取指定类型文件的KG
         """
-        # Create index:content dictionary && structure KG
-        all_index_content = dict()
+        # Collect every file's chunks && structure KG
+        all_chunks = []
         structure_kg = list()
-        for file_name in os.listdir(dir_path):
+        for file_name in sorted(os.listdir(dir_path)):
             file_path = os.path.join(dir_path, file_name)
             if os.path.isfile(file_path):
                 # 读取文件内容
                 index_content, structure_kg_ = self.file_loader.load(file_path)
-                all_index_content.update(index_content)
                 structure_kg.extend(structure_kg_)
-
-        # 将文本字典解包，遍历每个键值对并对值进行类型判断，如果是列表则将其并入当前文本总列表中
-        all_chunks = []
-        for key, value in all_index_content.items():
-            if isinstance(value, list):
-                all_chunks.extend(value)
-            else:
-                all_chunks.append(value)
+                # Chunk indexes restart at 0 in every file, so the per-file dicts must not be merged by key
+                # (that kept only the last file). 值为列表时并入当前文本总列表
+                for value in index_content.values():
+                    if isinstance(value, list):
+                        all_chunks.extend(value)
+                    else:
+                        all_chunks.append(value)
 
         logger.info(f'Extracting KG with {len(all_chunks)} chunks')  # debug提取所得
 

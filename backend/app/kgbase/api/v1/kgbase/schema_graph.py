@@ -720,7 +720,17 @@ async def update_schema_graph(self, uuid: str, user_token: str, obj_data: dict):
 
                 # 处理关系 (Relationship)
                 relationship = item.get('RelationType')
-                if source_entity_uuid and target_entity_uuid and relationship:
+                # 新抽取的类型会沿用原架构的实体，同名同端点的关系（例如专家手动添加的）已存在时不再重复创建
+                exists = (
+                    source_entity_uuid
+                    and target_entity_uuid
+                    and relationship
+                    and any(
+                        r.source_entity_uuid == source_entity_uuid and r.target_entity_uuid == target_entity_uuid
+                        for r in await schema_relationship_service.get_all(schema_graph_uuid=uuid, name=relationship)
+                    )
+                )
+                if source_entity_uuid and target_entity_uuid and relationship and not exists:
                     schema_relationship = AddSchemaRelationshipParam(
                         target_entity_uuid=target_entity_uuid,
                         source_entity_uuid=source_entity_uuid,

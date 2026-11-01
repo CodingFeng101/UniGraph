@@ -15,7 +15,9 @@
                             @Rules Every time an entity category is output, all entities corresponding to that entity category must be output.
                             @Rules Please note that the Entity Category in the Format should be replaced with a specific category output instead of directly outputting the "Entity Category".
                             @Rules Avoid creating an "other" or miscellaneous category.
-                            @Rules Each entity must be classified, avoid leaving any entity unclassified.
+                            {% if existing_types %}@Rules The knowledge architecture already has these entity categories: {{existing_types}}. When an entity genuinely belongs to one of them, output that category name exactly as given; otherwise create a new, more fitting category.
+                            {% endif %}{% if excluded_types %}@Rules The user removed these entity categories as irrelevant: {{excluded_types}}. Never output them or near-synonyms of them; leave out entities that would only belong to them (this overrides the rule that every entity must be classified).
+                            {% endif %}@Rules Each entity must be classified, avoid leaving any entity unclassified.
                             @Rules Do not output your thought process or any other unnecessary content
                             @Rules Any entity in the input cannot be used as an entity type.
                             @Rules Ensure that the entity is output in its original format without adding numbers.
